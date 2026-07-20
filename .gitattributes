@@ -1,0 +1,39 @@
+* text=auto eol=lf
+
+# Keep the installed package to what it needs at runtime: src/, config/,
+# routes/, resources/views/, and the compiled dist/ bundle. Everything below is
+# development-only and would otherwise ship with every `composer require`.
+#
+# resources/js/ is deliberately NOT ignored — the sources that produced dist/
+# are worth having alongside it when debugging an installed copy.
+/e2e                    export-ignore
+/workbench              export-ignore
+/tests                  export-ignore
+/public                 export-ignore
+/playwright-report      export-ignore
+/test-results           export-ignore
+/.claude                export-ignore
+/.vscode                export-ignore
+/.editorconfig          export-ignore
+/.gitattributes         export-ignore
+/.gitignore             export-ignore
+/.oxlintrc.json         export-ignore
+/.prettierrc.json       export-ignore
+/eslint.config.ts       export-ignore
+/playwright.config.ts   export-ignore
+/vite.config.ts         export-ignore
+/vite-plugin-layout.ts  export-ignore
+/vitest.config.ts       export-ignore
+/tsconfig.json          export-ignore
+/tsconfig.app.json      export-ignore
+/tsconfig.node.json     export-ignore
+/tsconfig.vitest.json   export-ignore
+/env.d.ts               export-ignore
+/index.html             export-ignore
+/components.json        export-ignore
+/package.json           export-ignore
+/pnpm-lock.yaml         export-ignore
+/pnpm-workspace.yaml    export-ignore
+/phpunit.xml            export-ignore
+/testbench.yaml         export-ignore
+/PROJECT-LOG.md         export-ignore

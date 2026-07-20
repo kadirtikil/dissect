@@ -1,0 +1,182 @@
+/*
+ * Bridges Vue Flow's default theme onto the shadcn design tokens so the canvas
+ * follows light/dark with the rest of the app. Vue Flow's theme-default.css
+ * hardcodes light colors, so without this the graph stays white in dark mode.
+ */
+
+.vue-flow {
+  --vf-node-bg: var(--card);
+  --vf-node-text: var(--card-foreground);
+  --vf-node-color: var(--border);
+  --vf-handle: var(--muted-foreground);
+  --vf-connection-path: var(--muted-foreground);
+  --vf-box-selection-bg: color-mix(in oklch, var(--primary) 12%, transparent);
+}
+
+/* Default theme tints input/output nodes blue/pink; keep them neutral. */
+.vue-flow__node-input,
+.vue-flow__node-output,
+.vue-flow__node-default {
+  border-color: var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: 0 1px 2px oklch(0 0 0 / 0.06);
+  /* Model names are identifiers — set them like code. */
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: -0.01em;
+}
+
+/* Left edge sigil: magenta, the primary identity color. */
+.vue-flow__node-input::before,
+.vue-flow__node-output::before,
+.vue-flow__node-default::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 2px;
+  border-radius: var(--radius-md) 0 0 var(--radius-md);
+  background: var(--primary);
+}
+
+.vue-flow__node.selected {
+  border-color: var(--ring);
+  box-shadow:
+    0 0 0 1px var(--ring),
+    0 0 16px -2px color-mix(in oklch, var(--ring) 60%, transparent);
+}
+
+/*
+ * Default theme hardcodes handles blue (#0041d0) via `.vue-flow__node-input
+ * .vue-flow__handle`, so the node-type prefix is needed to match its
+ * specificity — a bare `.vue-flow__handle` rule loses.
+ */
+.vue-flow__handle,
+.vue-flow__node-input .vue-flow__handle,
+.vue-flow__node-output .vue-flow__handle,
+.vue-flow__node-default .vue-flow__handle {
+  background: var(--muted-foreground);
+  border: 1px solid var(--background);
+  width: 7px;
+  height: 7px;
+}
+
+.vue-flow__handle:hover,
+.vue-flow__handle.connecting {
+  background: var(--accent);
+}
+
+.vue-flow__edge-path {
+  stroke: var(--muted-foreground);
+}
+
+/*
+ * Clicking an edge makes it glow in its own relation-family colour rather than
+ * recolouring it, so the selected edge stays identifiable by family.
+ *
+ * --edge-glow is set per-edge in the store (see buildEdge) because the colour
+ * differs per family and CSS cannot read the stroke paint value back out.
+ */
+/* `.selected.selected` is deliberate: it outranks the equal-specificity
+   `:hover` rule further down, which would otherwise win on source order and
+   leave a clicked edge looking merely hovered while the cursor rests on it. */
+.vue-flow__edge.selected.selected .vue-flow__edge-path,
+.vue-flow__edge:focus .vue-flow__edge-path {
+  /* Neon = a near-white hot core wrapped in saturated bloom. Stacked
+     drop-shadows from tight to wide build the falloff a single shadow can't.
+     !important on both: Vue Flow writes stroke and stroke-width inline, which
+     would otherwise win and make these declarations silent no-ops. */
+  stroke: var(--edge-core, var(--edge-glow, var(--primary))) !important;
+  stroke-width: 3.5 !important;
+  stroke-dasharray: none !important;
+  /* Tight falloff by default: on a pale surface a wide bloom turns into a grey
+     smudge instead of reading as light. */
+  filter: drop-shadow(0 0 1px var(--edge-glow, var(--primary)))
+    drop-shadow(0 0 3px var(--edge-glow, var(--primary)))
+    drop-shadow(0 0 7px color-mix(in oklch, var(--edge-glow, var(--primary)) 70%, transparent));
+}
+
+/* Dark mode gets the full neon treatment: a near-white hot core (which would
+   wash out on white) plus a much wider bloom that has darkness to burn into. */
+.dark .vue-flow__edge.selected.selected .vue-flow__edge-path,
+.dark .vue-flow__edge:focus .vue-flow__edge-path {
+  --edge-core: color-mix(in oklch, var(--edge-glow) 45%, white);
+  filter: drop-shadow(0 0 1px var(--edge-glow, var(--primary)))
+    drop-shadow(0 0 3px var(--edge-glow, var(--primary)))
+    drop-shadow(0 0 8px var(--edge-glow, var(--primary)))
+    drop-shadow(0 0 18px var(--edge-glow, var(--primary)))
+    drop-shadow(0 0 34px color-mix(in oklch, var(--edge-glow, var(--primary)) 65%, transparent));
+}
+
+/*
+ * Vue Flow gives every edge its own <svg class="vue-flow__edges"> wrapper, all
+ * at z-index 0, so a selected edge sits wherever it happens to fall in document
+ * order and the edges after it paint straight over its bloom. Lifting the
+ * wrapper that contains the selection puts the glow on top of all 75.
+ */
+.vue-flow__edges:has(.vue-flow__edge.selected) {
+  z-index: 10 !important;
+}
+
+.vue-flow__edge.selected.selected .vue-flow__edge-textwrapper {
+  filter: drop-shadow(0 0 6px color-mix(in oklch, var(--edge-glow) 70%, transparent));
+}
+
+/*
+ * 75 relation labels at fit-view zoom is unreadable noise, so labels stay
+ * hidden until an edge is hovered or selected. Vue Flow renders a wide
+ * invisible `edge-interaction` path, so the hover target is much fatter than
+ * the visible 1.5px stroke.
+ */
+.vue-flow__edge-textwrapper {
+  opacity: 0;
+  transition: opacity 0.12s ease;
+  /* Without this the invisible label background stays hit-testable and steals
+     pointer events from the edges underneath it. */
+  pointer-events: none;
+}
+
+.vue-flow__edge:hover .vue-flow__edge-textwrapper,
+.vue-flow__edge.selected .vue-flow__edge-textwrapper {
+  opacity: 1;
+}
+
+.vue-flow__edge:hover .vue-flow__edge-path {
+  /* Same inline-style override as the selected rule below. */
+  stroke-width: 2.5 !important;
+}
+
+/* Edge labels: the pill background and its text. */
+.vue-flow__edge-textbg {
+  fill: var(--background);
+}
+
+.vue-flow__edge-text {
+  fill: var(--muted-foreground);
+  font-family: var(--font-mono);
+  font-size: 10px;
+}
+
+.vue-flow__controls-button {
+  background: var(--card);
+  border-bottom: 1px solid var(--border);
+  fill: var(--card-foreground);
+}
+
+.vue-flow__controls-button:hover {
+  background: var(--accent);
+}
+
+.vue-flow__minimap {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.vue-flow__minimap-mask {
+  fill: color-mix(in oklch, var(--background) 65%, transparent);
+}
+
+.vue-flow__minimap-node {
+  fill: var(--muted-foreground);
+}

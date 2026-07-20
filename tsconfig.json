@@ -1,0 +1,22 @@
+{
+  "files": [],
+  // Mirrored from tsconfig.app.json so tooling that reads the root config
+  // (e.g. the shadcn-vue CLI) can resolve the "@/*" alias.
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./resources/js/*"]
+    }
+  },
+  "references": [
+    {
+      "path": "./tsconfig.node.json"
+    },
+    {
+      "path": "./tsconfig.app.json"
+    },
+    {
+      "path": "./tsconfig.vitest.json"
+    }
+  ]
+}

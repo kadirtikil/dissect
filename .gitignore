@@ -1,0 +1,54 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+.DS_Store
+# dist/ is NOT ignored: it is the compiled bundle the Composer package serves.
+# The whole promise is one `composer require` with no build step in the host
+# app, which means the built assets have to be committed.
+dist-ssr
+coverage
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+*.tsbuildinfo
+
+.eslintcache
+
+# Cypress
+/cypress/videos/
+/cypress/screenshots/
+
+# Vitest
+__screenshots__/
+
+# Vite
+*.timestamp-*-*.mjs
+
+test-results/
+playwright-report/
+
+# Composer (package dependencies; consumers resolve their own)
+/vendor
+composer.lock
+
+# Workbench scratch database
+workbench/database/*.sqlite
+
+# Local toggle: contains a Vite dev-server URL to enable HMR under Workbench
+.workbench-dev

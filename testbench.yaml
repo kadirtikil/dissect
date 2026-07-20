@@ -1,0 +1,36 @@
+# Configures the skeleton Laravel app that Workbench boots for local development
+# and tests. `vendor/bin/testbench serve` runs the package inside a real
+# application, so nothing external (and nothing containerised) is needed.
+
+laravel: '@testbench'
+
+providers:
+  - Workbench\App\Providers\WorkbenchServiceProvider
+  - KdrDev\Dissect\DissectServiceProvider
+
+migrations:
+  - workbench/database/migrations
+
+workbench:
+  # Land straight on the viewer.
+  start: '/dissect'
+  install: true
+  health: false
+  discovers:
+    web: true
+    api: false
+    commands: true
+    components: false
+    factories: false
+    views: false
+  build:
+    - create-sqlite-db
+    - migrate-fresh
+
+env:
+  # A file-backed SQLite database, because `serve` spans many requests and an
+  # in-memory database would be empty on each one. The exporter only reads
+  # schema metadata, so nothing is ever written to it.
+  - APP_ENV=local
+  - DB_CONNECTION=sqlite
+  - DB_DATABASE=workbench/database/database.sqlite

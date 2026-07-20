@@ -1,0 +1,108 @@
+/**
+ * Shape of public/schema.json, as exported from the Laravel side.
+ *
+ * Kept deliberately close to the wire format — normalisation happens in the
+ * store, so a future stream payload can reuse these types verbatim.
+ */
+
+/**
+ * Portable meaning of a column, assigned per driver on the PHP side so that
+ * `varchar(255)` (MySQL), `character varying(255)` (Postgres) and `TEXT`
+ * (SQLite) all arrive comparable. Mirrors the ColumnKind enum.
+ */
+export type ColumnKind =
+  | 'string'
+  | 'integer'
+  | 'float'
+  | 'boolean'
+  | 'datetime'
+  | 'date'
+  | 'time'
+  | 'json'
+  | 'uuid'
+  | 'binary'
+  | 'enum'
+  | 'network'
+  | 'spatial'
+  | 'unknown'
+
+/**
+ * A column as it arrives on the wire.
+ *
+ * Bare strings are still accepted because earlier exports emitted them, and a
+ * host may be running an older version of the package than the viewer.
+ */
+export type RawColumn =
+  | string
+  | {
+      name: string
+      /** Verbatim from the database, e.g. "timestamp(0) without time zone". */
+      type?: string | null
+      /** Short display form, e.g. "timestamp". */
+      label?: string
+      kind?: ColumnKind
+      nullable?: boolean
+      unique?: boolean
+      increments?: boolean
+      cast?: string | null
+      virtual?: boolean
+    }
+
+/** Normalised column, the only shape the UI deals with. */
+export interface SchemaColumn {
+  name: string
+  type?: string
+  /** What the UI renders; falls back to `type` for payloads without one. */
+  label?: string
+  kind: ColumnKind
+  nullable?: boolean
+  virtual?: boolean
+}
+
+export interface SchemaNode {
+  id: string
+  class: string
+  table: string
+  columns: RawColumn[]
+}
+
+/** Eloquent relation types the exporter emits. */
+export type RelationType =
+  | 'BelongsTo'
+  | 'BelongsToMany'
+  | 'HasMany'
+  | 'HasManyThrough'
+  | 'HasOne'
+  | 'HasOneThrough'
+  | 'MorphMany'
+  | 'MorphOne'
+  | 'MorphTo'
+  | 'MorphToMany'
+  | 'MorphedByMany'
+
+export interface SchemaEdge {
+  source: string
+  target: string
+  /** The relation method name on the source model, e.g. `documents`. */
+  name: string
+  type: RelationType | string
+}
+
+export interface Schema {
+  nodes: SchemaNode[]
+  edges: SchemaEdge[]
+}
+
+/** Data carried on each Vue Flow node. */
+export interface ModelNodeData {
+  label: string
+  table: string
+  className: string
+  columns: SchemaColumn[]
+  relationCount: number
+  /**
+   * True when the model is referenced by a relation but absent from `nodes` —
+   * typically a vendor model (Passkey, DatabaseNotification) outside the scan.
+   */
+  external: boolean
+}

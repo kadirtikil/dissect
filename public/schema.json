@@ -1,0 +1,2893 @@
+{
+    "nodes": [
+        {
+            "id": "AccessGrant",
+            "class": "App\\Models\\AccessGrant",
+            "table": "access_grants",
+            "connection": "pgsql",
+            "columns": [
+                {
+                    "name": "id",
+                    "type": "bigint",
+                    "label": "bigint",
+                    "kind": "integer",
+                    "nullable": false,
+                    "unique": true,
+                    "increments": true,
+                    "fillable": false,
+                    "hidden": false,
+                    "cast": "int",
+                    "virtual": false
+                },
+                {
+                    "name": "grantee_type",
+                    "type": "character varying(255)",
+                    "label": "varchar(255)",
+                    "kind": "string",
+                    "nullable": false,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": false,
+                    "hidden": false,
+                    "cast": null,
+                    "virtual": false
+                },
+                {
+                    "name": "grantee_id",
+                    "type": "bigint",
+                    "label": "bigint",
+                    "kind": "integer",
+                    "nullable": false,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": false,
+                    "hidden": false,
+                    "cast": null,
+                    "virtual": false
+                },
+                {
+                    "name": "grantable_type",
+                    "type": "character varying(255)",
+                    "label": "varchar(255)",
+                    "kind": "string",
+                    "nullable": false,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": false,
+                    "hidden": false,
+                    "cast": null,
+                    "virtual": false
+                },
+                {
+                    "name": "grantable_id",
+                    "type": "bigint",
+                    "label": "bigint",
+                    "kind": "integer",
+                    "nullable": false,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": false,
+                    "hidden": false,
+                    "cast": null,
+                    "virtual": false
+                },
+                {
+                    "name": "permission",
+                    "type": "character varying(255)",
+                    "label": "varchar(255)",
+                    "kind": "string",
+                    "nullable": false,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": true,
+                    "hidden": false,
+                    "cast": null,
+                    "virtual": false
+                },
+                {
+                    "name": "granted_by",
+                    "type": "bigint",
+                    "label": "bigint",
+                    "kind": "integer",
+                    "nullable": true,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": true,
+                    "hidden": false,
+                    "cast": null,
+                    "virtual": false
+                },
+                {
+                    "name": "created_at",
+                    "type": "timestamp(0) without time zone",
+                    "label": "timestamp",
+                    "kind": "datetime",
+                    "nullable": true,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": false,
+                    "hidden": false,
+                    "cast": "datetime",
+                    "virtual": false
+                },
+                {
+                    "name": "updated_at",
+                    "type": "timestamp(0) without time zone",
+                    "label": "timestamp",
+                    "kind": "datetime",
+                    "nullable": true,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": false,
+                    "hidden": false,
+                    "cast": "datetime",
+                    "virtual": false
+                }
+            ]
+        },
+        {
+            "id": "Activity",
+            "class": "App\\Models\\Activity",
+            "table": "activities",
+            "connection": "pgsql",
+            "columns": [
+                {
+                    "name": "id",
+                    "type": "bigint",
+                    "label": "bigint",
+                    "kind": "integer",
+                    "nullable": false,
+                    "unique": true,
+                    "increments": true,
+                    "fillable": false,
+                    "hidden": false,
+                    "cast": "int",
+                    "virtual": false
+                },
+                {
+                    "name": "user_id",
+                    "type": "bigint",
+                    "label": "bigint",
+                    "kind": "integer",
+                    "nullable": true,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": true,
+                    "hidden": false,
+                    "cast": null,
+                    "virtual": false
+                },
+                {
+                    "name": "subject_type",
+                    "type": "character varying(255)",
+                    "label": "varchar(255)",
+                    "kind": "string",
+                    "nullable": true,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": false,
+                    "hidden": false,
+                    "cast": null,
+                    "virtual": false
+                },
+                {
+                    "name": "subject_id",
+                    "type": "bigint",
+                    "label": "bigint",
+                    "kind": "integer",
+                    "nullable": true,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": false,
+                    "hidden": false,
+                    "cast": null,
+                    "virtual": false
+                },
+                {
+                    "name": "action",
+                    "type": "character varying(255)",
+                    "label": "varchar(255)",
+                    "kind": "string",
+                    "nullable": false,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": true,
+                    "hidden": false,
+                    "cast": null,
+                    "virtual": false
+                },
+                {
+                    "name": "properties",
+                    "type": "json",
+                    "label": "json",
+                    "kind": "json",
+                    "nullable": true,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": true,
+                    "hidden": false,
+                    "cast": "array",
+                    "virtual": false
+                },
+                {
+                    "name": "created_at",
+                    "type": "timestamp(0) without time zone",
+                    "label": "timestamp",
+                    "kind": "datetime",
+                    "nullable": true,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": false,
+                    "hidden": false,
+                    "cast": "datetime",
+                    "virtual": false
+                }
+            ]
+        },
+        {
+            "id": "Contact",
+            "class": "App\\Models\\Contact",
+            "table": "contacts",
+            "connection": "pgsql",
+            "columns": [
+                {
+                    "name": "id",
+                    "type": "bigint",
+                    "label": "bigint",
+                    "kind": "integer",
+                    "nullable": false,
+                    "unique": true,
+                    "increments": true,
+                    "fillable": false,
+                    "hidden": false,
+                    "cast": "int",
+                    "virtual": false
+                },
+                {
+                    "name": "owner_id",
+                    "type": "bigint",
+                    "label": "bigint",
+                    "kind": "integer",
+                    "nullable": false,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": true,
+                    "hidden": false,
+                    "cast": null,
+                    "virtual": false
+                },
+                {
+                    "name": "email",
+                    "type": "character varying(255)",
+                    "label": "varchar(255)",
+                    "kind": "string",
+                    "nullable": false,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": true,
+                    "hidden": false,
+                    "cast": null,
+                    "virtual": false
+                },
+                {
+                    "name": "user_id",
+                    "type": "bigint",
+                    "label": "bigint",
+                    "kind": "integer",
+                    "nullable": true,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": true,
+                    "hidden": false,
+                    "cast": null,
+                    "virtual": false
+                },
+                {
+                    "name": "name",
+                    "type": "character varying(255)",
+                    "label": "varchar(255)",
+                    "kind": "string",
+                    "nullable": true,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": true,
+                    "hidden": false,
+                    "cast": null,
+                    "virtual": false
+                },
+                {
+                    "name": "notes",
+                    "type": "text",
+                    "label": "text",
+                    "kind": "string",
+                    "nullable": true,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": true,
+                    "hidden": false,
+                    "cast": null,
+                    "virtual": false
+                },
+                {
+                    "name": "favorited_at",
+                    "type": "timestamp(0) without time zone",
+                    "label": "timestamp",
+                    "kind": "datetime",
+                    "nullable": true,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": true,
+                    "hidden": false,
+                    "cast": "datetime",
+                    "virtual": false
+                },
+                {
+                    "name": "created_at",
+                    "type": "timestamp(0) without time zone",
+                    "label": "timestamp",
+                    "kind": "datetime",
+                    "nullable": true,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": false,
+                    "hidden": false,
+                    "cast": "datetime",
+                    "virtual": false
+                },
+                {
+                    "name": "updated_at",
+                    "type": "timestamp(0) without time zone",
+                    "label": "timestamp",
+                    "kind": "datetime",
+                    "nullable": true,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": false,
+                    "hidden": false,
+                    "cast": "datetime",
+                    "virtual": false
+                },
+                {
+                    "name": "status",
+                    "type": "character varying(255)",
+                    "label": "varchar(255)",
+                    "kind": "string",
+                    "nullable": false,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": true,
+                    "hidden": false,
+                    "cast": null,
+                    "virtual": false
+                }
+            ]
+        },
+        {
+            "id": "Document",
+            "class": "App\\Models\\Document",
+            "table": "documents",
+            "connection": "pgsql",
+            "columns": [
+                {
+                    "name": "id",
+                    "type": "bigint",
+                    "label": "bigint",
+                    "kind": "integer",
+                    "nullable": false,
+                    "unique": true,
+                    "increments": true,
+                    "fillable": false,
+                    "hidden": false,
+                    "cast": "int",
+                    "virtual": false
+                },
+                {
+                    "name": "folder_id",
+                    "type": "bigint",
+                    "label": "bigint",
+                    "kind": "integer",
+                    "nullable": true,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": true,
+                    "hidden": false,
+                    "cast": null,
+                    "virtual": false
+                },
+                {
+                    "name": "document_type_id",
+                    "type": "bigint",
+                    "label": "bigint",
+                    "kind": "integer",
+                    "nullable": true,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": true,
+                    "hidden": false,
+                    "cast": null,
+                    "virtual": false
+                },
+                {
+                    "name": "title",
+                    "type": "character varying(255)",
+                    "label": "varchar(255)",
+                    "kind": "string",
+                    "nullable": false,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": true,
+                    "hidden": false,
+                    "cast": null,
+                    "virtual": false
+                },
+                {
+                    "name": "description",
+                    "type": "text",
+                    "label": "text",
+                    "kind": "string",
+                    "nullable": true,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": true,
+                    "hidden": false,
+                    "cast": null,
+                    "virtual": false
+                },
+                {
+                    "name": "status",
+                    "type": "character varying(255)",
+                    "label": "varchar(255)",
+                    "kind": "string",
+                    "nullable": false,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": true,
+                    "hidden": false,
+                    "cast": null,
+                    "virtual": false
+                },
+                {
+                    "name": "created_by",
+                    "type": "bigint",
+                    "label": "bigint",
+                    "kind": "integer",
+                    "nullable": true,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": true,
+                    "hidden": false,
+                    "cast": null,
+                    "virtual": false
+                },
+                {
+                    "name": "created_at",
+                    "type": "timestamp(0) without time zone",
+                    "label": "timestamp",
+                    "kind": "datetime",
+                    "nullable": true,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": false,
+                    "hidden": false,
+                    "cast": "datetime",
+                    "virtual": false
+                },
+                {
+                    "name": "updated_at",
+                    "type": "timestamp(0) without time zone",
+                    "label": "timestamp",
+                    "kind": "datetime",
+                    "nullable": true,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": false,
+                    "hidden": false,
+                    "cast": "datetime",
+                    "virtual": false
+                },
+                {
+                    "name": "deleted_at",
+                    "type": "timestamp(0) without time zone",
+                    "label": "timestamp",
+                    "kind": "datetime",
+                    "nullable": true,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": false,
+                    "hidden": false,
+                    "cast": "datetime",
+                    "virtual": false
+                },
+                {
+                    "name": "workspace_id",
+                    "type": "bigint",
+                    "label": "bigint",
+                    "kind": "integer",
+                    "nullable": true,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": true,
+                    "hidden": false,
+                    "cast": null,
+                    "virtual": false
+                }
+            ]
+        },
+        {
+            "id": "DocumentType",
+            "class": "App\\Models\\DocumentType",
+            "table": "document_types",
+            "connection": "pgsql",
+            "columns": [
+                {
+                    "name": "id",
+                    "type": "bigint",
+                    "label": "bigint",
+                    "kind": "integer",
+                    "nullable": false,
+                    "unique": true,
+                    "increments": true,
+                    "fillable": false,
+                    "hidden": false,
+                    "cast": "int",
+                    "virtual": false
+                },
+                {
+                    "name": "name",
+                    "type": "character varying(255)",
+                    "label": "varchar(255)",
+                    "kind": "string",
+                    "nullable": false,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": true,
+                    "hidden": false,
+                    "cast": null,
+                    "virtual": false
+                },
+                {
+                    "name": "slug",
+                    "type": "character varying(255)",
+                    "label": "varchar(255)",
+                    "kind": "string",
+                    "nullable": false,
+                    "unique": true,
+                    "increments": false,
+                    "fillable": true,
+                    "hidden": false,
+                    "cast": null,
+                    "virtual": false
+                },
+                {
+                    "name": "description",
+                    "type": "character varying(255)",
+                    "label": "varchar(255)",
+                    "kind": "string",
+                    "nullable": true,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": true,
+                    "hidden": false,
+                    "cast": null,
+                    "virtual": false
+                },
+                {
+                    "name": "created_at",
+                    "type": "timestamp(0) without time zone",
+                    "label": "timestamp",
+                    "kind": "datetime",
+                    "nullable": true,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": false,
+                    "hidden": false,
+                    "cast": "datetime",
+                    "virtual": false
+                },
+                {
+                    "name": "updated_at",
+                    "type": "timestamp(0) without time zone",
+                    "label": "timestamp",
+                    "kind": "datetime",
+                    "nullable": true,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": false,
+                    "hidden": false,
+                    "cast": "datetime",
+                    "virtual": false
+                }
+            ]
+        },
+        {
+            "id": "Folder",
+            "class": "App\\Models\\Folder",
+            "table": "folders",
+            "connection": "pgsql",
+            "columns": [
+                {
+                    "name": "id",
+                    "type": "bigint",
+                    "label": "bigint",
+                    "kind": "integer",
+                    "nullable": false,
+                    "unique": true,
+                    "increments": true,
+                    "fillable": false,
+                    "hidden": false,
+                    "cast": "int",
+                    "virtual": false
+                },
+                {
+                    "name": "parent_id",
+                    "type": "bigint",
+                    "label": "bigint",
+                    "kind": "integer",
+                    "nullable": true,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": true,
+                    "hidden": false,
+                    "cast": null,
+                    "virtual": false
+                },
+                {
+                    "name": "name",
+                    "type": "character varying(255)",
+                    "label": "varchar(255)",
+                    "kind": "string",
+                    "nullable": false,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": true,
+                    "hidden": false,
+                    "cast": null,
+                    "virtual": false
+                },
+                {
+                    "name": "created_by",
+                    "type": "bigint",
+                    "label": "bigint",
+                    "kind": "integer",
+                    "nullable": true,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": true,
+                    "hidden": false,
+                    "cast": null,
+                    "virtual": false
+                },
+                {
+                    "name": "created_at",
+                    "type": "timestamp(0) without time zone",
+                    "label": "timestamp",
+                    "kind": "datetime",
+                    "nullable": true,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": false,
+                    "hidden": false,
+                    "cast": "datetime",
+                    "virtual": false
+                },
+                {
+                    "name": "updated_at",
+                    "type": "timestamp(0) without time zone",
+                    "label": "timestamp",
+                    "kind": "datetime",
+                    "nullable": true,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": false,
+                    "hidden": false,
+                    "cast": "datetime",
+                    "virtual": false
+                },
+                {
+                    "name": "deleted_at",
+                    "type": "timestamp(0) without time zone",
+                    "label": "timestamp",
+                    "kind": "datetime",
+                    "nullable": true,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": false,
+                    "hidden": false,
+                    "cast": "datetime",
+                    "virtual": false
+                },
+                {
+                    "name": "workspace_id",
+                    "type": "bigint",
+                    "label": "bigint",
+                    "kind": "integer",
+                    "nullable": true,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": true,
+                    "hidden": false,
+                    "cast": null,
+                    "virtual": false
+                }
+            ]
+        },
+        {
+            "id": "Invitation",
+            "class": "App\\Models\\Invitation",
+            "table": "invitations",
+            "connection": "pgsql",
+            "columns": [
+                {
+                    "name": "id",
+                    "type": "bigint",
+                    "label": "bigint",
+                    "kind": "integer",
+                    "nullable": false,
+                    "unique": true,
+                    "increments": true,
+                    "fillable": false,
+                    "hidden": false,
+                    "cast": "int",
+                    "virtual": false
+                },
+                {
+                    "name": "invited_by",
+                    "type": "bigint",
+                    "label": "bigint",
+                    "kind": "integer",
+                    "nullable": true,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": true,
+                    "hidden": false,
+                    "cast": null,
+                    "virtual": false
+                },
+                {
+                    "name": "invitable_type",
+                    "type": "character varying(255)",
+                    "label": "varchar(255)",
+                    "kind": "string",
+                    "nullable": true,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": true,
+                    "hidden": false,
+                    "cast": null,
+                    "virtual": false
+                },
+                {
+                    "name": "invitable_id",
+                    "type": "bigint",
+                    "label": "bigint",
+                    "kind": "integer",
+                    "nullable": true,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": true,
+                    "hidden": false,
+                    "cast": null,
+                    "virtual": false
+                },
+                {
+                    "name": "permission",
+                    "type": "character varying(255)",
+                    "label": "varchar(255)",
+                    "kind": "string",
+                    "nullable": false,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": true,
+                    "hidden": false,
+                    "cast": null,
+                    "virtual": false
+                },
+                {
+                    "name": "token",
+                    "type": "character varying(255)",
+                    "label": "varchar(255)",
+                    "kind": "string",
+                    "nullable": true,
+                    "unique": true,
+                    "increments": false,
+                    "fillable": true,
+                    "hidden": false,
+                    "cast": null,
+                    "virtual": false
+                },
+                {
+                    "name": "accepted_at",
+                    "type": "timestamp(0) without time zone",
+                    "label": "timestamp",
+                    "kind": "datetime",
+                    "nullable": true,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": true,
+                    "hidden": false,
+                    "cast": "datetime",
+                    "virtual": false
+                },
+                {
+                    "name": "declined_at",
+                    "type": "timestamp(0) without time zone",
+                    "label": "timestamp",
+                    "kind": "datetime",
+                    "nullable": true,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": true,
+                    "hidden": false,
+                    "cast": "datetime",
+                    "virtual": false
+                },
+                {
+                    "name": "expires_at",
+                    "type": "timestamp(0) without time zone",
+                    "label": "timestamp",
+                    "kind": "datetime",
+                    "nullable": true,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": true,
+                    "hidden": false,
+                    "cast": "datetime",
+                    "virtual": false
+                },
+                {
+                    "name": "created_at",
+                    "type": "timestamp(0) without time zone",
+                    "label": "timestamp",
+                    "kind": "datetime",
+                    "nullable": true,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": false,
+                    "hidden": false,
+                    "cast": "datetime",
+                    "virtual": false
+                },
+                {
+                    "name": "updated_at",
+                    "type": "timestamp(0) without time zone",
+                    "label": "timestamp",
+                    "kind": "datetime",
+                    "nullable": true,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": false,
+                    "hidden": false,
+                    "cast": "datetime",
+                    "virtual": false
+                },
+                {
+                    "name": "contact_id",
+                    "type": "bigint",
+                    "label": "bigint",
+                    "kind": "integer",
+                    "nullable": false,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": true,
+                    "hidden": false,
+                    "cast": null,
+                    "virtual": false
+                }
+            ]
+        },
+        {
+            "id": "MetadataField",
+            "class": "App\\Models\\MetadataField",
+            "table": "metadata_fields",
+            "connection": "pgsql",
+            "columns": [
+                {
+                    "name": "id",
+                    "type": "bigint",
+                    "label": "bigint",
+                    "kind": "integer",
+                    "nullable": false,
+                    "unique": true,
+                    "increments": true,
+                    "fillable": false,
+                    "hidden": false,
+                    "cast": "int",
+                    "virtual": false
+                },
+                {
+                    "name": "document_type_id",
+                    "type": "bigint",
+                    "label": "bigint",
+                    "kind": "integer",
+                    "nullable": true,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": true,
+                    "hidden": false,
+                    "cast": null,
+                    "virtual": false
+                },
+                {
+                    "name": "key",
+                    "type": "character varying(255)",
+                    "label": "varchar(255)",
+                    "kind": "string",
+                    "nullable": false,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": true,
+                    "hidden": false,
+                    "cast": null,
+                    "virtual": false
+                },
+                {
+                    "name": "label",
+                    "type": "character varying(255)",
+                    "label": "varchar(255)",
+                    "kind": "string",
+                    "nullable": false,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": true,
+                    "hidden": false,
+                    "cast": null,
+                    "virtual": false
+                },
+                {
+                    "name": "data_type",
+                    "type": "character varying(255)",
+                    "label": "varchar(255)",
+                    "kind": "string",
+                    "nullable": false,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": true,
+                    "hidden": false,
+                    "cast": null,
+                    "virtual": false
+                },
+                {
+                    "name": "options",
+                    "type": "json",
+                    "label": "json",
+                    "kind": "json",
+                    "nullable": true,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": true,
+                    "hidden": false,
+                    "cast": "array",
+                    "virtual": false
+                },
+                {
+                    "name": "is_required",
+                    "type": "boolean",
+                    "label": "bool",
+                    "kind": "boolean",
+                    "nullable": false,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": true,
+                    "hidden": false,
+                    "cast": "boolean",
+                    "virtual": false
+                },
+                {
+                    "name": "sort_order",
+                    "type": "integer",
+                    "label": "int",
+                    "kind": "integer",
+                    "nullable": false,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": true,
+                    "hidden": false,
+                    "cast": "integer",
+                    "virtual": false
+                },
+                {
+                    "name": "created_at",
+                    "type": "timestamp(0) without time zone",
+                    "label": "timestamp",
+                    "kind": "datetime",
+                    "nullable": true,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": false,
+                    "hidden": false,
+                    "cast": "datetime",
+                    "virtual": false
+                },
+                {
+                    "name": "updated_at",
+                    "type": "timestamp(0) without time zone",
+                    "label": "timestamp",
+                    "kind": "datetime",
+                    "nullable": true,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": false,
+                    "hidden": false,
+                    "cast": "datetime",
+                    "virtual": false
+                }
+            ]
+        },
+        {
+            "id": "MetadataValue",
+            "class": "App\\Models\\MetadataValue",
+            "table": "metadata_values",
+            "connection": "pgsql",
+            "columns": [
+                {
+                    "name": "id",
+                    "type": "bigint",
+                    "label": "bigint",
+                    "kind": "integer",
+                    "nullable": false,
+                    "unique": true,
+                    "increments": true,
+                    "fillable": false,
+                    "hidden": false,
+                    "cast": "int",
+                    "virtual": false
+                },
+                {
+                    "name": "metadata_field_id",
+                    "type": "bigint",
+                    "label": "bigint",
+                    "kind": "integer",
+                    "nullable": false,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": true,
+                    "hidden": false,
+                    "cast": null,
+                    "virtual": false
+                },
+                {
+                    "name": "metadatable_type",
+                    "type": "character varying(255)",
+                    "label": "varchar(255)",
+                    "kind": "string",
+                    "nullable": false,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": false,
+                    "hidden": false,
+                    "cast": null,
+                    "virtual": false
+                },
+                {
+                    "name": "metadatable_id",
+                    "type": "bigint",
+                    "label": "bigint",
+                    "kind": "integer",
+                    "nullable": false,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": false,
+                    "hidden": false,
+                    "cast": null,
+                    "virtual": false
+                },
+                {
+                    "name": "value",
+                    "type": "text",
+                    "label": "text",
+                    "kind": "string",
+                    "nullable": true,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": true,
+                    "hidden": false,
+                    "cast": null,
+                    "virtual": false
+                },
+                {
+                    "name": "created_at",
+                    "type": "timestamp(0) without time zone",
+                    "label": "timestamp",
+                    "kind": "datetime",
+                    "nullable": true,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": false,
+                    "hidden": false,
+                    "cast": "datetime",
+                    "virtual": false
+                },
+                {
+                    "name": "updated_at",
+                    "type": "timestamp(0) without time zone",
+                    "label": "timestamp",
+                    "kind": "datetime",
+                    "nullable": true,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": false,
+                    "hidden": false,
+                    "cast": "datetime",
+                    "virtual": false
+                }
+            ]
+        },
+        {
+            "id": "ReviewComment",
+            "class": "App\\Models\\ReviewComment",
+            "table": "review_comments",
+            "connection": "pgsql",
+            "columns": [
+                {
+                    "name": "id",
+                    "type": "bigint",
+                    "label": "bigint",
+                    "kind": "integer",
+                    "nullable": false,
+                    "unique": true,
+                    "increments": true,
+                    "fillable": false,
+                    "hidden": false,
+                    "cast": "int",
+                    "virtual": false
+                },
+                {
+                    "name": "version_review_id",
+                    "type": "bigint",
+                    "label": "bigint",
+                    "kind": "integer",
+                    "nullable": false,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": true,
+                    "hidden": false,
+                    "cast": null,
+                    "virtual": false
+                },
+                {
+                    "name": "user_id",
+                    "type": "bigint",
+                    "label": "bigint",
+                    "kind": "integer",
+                    "nullable": true,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": true,
+                    "hidden": false,
+                    "cast": null,
+                    "virtual": false
+                },
+                {
+                    "name": "page_number",
+                    "type": "integer",
+                    "label": "int",
+                    "kind": "integer",
+                    "nullable": true,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": true,
+                    "hidden": false,
+                    "cast": "integer",
+                    "virtual": false
+                },
+                {
+                    "name": "pos_x",
+                    "type": "numeric(6,5)",
+                    "label": "numeric(6,5)",
+                    "kind": "float",
+                    "nullable": true,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": true,
+                    "hidden": false,
+                    "cast": "float",
+                    "virtual": false
+                },
+                {
+                    "name": "pos_y",
+                    "type": "numeric(6,5)",
+                    "label": "numeric(6,5)",
+                    "kind": "float",
+                    "nullable": true,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": true,
+                    "hidden": false,
+                    "cast": "float",
+                    "virtual": false
+                },
+                {
+                    "name": "body",
+                    "type": "text",
+                    "label": "text",
+                    "kind": "string",
+                    "nullable": false,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": true,
+                    "hidden": false,
+                    "cast": null,
+                    "virtual": false
+                },
+                {
+                    "name": "resolved_at",
+                    "type": "timestamp(0) without time zone",
+                    "label": "timestamp",
+                    "kind": "datetime",
+                    "nullable": true,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": true,
+                    "hidden": false,
+                    "cast": "datetime",
+                    "virtual": false
+                },
+                {
+                    "name": "created_at",
+                    "type": "timestamp(0) without time zone",
+                    "label": "timestamp",
+                    "kind": "datetime",
+                    "nullable": true,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": false,
+                    "hidden": false,
+                    "cast": "datetime",
+                    "virtual": false
+                },
+                {
+                    "name": "updated_at",
+                    "type": "timestamp(0) without time zone",
+                    "label": "timestamp",
+                    "kind": "datetime",
+                    "nullable": true,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": false,
+                    "hidden": false,
+                    "cast": "datetime",
+                    "virtual": false
+                }
+            ]
+        },
+        {
+            "id": "Role",
+            "class": "App\\Models\\Role",
+            "table": "roles",
+            "connection": "pgsql",
+            "columns": [
+                {
+                    "name": "id",
+                    "type": "bigint",
+                    "label": "bigint",
+                    "kind": "integer",
+                    "nullable": false,
+                    "unique": true,
+                    "increments": true,
+                    "fillable": false,
+                    "hidden": false,
+                    "cast": "int",
+                    "virtual": false
+                },
+                {
+                    "name": "name",
+                    "type": "character varying(255)",
+                    "label": "varchar(255)",
+                    "kind": "string",
+                    "nullable": false,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": true,
+                    "hidden": false,
+                    "cast": null,
+                    "virtual": false
+                },
+                {
+                    "name": "slug",
+                    "type": "character varying(255)",
+                    "label": "varchar(255)",
+                    "kind": "string",
+                    "nullable": false,
+                    "unique": true,
+                    "increments": false,
+                    "fillable": true,
+                    "hidden": false,
+                    "cast": null,
+                    "virtual": false
+                },
+                {
+                    "name": "description",
+                    "type": "character varying(255)",
+                    "label": "varchar(255)",
+                    "kind": "string",
+                    "nullable": true,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": true,
+                    "hidden": false,
+                    "cast": null,
+                    "virtual": false
+                },
+                {
+                    "name": "created_at",
+                    "type": "timestamp(0) without time zone",
+                    "label": "timestamp",
+                    "kind": "datetime",
+                    "nullable": true,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": false,
+                    "hidden": false,
+                    "cast": "datetime",
+                    "virtual": false
+                },
+                {
+                    "name": "updated_at",
+                    "type": "timestamp(0) without time zone",
+                    "label": "timestamp",
+                    "kind": "datetime",
+                    "nullable": true,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": false,
+                    "hidden": false,
+                    "cast": "datetime",
+                    "virtual": false
+                }
+            ]
+        },
+        {
+            "id": "Tag",
+            "class": "App\\Models\\Tag",
+            "table": "tags",
+            "connection": "pgsql",
+            "columns": [
+                {
+                    "name": "id",
+                    "type": "bigint",
+                    "label": "bigint",
+                    "kind": "integer",
+                    "nullable": false,
+                    "unique": true,
+                    "increments": true,
+                    "fillable": false,
+                    "hidden": false,
+                    "cast": "int",
+                    "virtual": false
+                },
+                {
+                    "name": "name",
+                    "type": "character varying(255)",
+                    "label": "varchar(255)",
+                    "kind": "string",
+                    "nullable": false,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": true,
+                    "hidden": false,
+                    "cast": null,
+                    "virtual": false
+                },
+                {
+                    "name": "slug",
+                    "type": "character varying(255)",
+                    "label": "varchar(255)",
+                    "kind": "string",
+                    "nullable": false,
+                    "unique": true,
+                    "increments": false,
+                    "fillable": true,
+                    "hidden": false,
+                    "cast": null,
+                    "virtual": false
+                },
+                {
+                    "name": "color",
+                    "type": "character varying(255)",
+                    "label": "varchar(255)",
+                    "kind": "string",
+                    "nullable": true,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": true,
+                    "hidden": false,
+                    "cast": null,
+                    "virtual": false
+                },
+                {
+                    "name": "created_at",
+                    "type": "timestamp(0) without time zone",
+                    "label": "timestamp",
+                    "kind": "datetime",
+                    "nullable": true,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": false,
+                    "hidden": false,
+                    "cast": "datetime",
+                    "virtual": false
+                },
+                {
+                    "name": "updated_at",
+                    "type": "timestamp(0) without time zone",
+                    "label": "timestamp",
+                    "kind": "datetime",
+                    "nullable": true,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": false,
+                    "hidden": false,
+                    "cast": "datetime",
+                    "virtual": false
+                }
+            ]
+        },
+        {
+            "id": "Team",
+            "class": "App\\Models\\Team",
+            "table": "teams",
+            "connection": "pgsql",
+            "columns": [
+                {
+                    "name": "id",
+                    "type": "bigint",
+                    "label": "bigint",
+                    "kind": "integer",
+                    "nullable": false,
+                    "unique": true,
+                    "increments": true,
+                    "fillable": false,
+                    "hidden": false,
+                    "cast": "int",
+                    "virtual": false
+                },
+                {
+                    "name": "name",
+                    "type": "character varying(255)",
+                    "label": "varchar(255)",
+                    "kind": "string",
+                    "nullable": false,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": true,
+                    "hidden": false,
+                    "cast": null,
+                    "virtual": false
+                },
+                {
+                    "name": "description",
+                    "type": "character varying(255)",
+                    "label": "varchar(255)",
+                    "kind": "string",
+                    "nullable": true,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": true,
+                    "hidden": false,
+                    "cast": null,
+                    "virtual": false
+                },
+                {
+                    "name": "created_by",
+                    "type": "bigint",
+                    "label": "bigint",
+                    "kind": "integer",
+                    "nullable": true,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": true,
+                    "hidden": false,
+                    "cast": null,
+                    "virtual": false
+                },
+                {
+                    "name": "created_at",
+                    "type": "timestamp(0) without time zone",
+                    "label": "timestamp",
+                    "kind": "datetime",
+                    "nullable": true,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": false,
+                    "hidden": false,
+                    "cast": "datetime",
+                    "virtual": false
+                },
+                {
+                    "name": "updated_at",
+                    "type": "timestamp(0) without time zone",
+                    "label": "timestamp",
+                    "kind": "datetime",
+                    "nullable": true,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": false,
+                    "hidden": false,
+                    "cast": "datetime",
+                    "virtual": false
+                }
+            ]
+        },
+        {
+            "id": "User",
+            "class": "App\\Models\\User",
+            "table": "users",
+            "connection": "pgsql",
+            "columns": [
+                {
+                    "name": "id",
+                    "type": "bigint",
+                    "label": "bigint",
+                    "kind": "integer",
+                    "nullable": false,
+                    "unique": true,
+                    "increments": true,
+                    "fillable": false,
+                    "hidden": false,
+                    "cast": "int",
+                    "virtual": false
+                },
+                {
+                    "name": "name",
+                    "type": "character varying(255)",
+                    "label": "varchar(255)",
+                    "kind": "string",
+                    "nullable": false,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": true,
+                    "hidden": false,
+                    "cast": null,
+                    "virtual": false
+                },
+                {
+                    "name": "email",
+                    "type": "character varying(255)",
+                    "label": "varchar(255)",
+                    "kind": "string",
+                    "nullable": false,
+                    "unique": true,
+                    "increments": false,
+                    "fillable": true,
+                    "hidden": false,
+                    "cast": null,
+                    "virtual": false
+                },
+                {
+                    "name": "email_verified_at",
+                    "type": "timestamp(0) without time zone",
+                    "label": "timestamp",
+                    "kind": "datetime",
+                    "nullable": true,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": false,
+                    "hidden": false,
+                    "cast": "datetime",
+                    "virtual": false
+                },
+                {
+                    "name": "password",
+                    "type": "character varying(255)",
+                    "label": "varchar(255)",
+                    "kind": "string",
+                    "nullable": false,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": true,
+                    "hidden": true,
+                    "cast": "hashed",
+                    "virtual": false
+                },
+                {
+                    "name": "remember_token",
+                    "type": "character varying(100)",
+                    "label": "varchar(100)",
+                    "kind": "string",
+                    "nullable": true,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": false,
+                    "hidden": true,
+                    "cast": null,
+                    "virtual": false
+                },
+                {
+                    "name": "created_at",
+                    "type": "timestamp(0) without time zone",
+                    "label": "timestamp",
+                    "kind": "datetime",
+                    "nullable": true,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": false,
+                    "hidden": false,
+                    "cast": "datetime",
+                    "virtual": false
+                },
+                {
+                    "name": "updated_at",
+                    "type": "timestamp(0) without time zone",
+                    "label": "timestamp",
+                    "kind": "datetime",
+                    "nullable": true,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": false,
+                    "hidden": false,
+                    "cast": "datetime",
+                    "virtual": false
+                },
+                {
+                    "name": "two_factor_secret",
+                    "type": "text",
+                    "label": "text",
+                    "kind": "string",
+                    "nullable": true,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": false,
+                    "hidden": true,
+                    "cast": null,
+                    "virtual": false
+                },
+                {
+                    "name": "two_factor_recovery_codes",
+                    "type": "text",
+                    "label": "text",
+                    "kind": "string",
+                    "nullable": true,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": false,
+                    "hidden": true,
+                    "cast": null,
+                    "virtual": false
+                },
+                {
+                    "name": "two_factor_confirmed_at",
+                    "type": "timestamp(0) without time zone",
+                    "label": "timestamp",
+                    "kind": "datetime",
+                    "nullable": true,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": false,
+                    "hidden": false,
+                    "cast": "datetime",
+                    "virtual": false
+                }
+            ]
+        },
+        {
+            "id": "Variant",
+            "class": "App\\Models\\Variant",
+            "table": "variants",
+            "connection": "pgsql",
+            "columns": [
+                {
+                    "name": "id",
+                    "type": "bigint",
+                    "label": "bigint",
+                    "kind": "integer",
+                    "nullable": false,
+                    "unique": true,
+                    "increments": true,
+                    "fillable": false,
+                    "hidden": false,
+                    "cast": "int",
+                    "virtual": false
+                },
+                {
+                    "name": "document_id",
+                    "type": "bigint",
+                    "label": "bigint",
+                    "kind": "integer",
+                    "nullable": false,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": true,
+                    "hidden": false,
+                    "cast": null,
+                    "virtual": false
+                },
+                {
+                    "name": "name",
+                    "type": "character varying(255)",
+                    "label": "varchar(255)",
+                    "kind": "string",
+                    "nullable": false,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": true,
+                    "hidden": false,
+                    "cast": null,
+                    "virtual": false
+                },
+                {
+                    "name": "description",
+                    "type": "character varying(255)",
+                    "label": "varchar(255)",
+                    "kind": "string",
+                    "nullable": true,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": true,
+                    "hidden": false,
+                    "cast": null,
+                    "virtual": false
+                },
+                {
+                    "name": "attributes",
+                    "type": "json",
+                    "label": "json",
+                    "kind": "json",
+                    "nullable": true,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": true,
+                    "hidden": false,
+                    "cast": "array",
+                    "virtual": false
+                },
+                {
+                    "name": "current_version_id",
+                    "type": "bigint",
+                    "label": "bigint",
+                    "kind": "integer",
+                    "nullable": true,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": true,
+                    "hidden": false,
+                    "cast": null,
+                    "virtual": false
+                },
+                {
+                    "name": "sort_order",
+                    "type": "integer",
+                    "label": "int",
+                    "kind": "integer",
+                    "nullable": false,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": true,
+                    "hidden": false,
+                    "cast": "integer",
+                    "virtual": false
+                },
+                {
+                    "name": "created_at",
+                    "type": "timestamp(0) without time zone",
+                    "label": "timestamp",
+                    "kind": "datetime",
+                    "nullable": true,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": false,
+                    "hidden": false,
+                    "cast": "datetime",
+                    "virtual": false
+                },
+                {
+                    "name": "updated_at",
+                    "type": "timestamp(0) without time zone",
+                    "label": "timestamp",
+                    "kind": "datetime",
+                    "nullable": true,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": false,
+                    "hidden": false,
+                    "cast": "datetime",
+                    "virtual": false
+                },
+                {
+                    "name": "deleted_at",
+                    "type": "timestamp(0) without time zone",
+                    "label": "timestamp",
+                    "kind": "datetime",
+                    "nullable": true,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": false,
+                    "hidden": false,
+                    "cast": "datetime",
+                    "virtual": false
+                }
+            ]
+        },
+        {
+            "id": "Version",
+            "class": "App\\Models\\Version",
+            "table": "versions",
+            "connection": "pgsql",
+            "columns": [
+                {
+                    "name": "id",
+                    "type": "bigint",
+                    "label": "bigint",
+                    "kind": "integer",
+                    "nullable": false,
+                    "unique": true,
+                    "increments": true,
+                    "fillable": false,
+                    "hidden": false,
+                    "cast": "int",
+                    "virtual": false
+                },
+                {
+                    "name": "variant_id",
+                    "type": "bigint",
+                    "label": "bigint",
+                    "kind": "integer",
+                    "nullable": false,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": true,
+                    "hidden": false,
+                    "cast": null,
+                    "virtual": false
+                },
+                {
+                    "name": "version_number",
+                    "type": "integer",
+                    "label": "int",
+                    "kind": "integer",
+                    "nullable": false,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": true,
+                    "hidden": false,
+                    "cast": "integer",
+                    "virtual": false
+                },
+                {
+                    "name": "status",
+                    "type": "character varying(255)",
+                    "label": "varchar(255)",
+                    "kind": "string",
+                    "nullable": false,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": true,
+                    "hidden": false,
+                    "cast": null,
+                    "virtual": false
+                },
+                {
+                    "name": "disk",
+                    "type": "character varying(255)",
+                    "label": "varchar(255)",
+                    "kind": "string",
+                    "nullable": true,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": true,
+                    "hidden": false,
+                    "cast": null,
+                    "virtual": false
+                },
+                {
+                    "name": "path",
+                    "type": "character varying(255)",
+                    "label": "varchar(255)",
+                    "kind": "string",
+                    "nullable": true,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": true,
+                    "hidden": false,
+                    "cast": null,
+                    "virtual": false
+                },
+                {
+                    "name": "original_filename",
+                    "type": "character varying(255)",
+                    "label": "varchar(255)",
+                    "kind": "string",
+                    "nullable": true,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": true,
+                    "hidden": false,
+                    "cast": null,
+                    "virtual": false
+                },
+                {
+                    "name": "mime_type",
+                    "type": "character varying(255)",
+                    "label": "varchar(255)",
+                    "kind": "string",
+                    "nullable": true,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": true,
+                    "hidden": false,
+                    "cast": null,
+                    "virtual": false
+                },
+                {
+                    "name": "size",
+                    "type": "bigint",
+                    "label": "bigint",
+                    "kind": "integer",
+                    "nullable": true,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": true,
+                    "hidden": false,
+                    "cast": "integer",
+                    "virtual": false
+                },
+                {
+                    "name": "checksum",
+                    "type": "character varying(64)",
+                    "label": "varchar(64)",
+                    "kind": "string",
+                    "nullable": true,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": true,
+                    "hidden": false,
+                    "cast": null,
+                    "virtual": false
+                },
+                {
+                    "name": "change_notes",
+                    "type": "text",
+                    "label": "text",
+                    "kind": "string",
+                    "nullable": true,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": true,
+                    "hidden": false,
+                    "cast": null,
+                    "virtual": false
+                },
+                {
+                    "name": "uploaded_by",
+                    "type": "bigint",
+                    "label": "bigint",
+                    "kind": "integer",
+                    "nullable": true,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": true,
+                    "hidden": false,
+                    "cast": null,
+                    "virtual": false
+                },
+                {
+                    "name": "approved_by",
+                    "type": "bigint",
+                    "label": "bigint",
+                    "kind": "integer",
+                    "nullable": true,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": true,
+                    "hidden": false,
+                    "cast": null,
+                    "virtual": false
+                },
+                {
+                    "name": "approved_at",
+                    "type": "timestamp(0) without time zone",
+                    "label": "timestamp",
+                    "kind": "datetime",
+                    "nullable": true,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": true,
+                    "hidden": false,
+                    "cast": "datetime",
+                    "virtual": false
+                },
+                {
+                    "name": "created_at",
+                    "type": "timestamp(0) without time zone",
+                    "label": "timestamp",
+                    "kind": "datetime",
+                    "nullable": true,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": false,
+                    "hidden": false,
+                    "cast": "datetime",
+                    "virtual": false
+                },
+                {
+                    "name": "updated_at",
+                    "type": "timestamp(0) without time zone",
+                    "label": "timestamp",
+                    "kind": "datetime",
+                    "nullable": true,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": false,
+                    "hidden": false,
+                    "cast": "datetime",
+                    "virtual": false
+                },
+                {
+                    "name": "deleted_at",
+                    "type": "timestamp(0) without time zone",
+                    "label": "timestamp",
+                    "kind": "datetime",
+                    "nullable": true,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": false,
+                    "hidden": false,
+                    "cast": "datetime",
+                    "virtual": false
+                },
+                {
+                    "name": "source_type",
+                    "type": "character varying(255)",
+                    "label": "varchar(255)",
+                    "kind": "string",
+                    "nullable": false,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": true,
+                    "hidden": false,
+                    "cast": null,
+                    "virtual": false
+                },
+                {
+                    "name": "content_format",
+                    "type": "character varying(255)",
+                    "label": "varchar(255)",
+                    "kind": "string",
+                    "nullable": true,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": true,
+                    "hidden": false,
+                    "cast": null,
+                    "virtual": false
+                },
+                {
+                    "name": "content_body",
+                    "type": "text",
+                    "label": "text",
+                    "kind": "string",
+                    "nullable": true,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": true,
+                    "hidden": false,
+                    "cast": null,
+                    "virtual": false
+                }
+            ]
+        },
+        {
+            "id": "VersionContent",
+            "class": "App\\Models\\VersionContent",
+            "table": "version_contents",
+            "connection": "pgsql",
+            "columns": [
+                {
+                    "name": "id",
+                    "type": "bigint",
+                    "label": "bigint",
+                    "kind": "integer",
+                    "nullable": false,
+                    "unique": true,
+                    "increments": true,
+                    "fillable": false,
+                    "hidden": false,
+                    "cast": "int",
+                    "virtual": false
+                },
+                {
+                    "name": "version_id",
+                    "type": "bigint",
+                    "label": "bigint",
+                    "kind": "integer",
+                    "nullable": false,
+                    "unique": true,
+                    "increments": false,
+                    "fillable": true,
+                    "hidden": false,
+                    "cast": null,
+                    "virtual": false
+                },
+                {
+                    "name": "content",
+                    "type": "text",
+                    "label": "text",
+                    "kind": "string",
+                    "nullable": true,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": true,
+                    "hidden": false,
+                    "cast": null,
+                    "virtual": false
+                },
+                {
+                    "name": "created_at",
+                    "type": "timestamp(0) without time zone",
+                    "label": "timestamp",
+                    "kind": "datetime",
+                    "nullable": true,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": false,
+                    "hidden": false,
+                    "cast": "datetime",
+                    "virtual": false
+                },
+                {
+                    "name": "updated_at",
+                    "type": "timestamp(0) without time zone",
+                    "label": "timestamp",
+                    "kind": "datetime",
+                    "nullable": true,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": false,
+                    "hidden": false,
+                    "cast": "datetime",
+                    "virtual": false
+                }
+            ]
+        },
+        {
+            "id": "VersionReview",
+            "class": "App\\Models\\VersionReview",
+            "table": "version_reviews",
+            "connection": "pgsql",
+            "columns": [
+                {
+                    "name": "id",
+                    "type": "bigint",
+                    "label": "bigint",
+                    "kind": "integer",
+                    "nullable": false,
+                    "unique": true,
+                    "increments": true,
+                    "fillable": false,
+                    "hidden": false,
+                    "cast": "int",
+                    "virtual": false
+                },
+                {
+                    "name": "version_id",
+                    "type": "bigint",
+                    "label": "bigint",
+                    "kind": "integer",
+                    "nullable": false,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": true,
+                    "hidden": false,
+                    "cast": null,
+                    "virtual": false
+                },
+                {
+                    "name": "requested_by",
+                    "type": "bigint",
+                    "label": "bigint",
+                    "kind": "integer",
+                    "nullable": true,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": true,
+                    "hidden": false,
+                    "cast": null,
+                    "virtual": false
+                },
+                {
+                    "name": "assigned_to",
+                    "type": "bigint",
+                    "label": "bigint",
+                    "kind": "integer",
+                    "nullable": true,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": true,
+                    "hidden": false,
+                    "cast": null,
+                    "virtual": false
+                },
+                {
+                    "name": "status",
+                    "type": "character varying(255)",
+                    "label": "varchar(255)",
+                    "kind": "string",
+                    "nullable": false,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": true,
+                    "hidden": false,
+                    "cast": null,
+                    "virtual": false
+                },
+                {
+                    "name": "decision_comment",
+                    "type": "text",
+                    "label": "text",
+                    "kind": "string",
+                    "nullable": true,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": true,
+                    "hidden": false,
+                    "cast": null,
+                    "virtual": false
+                },
+                {
+                    "name": "decided_at",
+                    "type": "timestamp(0) without time zone",
+                    "label": "timestamp",
+                    "kind": "datetime",
+                    "nullable": true,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": true,
+                    "hidden": false,
+                    "cast": "datetime",
+                    "virtual": false
+                },
+                {
+                    "name": "created_at",
+                    "type": "timestamp(0) without time zone",
+                    "label": "timestamp",
+                    "kind": "datetime",
+                    "nullable": true,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": false,
+                    "hidden": false,
+                    "cast": "datetime",
+                    "virtual": false
+                },
+                {
+                    "name": "updated_at",
+                    "type": "timestamp(0) without time zone",
+                    "label": "timestamp",
+                    "kind": "datetime",
+                    "nullable": true,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": false,
+                    "hidden": false,
+                    "cast": "datetime",
+                    "virtual": false
+                }
+            ]
+        },
+        {
+            "id": "Workspace",
+            "class": "App\\Models\\Workspace",
+            "table": "workspaces",
+            "connection": "pgsql",
+            "columns": [
+                {
+                    "name": "id",
+                    "type": "bigint",
+                    "label": "bigint",
+                    "kind": "integer",
+                    "nullable": false,
+                    "unique": true,
+                    "increments": true,
+                    "fillable": false,
+                    "hidden": false,
+                    "cast": "int",
+                    "virtual": false
+                },
+                {
+                    "name": "name",
+                    "type": "character varying(255)",
+                    "label": "varchar(255)",
+                    "kind": "string",
+                    "nullable": false,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": true,
+                    "hidden": false,
+                    "cast": null,
+                    "virtual": false
+                },
+                {
+                    "name": "description",
+                    "type": "character varying(1000)",
+                    "label": "varchar(1000)",
+                    "kind": "string",
+                    "nullable": true,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": true,
+                    "hidden": false,
+                    "cast": null,
+                    "virtual": false
+                },
+                {
+                    "name": "created_by",
+                    "type": "bigint",
+                    "label": "bigint",
+                    "kind": "integer",
+                    "nullable": true,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": true,
+                    "hidden": false,
+                    "cast": null,
+                    "virtual": false
+                },
+                {
+                    "name": "created_at",
+                    "type": "timestamp(0) without time zone",
+                    "label": "timestamp",
+                    "kind": "datetime",
+                    "nullable": true,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": false,
+                    "hidden": false,
+                    "cast": "datetime",
+                    "virtual": false
+                },
+                {
+                    "name": "updated_at",
+                    "type": "timestamp(0) without time zone",
+                    "label": "timestamp",
+                    "kind": "datetime",
+                    "nullable": true,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": false,
+                    "hidden": false,
+                    "cast": "datetime",
+                    "virtual": false
+                },
+                {
+                    "name": "review_policy",
+                    "type": "character varying(255)",
+                    "label": "varchar(255)",
+                    "kind": "string",
+                    "nullable": false,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": true,
+                    "hidden": false,
+                    "cast": null,
+                    "virtual": false
+                }
+            ]
+        },
+        {
+            "id": "WorkspaceMembership",
+            "class": "App\\Models\\WorkspaceMembership",
+            "table": "user_workspace",
+            "connection": "pgsql",
+            "columns": [
+                {
+                    "name": "id",
+                    "type": "bigint",
+                    "label": "bigint",
+                    "kind": "integer",
+                    "nullable": false,
+                    "unique": true,
+                    "increments": true,
+                    "fillable": true,
+                    "hidden": false,
+                    "cast": "int",
+                    "virtual": false
+                },
+                {
+                    "name": "workspace_id",
+                    "type": "bigint",
+                    "label": "bigint",
+                    "kind": "integer",
+                    "nullable": false,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": true,
+                    "hidden": false,
+                    "cast": null,
+                    "virtual": false
+                },
+                {
+                    "name": "user_id",
+                    "type": "bigint",
+                    "label": "bigint",
+                    "kind": "integer",
+                    "nullable": false,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": true,
+                    "hidden": false,
+                    "cast": null,
+                    "virtual": false
+                },
+                {
+                    "name": "role",
+                    "type": "character varying(255)",
+                    "label": "varchar(255)",
+                    "kind": "string",
+                    "nullable": false,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": true,
+                    "hidden": false,
+                    "cast": null,
+                    "virtual": false
+                },
+                {
+                    "name": "created_at",
+                    "type": "timestamp(0) without time zone",
+                    "label": "timestamp",
+                    "kind": "datetime",
+                    "nullable": true,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": true,
+                    "hidden": false,
+                    "cast": "datetime",
+                    "virtual": false
+                },
+                {
+                    "name": "updated_at",
+                    "type": "timestamp(0) without time zone",
+                    "label": "timestamp",
+                    "kind": "datetime",
+                    "nullable": true,
+                    "unique": false,
+                    "increments": false,
+                    "fillable": true,
+                    "hidden": false,
+                    "cast": "datetime",
+                    "virtual": false
+                }
+            ]
+        }
+    ],
+    "edges": [
+        {
+            "target": "AccessGrant",
+            "type": "MorphTo",
+            "name": "grantable",
+            "source": "AccessGrant"
+        },
+        {
+            "target": "User",
+            "type": "BelongsTo",
+            "name": "grantedBy",
+            "source": "AccessGrant"
+        },
+        {
+            "target": "AccessGrant",
+            "type": "MorphTo",
+            "name": "grantee",
+            "source": "AccessGrant"
+        },
+        {
+            "target": "Activity",
+            "type": "MorphTo",
+            "name": "subject",
+            "source": "Activity"
+        },
+        {
+            "target": "User",
+            "type": "BelongsTo",
+            "name": "user",
+            "source": "Activity"
+        },
+        {
+            "target": "Invitation",
+            "type": "HasMany",
+            "name": "invitations",
+            "source": "Contact"
+        },
+        {
+            "target": "User",
+            "type": "BelongsTo",
+            "name": "owner",
+            "source": "Contact"
+        },
+        {
+            "target": "User",
+            "type": "BelongsTo",
+            "name": "user",
+            "source": "Contact"
+        },
+        {
+            "target": "AccessGrant",
+            "type": "MorphMany",
+            "name": "accessGrants",
+            "source": "Document"
+        },
+        {
+            "target": "Activity",
+            "type": "MorphMany",
+            "name": "activities",
+            "source": "Document"
+        },
+        {
+            "target": "User",
+            "type": "BelongsTo",
+            "name": "creator",
+            "source": "Document"
+        },
+        {
+            "target": "DocumentType",
+            "type": "BelongsTo",
+            "name": "documentType",
+            "source": "Document"
+        },
+        {
+            "target": "Folder",
+            "type": "BelongsTo",
+            "name": "folder",
+            "source": "Document"
+        },
+        {
+            "target": "Invitation",
+            "type": "MorphMany",
+            "name": "invitations",
+            "source": "Document"
+        },
+        {
+            "target": "MetadataValue",
+            "type": "MorphMany",
+            "name": "metadataValues",
+            "source": "Document"
+        },
+        {
+            "target": "Tag",
+            "type": "MorphToMany",
+            "name": "tags",
+            "source": "Document"
+        },
+        {
+            "target": "Variant",
+            "type": "HasMany",
+            "name": "variants",
+            "source": "Document"
+        },
+        {
+            "target": "Workspace",
+            "type": "BelongsTo",
+            "name": "workspace",
+            "source": "Document"
+        },
+        {
+            "target": "Document",
+            "type": "HasMany",
+            "name": "documents",
+            "source": "DocumentType"
+        },
+        {
+            "target": "MetadataField",
+            "type": "HasMany",
+            "name": "metadataFields",
+            "source": "DocumentType"
+        },
+        {
+            "target": "AccessGrant",
+            "type": "MorphMany",
+            "name": "accessGrants",
+            "source": "Folder"
+        },
+        {
+            "target": "Folder",
+            "type": "HasMany",
+            "name": "children",
+            "source": "Folder"
+        },
+        {
+            "target": "User",
+            "type": "BelongsTo",
+            "name": "creator",
+            "source": "Folder"
+        },
+        {
+            "target": "Document",
+            "type": "HasMany",
+            "name": "documents",
+            "source": "Folder"
+        },
+        {
+            "target": "Invitation",
+            "type": "MorphMany",
+            "name": "invitations",
+            "source": "Folder"
+        },
+        {
+            "target": "Folder",
+            "type": "BelongsTo",
+            "name": "parent",
+            "source": "Folder"
+        },
+        {
+            "target": "Workspace",
+            "type": "BelongsTo",
+            "name": "workspace",
+            "source": "Folder"
+        },
+        {
+            "target": "Contact",
+            "type": "BelongsTo",
+            "name": "contact",
+            "source": "Invitation"
+        },
+        {
+            "target": "Invitation",
+            "type": "MorphTo",
+            "name": "invitable",
+            "source": "Invitation"
+        },
+        {
+            "target": "User",
+            "type": "BelongsTo",
+            "name": "inviter",
+            "source": "Invitation"
+        },
+        {
+            "target": "DocumentType",
+            "type": "BelongsTo",
+            "name": "documentType",
+            "source": "MetadataField"
+        },
+        {
+            "target": "MetadataValue",
+            "type": "HasMany",
+            "name": "values",
+            "source": "MetadataField"
+        },
+        {
+            "target": "MetadataField",
+            "type": "BelongsTo",
+            "name": "field",
+            "source": "MetadataValue"
+        },
+        {
+            "target": "MetadataValue",
+            "type": "MorphTo",
+            "name": "metadatable",
+            "source": "MetadataValue"
+        },
+        {
+            "target": "User",
+            "type": "BelongsTo",
+            "name": "author",
+            "source": "ReviewComment"
+        },
+        {
+            "target": "VersionReview",
+            "type": "BelongsTo",
+            "name": "review",
+            "source": "ReviewComment"
+        },
+        {
+            "target": "AccessGrant",
+            "type": "MorphMany",
+            "name": "accessGrants",
+            "source": "Role"
+        },
+        {
+            "target": "User",
+            "type": "BelongsToMany",
+            "name": "users",
+            "source": "Role"
+        },
+        {
+            "target": "Document",
+            "type": "MorphToMany",
+            "name": "documents",
+            "source": "Tag"
+        },
+        {
+            "target": "AccessGrant",
+            "type": "MorphMany",
+            "name": "accessGrants",
+            "source": "Team"
+        },
+        {
+            "target": "User",
+            "type": "BelongsTo",
+            "name": "creator",
+            "source": "Team"
+        },
+        {
+            "target": "Invitation",
+            "type": "MorphMany",
+            "name": "invitations",
+            "source": "Team"
+        },
+        {
+            "target": "User",
+            "type": "BelongsToMany",
+            "name": "members",
+            "source": "Team"
+        },
+        {
+            "target": "Contact",
+            "type": "HasMany",
+            "name": "contacts",
+            "source": "User"
+        },
+        {
+            "target": "Contact",
+            "type": "HasMany",
+            "name": "incomingContactRequests",
+            "source": "User"
+        },
+        {
+            "target": "DatabaseNotification",
+            "type": "MorphMany",
+            "name": "notifications",
+            "source": "User"
+        },
+        {
+            "target": "Passkey",
+            "type": "HasMany",
+            "name": "passkeys",
+            "source": "User"
+        },
+        {
+            "target": "Invitation",
+            "type": "HasManyThrough",
+            "name": "receivedInvitations",
+            "source": "User"
+        },
+        {
+            "target": "Role",
+            "type": "BelongsToMany",
+            "name": "roles",
+            "source": "User"
+        },
+        {
+            "target": "Invitation",
+            "type": "HasMany",
+            "name": "sentInvitations",
+            "source": "User"
+        },
+        {
+            "target": "Team",
+            "type": "BelongsToMany",
+            "name": "teams",
+            "source": "User"
+        },
+        {
+            "target": "Workspace",
+            "type": "BelongsToMany",
+            "name": "workspaces",
+            "source": "User"
+        },
+        {
+            "target": "Version",
+            "type": "BelongsTo",
+            "name": "currentVersion",
+            "source": "Variant"
+        },
+        {
+            "target": "Document",
+            "type": "BelongsTo",
+            "name": "document",
+            "source": "Variant"
+        },
+        {
+            "target": "MetadataValue",
+            "type": "MorphMany",
+            "name": "metadataValues",
+            "source": "Variant"
+        },
+        {
+            "target": "Version",
+            "type": "HasMany",
+            "name": "versions",
+            "source": "Variant"
+        },
+        {
+            "target": "Activity",
+            "type": "MorphMany",
+            "name": "activities",
+            "source": "Version"
+        },
+        {
+            "target": "User",
+            "type": "BelongsTo",
+            "name": "approver",
+            "source": "Version"
+        },
+        {
+            "target": "VersionContent",
+            "type": "HasOne",
+            "name": "content",
+            "source": "Version"
+        },
+        {
+            "target": "VersionReview",
+            "type": "HasMany",
+            "name": "reviews",
+            "source": "Version"
+        },
+        {
+            "target": "User",
+            "type": "BelongsTo",
+            "name": "uploader",
+            "source": "Version"
+        },
+        {
+            "target": "Variant",
+            "type": "BelongsTo",
+            "name": "variant",
+            "source": "Version"
+        },
+        {
+            "target": "Version",
+            "type": "BelongsTo",
+            "name": "version",
+            "source": "VersionContent"
+        },
+        {
+            "target": "ReviewComment",
+            "type": "HasMany",
+            "name": "comments",
+            "source": "VersionReview"
+        },
+        {
+            "target": "User",
+            "type": "BelongsTo",
+            "name": "requester",
+            "source": "VersionReview"
+        },
+        {
+            "target": "User",
+            "type": "BelongsTo",
+            "name": "reviewer",
+            "source": "VersionReview"
+        },
+        {
+            "target": "Version",
+            "type": "BelongsTo",
+            "name": "version",
+            "source": "VersionReview"
+        },
+        {
+            "target": "User",
+            "type": "BelongsTo",
+            "name": "creator",
+            "source": "Workspace"
+        },
+        {
+            "target": "Invitation",
+            "type": "MorphMany",
+            "name": "invitations",
+            "source": "Workspace"
+        },
+        {
+            "target": "User",
+            "type": "BelongsToMany",
+            "name": "members",
+            "source": "Workspace"
+        },
+        {
+            "target": "WorkspaceMembership",
+            "type": "HasMany",
+            "name": "memberships",
+            "source": "Workspace"
+        },
+        {
+            "target": "User",
+            "type": "BelongsTo",
+            "name": "user",
+            "source": "WorkspaceMembership"
+        },
+        {
+            "target": "Workspace",
+            "type": "BelongsTo",
+            "name": "workspace",
+            "source": "WorkspaceMembership"
+        }
+    ],
+    "generated_at": "2026-07-19T21:10:41+00:00"
+}
