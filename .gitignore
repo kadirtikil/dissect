@@ -52,3 +52,7 @@ workbench/database/*.sqlite
 
 # Local toggle: contains a Vite dev-server URL to enable HMR under Workbench
 .workbench-dev
+
+
+PROJECT-LOG.md
+.claude
