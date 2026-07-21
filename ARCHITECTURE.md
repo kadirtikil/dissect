@@ -80,9 +80,10 @@ falls back to fetching. Nothing else in the app knows which host it is in.
 DissectServiceProvider    wiring; registers routes only when enabled
   ├── SchemaExporter          orchestrates: discover → inspect → normalise
   │     ├── ModelInspector    (Laravel's own, needs ^11.33)
-  │     └── ColumnNormalizer  attribute rows → the viewer's column shape
-  │           └── TypeNormalizerManager
-  │                 └── {Postgres,MySql,Sqlite,SqlServer,Generic}TypeNormalizer
+  │     ├── ColumnNormalizer  attribute rows → the viewer's column shape
+  │     │     └── TypeNormalizerManager
+  │     │           └── {Postgres,MySql,Sqlite,SqlServer,Generic}TypeNormalizer
+  │     └── MigrationState    "has a migration actually run?" — half the fingerprint
   ├── LayoutRepository        read/write/sanitise the layout file
   └── DissectController   page, schema JSON, fingerprint, asset serving
 ```
@@ -90,12 +91,39 @@ DissectServiceProvider    wiring; registers routes only when enabled
 ### Request lifecycle
 
 1. `DissectController::index()` asks for the schema.
-2. The schema is cached under `dissect.schema.{fingerprint}`, where the
-   fingerprint is the newest mtime across the model directory. Inspecting every
+2. The schema is cached under `dissect.schema.{fingerprint}`. Inspecting every
    model costs reflection plus a schema query each, so this happens once per
-   model-file change rather than once per request.
+   *change* rather than once per request.
 3. Schema, layout, save URL and CSRF token are inlined into the Blade view.
 4. The page boots with **zero XHR**.
+
+### Staying current
+
+The graph has two sources with different lifecycles, and the fingerprint covers
+both:
+
+| Half of the graph | Comes from | Signal |
+|---|---|---|
+| Relations | the model files | newest mtime + file count across the model directory |
+| Columns | the live database | `MigrationState` — row count and max id of the `migrations` table |
+
+The migration half is deliberately **not** read from the migration *files*.
+Columns are reported by the database, so a migration that has merely been
+written describes columns that do not exist yet; re-exporting then would render
+a schema nobody has. Laravel inserts the `migrations` row only after `up()`
+returns, so the table is exactly "what ran successfully" — a migration that
+threw part-way leaves no row and moves nothing.
+
+The client polls `/fingerprint` every 3s (paused while the tab is hidden,
+checked immediately when it returns) and re-fetches `schema.json` when the value
+moves. The new payload goes through `applySchema`, the same ingest path as the
+initial load, so slot order and saved positions survive: existing models keep
+their place and only new ones are appended. A failed refresh leaves the working
+graph on screen and does not advance the stored fingerprint, so it retries.
+
+`MigrationState` reads the **default connection only**, and never throws — a
+database that is down or unmigrated degrades to a constant signal rather than
+an error page.
 
 ### Type normalisation
 
@@ -227,6 +255,8 @@ Config (`config/dissect.php`): `enabled`, `path`, `middleware`,
 | Support another database's types | `src/Types/` — add a normalizer, register it in `TypeNormalizerManager::make()` |
 | Change what a column shows | `src/ColumnNormalizer.php`, then `ModelNode.vue` |
 | Change how models are found | `SchemaExporter::discoverModels()` |
+| Change what counts as a change | `SchemaExporter::fingerprint()`, `src/MigrationState.php` |
+| Change the poll interval | `POLL_INTERVAL_MS` in `resources/js/stores/schema.ts` |
 | Change the grid | `resources/js/lib/layout.ts` |
 | Change relation colours/families | `resources/js/lib/relations.ts` |
 | Change the theme | `resources/js/assets/main.css` (tokens), `vue-flow-theme.css` (canvas) |

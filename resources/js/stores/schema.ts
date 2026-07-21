@@ -17,6 +17,13 @@ import { bootstrap } from '@/lib/bootstrap'
 type Status = 'idle' | 'loading' | 'ready' | 'error'
 
 /**
+ * How often the change signal is checked. The endpoint stats the model files
+ * and runs two indexed queries, so this is cheap enough to feel live without
+ * being a poll loop anybody notices.
+ */
+const POLL_INTERVAL_MS = 3000
+
+/**
  * Holds the model graph.
  *
  * `applySchema` is the single ingest path so the planned change-stream can push
@@ -27,6 +34,12 @@ type Status = 'idle' | 'loading' | 'ready' | 'error'
 export const useSchemaStore = defineStore('schema', () => {
   const status = ref<Status>('idle')
   const error = ref<string | null>(null)
+
+  /** Server change signal this graph was built from; null when standalone. */
+  const fingerprint = ref<string | null>(bootstrap().fingerprint ?? null)
+
+  /** Timestamp of the last live update, so the header can acknowledge one. */
+  const lastUpdated = ref<number | null>(null)
 
   // shallowRef: these arrays are replaced wholesale, never mutated in place,
   // and deep-reactivity over hundreds of nodes is wasted work.
@@ -155,13 +168,112 @@ export const useSchemaStore = defineStore('schema', () => {
     }
   }
 
+  /**
+   * Pulls a fresh payload and swaps it in, leaving the graph alone if it
+   * cannot.
+   *
+   * Deliberately does not touch `status`: a failed refresh should leave the
+   * working graph on screen rather than replacing it with an error card, and
+   * the poller will simply try again.
+   */
+  async function refresh(): Promise<boolean> {
+    const url = bootstrap().schemaUrl ?? `${import.meta.env.BASE_URL}schema.json`
+
+    try {
+      const res = await fetch(url, { cache: 'no-store' })
+      if (!res.ok) throw new Error(`${res.status} ${res.statusText}`)
+      const payload = (await res.json()) as Schema
+      if (!Array.isArray(payload?.nodes) || !Array.isArray(payload?.edges)) return false
+
+      // Same ingest path as the initial load, so slot order and saved
+      // positions survive: a model that already exists keeps its place and
+      // only genuinely new ones are appended.
+      applySchema(payload)
+      lastUpdated.value = Date.now()
+      status.value = 'ready'
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  /**
+   * Polls the server's change signal and re-exports when it moves.
+   *
+   * The signal covers model files *and* applied migrations, so editing a
+   * relation or running `migrate` both land here — but writing a migration
+   * without running it does not, since the columns it describes do not exist
+   * yet. See SchemaExporter::fingerprint().
+   *
+   * Returns a stop function. No-op in the standalone Vite host, where nothing
+   * inlines an endpoint and Vite's own watcher already reloads the page.
+   */
+  function watchForChanges(intervalMs = POLL_INTERVAL_MS): () => void {
+    const url = bootstrap().fingerprintUrl
+    if (!url) return () => {}
+
+    let timer: ReturnType<typeof setInterval> | undefined
+    let checking = false
+
+    async function check() {
+      // A slow response must not queue up behind itself.
+      if (checking || document.hidden) return
+      checking = true
+
+      try {
+        const res = await fetch(url!, { cache: 'no-store' })
+        if (!res.ok) return
+        const next = (await res.json())?.fingerprint
+
+        if (typeof next !== 'string' || next === fingerprint.value) return
+
+        // Only adopt the new signal once the payload behind it is actually in
+        // hand — otherwise a failed fetch would look like a successful update
+        // and the change would never be picked up again.
+        if (await refresh()) fingerprint.value = next
+      } catch {
+        // Server restarting, tunnel dropped, laptop asleep. Try again later.
+      } finally {
+        checking = false
+      }
+    }
+
+    // Editing models usually means the tab was in the background; check the
+    // moment it comes back rather than up to an interval later.
+    const onVisible = () => {
+      if (!document.hidden) void check()
+    }
+
+    timer = setInterval(() => void check(), intervalMs)
+    document.addEventListener('visibilitychange', onVisible)
+
+    return () => {
+      clearInterval(timer)
+      timer = undefined
+      document.removeEventListener('visibilitychange', onVisible)
+    }
+  }
+
   /** Re-places every node from the current payload, picking up whatever saved
    *  positions exist now — used after the layout is cleared. */
   function relayout() {
     if (lastSchema.value) applySchema(lastSchema.value)
   }
 
-  return { status, error, nodes, edges, stats, externalModels, load, applySchema, relayout }
+  return {
+    status,
+    error,
+    nodes,
+    edges,
+    stats,
+    externalModels,
+    lastUpdated,
+    load,
+    applySchema,
+    refresh,
+    watchForChanges,
+    relayout,
+  }
 })
 
 /**

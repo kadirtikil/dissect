@@ -6,7 +6,7 @@ import { Separator } from '@/components/ui/separator'
 import { Moon, RotateCcw, Sun } from '@lucide/vue'
 import { useDark, useToggle } from '@vueuse/core'
 import { storeToRefs } from 'pinia'
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useSchemaStore } from '@/stores/schema'
 import { useLayoutStore } from '@/stores/layout'
 
@@ -15,10 +15,23 @@ const toggleDark = useToggle(isDark)
 
 const schema = useSchemaStore()
 const layout = useLayoutStore()
-const { stats, status } = storeToRefs(schema)
+const { stats, status, lastUpdated } = storeToRefs(schema)
 const { positions, saving, saveError } = storeToRefs(layout)
 
 const pinnedCount = computed(() => Object.keys(positions.value).length)
+
+// The graph re-exports itself when models or migrations change. That can be a
+// single new column somewhere off-screen, so say so briefly — otherwise a live
+// update is indistinguishable from nothing having happened.
+const justUpdated = ref(false)
+let updateTimer: ReturnType<typeof setTimeout> | undefined
+
+watch(lastUpdated, (at) => {
+  if (!at) return
+  justUpdated.value = true
+  clearTimeout(updateTimer)
+  updateTimer = setTimeout(() => (justUpdated.value = false), 2500)
+})
 
 // Two-step rather than a modal: resetting throws away hand-placed nodes, but a
 // dialog for a one-key action is heavier than the decision warrants.
@@ -59,6 +72,15 @@ async function confirmReset() {
 
       <!-- Only offer the reset once something has actually been placed. -->
       <div class="ml-auto flex items-center gap-2">
+        <span
+          v-if="justUpdated"
+          class="font-mono text-[10px] text-accent-foreground"
+          role="status"
+          title="Models or migrations changed — the graph was re-exported"
+        >
+          updated
+        </span>
+
         <span
           v-if="saveError"
           class="font-mono text-[10px] text-destructive"

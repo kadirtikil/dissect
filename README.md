@@ -22,6 +22,19 @@ which does not exist in earlier releases.
 
 ## Installation
 
+Not on Packagist yet, so point Composer at the repository. In your
+application's `composer.json`:
+
+```json
+{
+    "repositories": [
+        { "type": "vcs", "url": "git@github.com:kadirtikil/dissect.git" }
+    ]
+}
+```
+
+Then:
+
 ```sh
 composer require kdr-dev/dissect --dev
 ```
@@ -34,20 +47,6 @@ Publishing the config file is optional:
 ```sh
 php artisan vendor:publish --tag=dissect-config
 ```
-
-### Installing from a private VCS repository
-
-Not on Packagist. Add the repository to your application's `composer.json`:
-
-```json
-{
-    "repositories": [
-        { "type": "vcs", "url": "https://gitea.kadir-dev.tech/kadir/eloquent-via.git" }
-    ]
-}
-```
-
-Then `composer require kdr-dev/dissect --dev` as above.
 
 ## Configuration
 

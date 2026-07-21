@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { markRaw, onMounted } from 'vue'
+import { markRaw, onBeforeUnmount, onMounted } from 'vue'
 import { VueFlow } from '@vue-flow/core'
 import { Background } from '@vue-flow/background'
 import { Controls } from '@vue-flow/controls'
@@ -27,12 +27,20 @@ const { nodes, edges, status, error } = storeToRefs(store)
 // stable object keeps Vue Flow from re-registering node types on every render.
 const nodeTypes = markRaw({ model: ModelNode })
 
+let stopWatching: (() => void) | undefined
+
 onMounted(async () => {
   // Layout first: applySchema reads saved positions while placing nodes, so
   // loading it second would render the grid and then jump.
   await layout.load()
   await store.load()
+
+  // Keeps the graph in step with the app: an edited relation or a migration
+  // that has actually run re-exports in place, without a reload.
+  stopWatching = store.watchForChanges()
 })
+
+onBeforeUnmount(() => stopWatching?.())
 
 /** Below this, a "drag" is an accidental nudge rather than a placement. */
 const DRAG_THRESHOLD_PX = 3

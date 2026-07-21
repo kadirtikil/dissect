@@ -14,6 +14,12 @@ export interface Bootstrap {
   layout?: { version: number; positions: Record<string, NodePosition> }
   /** Endpoint that persists positions. */
   saveUrl?: string
+  /** Endpoint the schema can be re-fetched from once it goes stale. */
+  schemaUrl?: string
+  /** Endpoint returning the current change signal — see stores/schema.ts. */
+  fingerprintUrl?: string
+  /** The signal as of page render; polling compares against this. */
+  fingerprint?: string
   /** Laravel CSRF token, required for the POST above. */
   csrfToken?: string
 }

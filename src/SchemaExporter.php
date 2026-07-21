@@ -26,6 +26,7 @@ class SchemaExporter
     public function __construct(
         protected ModelInspector $inspector,
         protected ColumnNormalizer $columns,
+        protected MigrationState $migrations,
         protected string $modelsPath = 'app/Models',
         protected ?string $modelsNamespace = null,
     ) {}
@@ -85,9 +86,19 @@ class SchemaExporter
     }
 
     /**
-     * Cheap change signal: the newest mtime across the model directory. Used
-     * both as a cache key and by the client to poll for changes without
-     * rebuilding the whole graph.
+     * Cheap change signal, used both as a cache key and by the client to poll
+     * for changes without rebuilding the whole graph.
+     *
+     * The graph has two independent sources, so the signal covers both:
+     *
+     *  - **Relations** come from the model files — the newest mtime across the
+     *    model directory catches an edited or added relation method.
+     *  - **Columns** come from the live database — {@see MigrationState} moves
+     *    only once a migration has actually run, so writing one changes
+     *    nothing until `migrate` succeeds.
+     *
+     * Both are file stats and two indexed queries; nothing here inspects a
+     * model or reads a table definition.
      */
     public function fingerprint(): string
     {
@@ -99,7 +110,7 @@ class SchemaExporter
             $count++;
         }
 
-        return substr(sha1($latest.':'.$count), 0, 16);
+        return substr(sha1($latest.':'.$count.':'.$this->migrations->signal()), 0, 16);
     }
 
     /** @return array<int, class-string<Model>> */

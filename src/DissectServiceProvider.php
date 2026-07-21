@@ -23,9 +23,14 @@ class DissectServiceProvider extends ServiceProvider
             $app->make(TypeNormalizerManager::class),
         ));
 
+        $this->app->singleton(MigrationState::class, fn (Application $app) => new MigrationState(
+            $app->make(DatabaseManager::class),
+        ));
+
         $this->app->singleton(SchemaExporter::class, fn (Application $app) => new SchemaExporter(
             $app->make(ModelInspector::class),
             $app->make(ColumnNormalizer::class),
+            $app->make(MigrationState::class),
             (string) config('dissect.models_path', 'app/Models'),
             config('dissect.models_namespace'),
         ));

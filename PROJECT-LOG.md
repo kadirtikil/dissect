@@ -166,6 +166,35 @@ Key decisions:
   `window.__DISSECT__`; standalone under Vite it falls back to fetching
   JSON files.
 
+### 9. Auto-refresh, finished
+
+`/fingerprint` had existed since packaging but nothing polled it, and it only
+hashed model-file mtimes — half the graph. Columns come from the live database,
+so the missing half was migrations.
+
+The subtlety is *which* migration event counts. Watching the migration
+**files** would be wrong: a written-but-unrun migration describes columns that
+do not exist, and re-exporting on save would render a schema no database has.
+The right signal is the `migrations` **table** — Laravel writes that row only
+after `up()` returns, so its contents are precisely "what ran successfully",
+and a migration that threw part-way leaves nothing behind. `MigrationState`
+reads row count plus max id (the id alone misses a rollback; the count alone
+misses a rollback followed by a different migration) on the default connection,
+and swallows every error, since an unmigrated or unreachable database is a
+normal state for this tool rather than a crash.
+
+The client polls every 3s, paused while the tab is hidden and checked
+immediately on return — editing models usually happens with the tab in the
+background. Updates go through `applySchema`, the same path as the initial
+load, which was written for exactly this: existing models keep their slot and
+saved positions, so a live re-export never reshuffles a hand-arranged board. A
+failed refresh keeps the working graph on screen and does not advance the
+stored fingerprint, so the change is retried rather than lost.
+
+Verified live against the workbench: writing a migration moved nothing; running
+it changed the fingerprint and `subtitle` appeared on `Post` with no restart;
+adding a `hasMany` to a model produced the new edge the same way.
+
 ---
 
 ## Bugs found and fixed
@@ -206,10 +235,8 @@ restored on reload.
 
 - **Not published.** No remote, no tag, no Packagist entry.
 - **No README** for package consumers.
-- **No PHP tests.** `orchestra/testbench` is in `require-dev` but unused.
-- **Auto-refresh is half-built.** `/fingerprint` returns a hash of model-file
-  mtimes, but nothing polls it yet. This is the "re-render when models change"
-  feature, designed to avoid a long-running PHP watcher.
+- **Frontend unit tests.** Vitest is installed and unused; the PHP side now has
+  a Testbench suite, the Vue side still has only the e2e smoke tests.
 - **FK ownership data is not exported.** `Schema::getForeignKeys()` exposes
   `on_delete: cascade`, which is the real ownership signal for any future
   grouping/clustering work.

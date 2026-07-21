@@ -12,6 +12,9 @@ use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class DissectController
 {
+    /** Computed at most once per request — index() needs it twice. */
+    protected ?string $fingerprint = null;
+
     public function __construct(
         protected SchemaExporter $exporter,
         protected LayoutRepository $layout,
@@ -29,7 +32,7 @@ class DissectController
             'devEntry' => $devServer ? $devServer.'/resources/js/main.ts' : null,
             'schema' => $this->schema(),
             'layout' => $this->layout->get(),
-            'fingerprint' => $this->exporter->fingerprint(),
+            'fingerprint' => $this->fingerprint(),
             // When set, assets come from a running Vite dev server rather than
             // dist/ — see config('dissect.dev_server').
             'devServer' => $devServer,
@@ -37,18 +40,26 @@ class DissectController
     }
 
     /**
-     * Cheap polling endpoint. Returns the model-directory fingerprint so the
-     * page can detect edits without rebuilding the graph on every check —
-     * no file watcher process required.
+     * Cheap polling endpoint. Returns a hash of the model files plus the
+     * applied-migration state, so the page can detect both an edited relation
+     * and a migration that has actually run — without rebuilding the graph on
+     * every check, and with no file watcher process required.
      */
-    public function fingerprint(): JsonResponse
+    public function fingerprintJson(): JsonResponse
     {
-        return response()->json(['fingerprint' => $this->exporter->fingerprint()]);
+        // The whole point is to see the current value; a cached 200 would make
+        // the page believe nothing had changed for as long as the browser
+        // decided to hold on to it.
+        return response()
+            ->json(['fingerprint' => $this->fingerprint()])
+            ->header('Cache-Control', 'no-store');
     }
 
     public function schemaJson(): JsonResponse
     {
-        return response()->json($this->schema());
+        return response()
+            ->json($this->schema())
+            ->header('Cache-Control', 'no-store');
     }
 
     public function saveLayout(Request $request): JsonResponse
@@ -107,16 +118,22 @@ class DissectController
         return rtrim($url, '/');
     }
 
+    /** Memoised: index() renders it and keys the schema cache with it. */
+    protected function fingerprint(): string
+    {
+        return $this->fingerprint ??= $this->exporter->fingerprint();
+    }
+
     /**
      * @return array<string, mixed>
      */
     protected function schema(): array
     {
         // Inspecting every model does reflection plus a schema query each; the
-        // fingerprint means that work happens once per model-file change
-        // rather than once per request.
+        // fingerprint means that work happens once per model edit or applied
+        // migration rather than once per request.
         return Cache::remember(
-            'dissect.schema.'.$this->exporter->fingerprint(),
+            'dissect.schema.'.$this->fingerprint(),
             now()->addHour(),
             fn () => $this->exporter->export(),
         );
