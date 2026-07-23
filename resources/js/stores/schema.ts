@@ -51,6 +51,15 @@ export const useSchemaStore = defineStore('schema', () => {
   const lastSchema = shallowRef<Schema | null>(null)
 
   /**
+   * Models whose node is showing its full attribute list.
+   *
+   * Kept here rather than in the node component because Vue Flow remounts
+   * nodes when the array is replaced — component-local state would collapse
+   * every card on each live update.
+   */
+  const expanded = ref<Set<string>>(new Set())
+
+  /**
    * Grid slot order, remembered across applies. Models that already exist keep
    * their slot and new ones are appended, so a stream update adds a model at
    * the end instead of reshuffling the whole board.
@@ -133,6 +142,21 @@ export const useSchemaStore = defineStore('schema', () => {
     ) as Node<ModelNodeData>[]
 
     edges.value = nextEdges
+
+    // A model that disappeared must not keep an entry here, or re-adding it
+    // later would bring back an expansion nobody asked for.
+    for (const id of expanded.value) {
+      if (!incoming.has(id)) expanded.value.delete(id)
+    }
+  }
+
+  function toggleExpanded(id: string) {
+    if (expanded.value.has(id)) expanded.value.delete(id)
+    else expanded.value.add(id)
+  }
+
+  function collapseAll() {
+    expanded.value.clear()
   }
 
   async function load(url = `${import.meta.env.BASE_URL}schema.json`) {
@@ -268,6 +292,9 @@ export const useSchemaStore = defineStore('schema', () => {
     stats,
     externalModels,
     lastUpdated,
+    expanded,
+    toggleExpanded,
+    collapseAll,
     load,
     applySchema,
     refresh,
@@ -301,6 +328,11 @@ function normaliseColumns(columns: RawColumn[] | undefined): SchemaColumn[] {
         label: col.label ?? col.type ?? undefined,
         kind: col.kind ?? 'unknown',
         nullable: col.nullable,
+        unique: col.unique,
+        increments: col.increments,
+        fillable: col.fillable,
+        hidden: col.hidden,
+        cast: col.cast ?? null,
         virtual: col.virtual,
       },
     ]

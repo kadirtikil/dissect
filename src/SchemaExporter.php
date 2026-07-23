@@ -43,7 +43,12 @@ class SchemaExporter
             $id = class_basename($class);
 
             try {
-                $info = $this->inspector->inspect($class)->toArray();
+                // ModelInspector::inspect() returns a plain array on Laravel
+                // ≤12 and a ModelInfo object (the @internal value) on 13+.
+                // Fold both to the array we normalise, or every model on 12
+                // would fall into the catch below and render columnless.
+                $inspected = $this->inspector->inspect($class);
+                $info = is_array($inspected) ? $inspected : $inspected->toArray();
             } catch (Throwable) {
                 // A model whose table is missing, or whose connection is down,
                 // must not take down the whole page — show it without columns.

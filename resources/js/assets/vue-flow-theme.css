@@ -117,6 +117,28 @@
   z-index: 10 !important;
 }
 
+/*
+ * An expanded node grows past the space the grid reserved for it, so it has to
+ * float over its surroundings rather than push them — re-flowing the board on
+ * a click would move every other model out from under the cursor.
+ *
+ * Two levels are needed, because the node wrapper cannot escape its container:
+ * the wrapper to clear the neighbouring nodes, and .vue-flow__nodes itself to
+ * clear the edge SVGs, which are siblings of that container and would otherwise
+ * be drawn straight across the card.
+ *
+ * 1001 rather than something modest because `elevate-edges-on-select` lifts the
+ * selected node's own edges to 1000 — and expanding a card selects it, so those
+ * are exactly the edges that would cross it.
+ */
+.vue-flow__nodes:has(.model-node.is-expanded) {
+  z-index: 1001;
+}
+
+.vue-flow__node:has(.model-node.is-expanded) {
+  z-index: 50 !important;
+}
+
 .vue-flow__edge.selected.selected .vue-flow__edge-textwrapper {
   filter: drop-shadow(0 0 6px color-mix(in oklch, var(--edge-glow) 70%, transparent));
 }

@@ -1,0 +1,57 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# A second push to the same branch makes the first run's answer irrelevant.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  phpunit:
+    runs-on: ubuntu-latest
+
+    # The package supports a range rather than a pinned version, so the range is
+    # what gets tested. `lowest` is the leg that matters most: it pins the floor
+    # in composer.json to something a machine checks, rather than something that
+    # was true on the day it was written.
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ['8.2', '8.3', '8.4', '8.5']
+        deps: [highest]
+        include:
+          - php: '8.2'
+            deps: lowest
+
+    name: PHP ${{ matrix.php }} · ${{ matrix.deps }} deps
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          # SQLite is the workbench database; the suite never touches a server.
+          extensions: sqlite3, pdo_sqlite, mbstring
+          coverage: none
+
+      - name: Cache Composer downloads
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/composer/files
+          key: composer-${{ matrix.php }}-${{ matrix.deps }}-${{ hashFiles('composer.json') }}
+          restore-keys: composer-${{ matrix.php }}-${{ matrix.deps }}-
+
+      # `update`, not `install`: composer.lock pins one resolution, and testing
+      # only that would defeat the point of the matrix above.
+      - name: Install dependencies
+        run: |
+          composer update --prefer-dist --no-interaction --no-progress \
+            ${{ matrix.deps == 'lowest' && '--prefer-lowest --prefer-stable' || '' }}
+
+      - name: Run tests
+        run: vendor/bin/phpunit

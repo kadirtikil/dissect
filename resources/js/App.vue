@@ -3,7 +3,7 @@ import GraphCanvas from '@/components/GraphCanvas.vue'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
-import { Moon, RotateCcw, Sun } from '@lucide/vue'
+import { ChevronsDownUp, Moon, RotateCcw, Sun } from '@lucide/vue'
 import { useDark, useToggle } from '@vueuse/core'
 import { storeToRefs } from 'pinia'
 import { computed, ref, watch } from 'vue'
@@ -15,7 +15,7 @@ const toggleDark = useToggle(isDark)
 
 const schema = useSchemaStore()
 const layout = useLayoutStore()
-const { stats, status, lastUpdated } = storeToRefs(schema)
+const { stats, status, lastUpdated, expanded } = storeToRefs(schema)
 const { positions, saving, saveError } = storeToRefs(layout)
 
 const pinnedCount = computed(() => Object.keys(positions.value).length)
@@ -88,6 +88,21 @@ async function confirmReset() {
         >
           not saved
         </span>
+
+        <!-- Expanded cards float over their neighbours, so with several open the
+             board is hard to read — this is the way back out without hunting
+             for each one. -->
+        <Button
+          v-if="expanded.size"
+          variant="ghost"
+          size="sm"
+          class="font-mono text-xs"
+          :aria-label="`Collapse ${expanded.size} expanded models`"
+          @click="schema.collapseAll()"
+        >
+          <ChevronsDownUp class="size-3.5" />
+          Collapse · {{ expanded.size }}
+        </Button>
 
         <Button
           v-if="pinnedCount"

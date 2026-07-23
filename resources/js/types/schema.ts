@@ -44,11 +44,19 @@ export type RawColumn =
       nullable?: boolean
       unique?: boolean
       increments?: boolean
+      fillable?: boolean
+      hidden?: boolean
       cast?: string | null
       virtual?: boolean
     }
 
-/** Normalised column, the only shape the UI deals with. */
+/**
+ * Normalised column, the only shape the UI deals with.
+ *
+ * Everything past `kind` is only rendered by an expanded node, but it is kept
+ * on the collapsed shape too: the payload carries it either way, and branching
+ * the type by view state would buy nothing.
+ */
 export interface SchemaColumn {
   name: string
   type?: string
@@ -56,6 +64,13 @@ export interface SchemaColumn {
   label?: string
   kind: ColumnKind
   nullable?: boolean
+  unique?: boolean
+  /** Auto-incrementing — the primary key, for all practical purposes. */
+  increments?: boolean
+  fillable?: boolean
+  hidden?: boolean
+  /** Eloquent cast, e.g. `datetime` or an enum class. */
+  cast?: string | null
   virtual?: boolean
 }
 

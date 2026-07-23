@@ -31,3 +31,24 @@ test('lays models out in columns of five', async ({ page }) => {
 
   expect(columns).toEqual([5, 5, 5, 5, 2])
 })
+
+test('expands a card to its full attribute list, and collapses again', async ({ page }) => {
+  await page.goto('/')
+  await expect(page.locator('.vue-flow__node')).toHaveCount(22)
+
+  // Document has more columns than a collapsed card lists, so the truncation
+  // row is what proves the expansion actually revealed something.
+  const card = page.locator('.model-node', { hasText: 'documents' }).first()
+  await expect(card.getByText(/\+\d+ more/)).toBeVisible()
+
+  await card.click()
+
+  await expect(card).toHaveAttribute('aria-expanded', 'true')
+  await expect(card.getByText(/\+\d+ more/)).toHaveCount(0)
+  // The flags only exist on an expanded card; the key column carries one.
+  await expect(card.getByTitle('Auto-incrementing key')).toBeVisible()
+
+  // The header offers the way back out once anything is open.
+  await page.getByRole('button', { name: /Collapse 1 expanded/ }).click()
+  await expect(card).toHaveAttribute('aria-expanded', 'false')
+})
