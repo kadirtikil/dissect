@@ -56,3 +56,9 @@ workbench/database/*.sqlite
 
 PROJECT-LOG.md
 .claude
+
+# Generated development fixture (see workbench/scripts/generate-huge-models.php).
+# The generator is committed; its output is not — it is large, deterministic and
+# one command away.
+workbench/app/Huge/
+workbench/database/migrations-huge/

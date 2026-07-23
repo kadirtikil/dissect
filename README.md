@@ -138,7 +138,15 @@ composer serve      # build the workbench app and serve it
 composer test       # PHPUnit
 pnpm test:e2e       # Playwright
 pnpm build          # compile the frontend into dist/
+
+composer serve:huge # serve a generated 122-model schema instead
+composer huge:clean # and remove it again
 ```
+
+The fixture in `workbench/app/Models` is small on purpose — it covers every
+relation family and column kind, and the tests assert against it. 🐘
+`composer serve:huge` generates the opposite fixture, a schema large enough to
+show what layout, the minimap and saved views do under load.
 
 ### ⚡ Frontend hot reload
 

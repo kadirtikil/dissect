@@ -130,6 +130,24 @@ function onNodeDragStop(event: NodeDragEvent) {
       </div>
     </div>
 
+    <!-- A view names models by id, and those ids can stop existing: a renamed
+         model, or a whole different models directory (the generated fixture).
+         Filtering to nothing then looks exactly like a broken page. -->
+    <div
+      v-if="status === 'ready' && active && !visibleNodes.length"
+      class="absolute inset-0 z-20 grid place-items-center px-6"
+    >
+      <div class="max-w-md rounded-md border bg-card px-4 py-3 text-center">
+        <p class="font-mono text-xs font-semibold">
+          Nothing to show in &ldquo;{{ active.name }}&rdquo;
+        </p>
+        <p class="mt-1 font-mono text-[11px] text-muted-foreground">
+          None of its {{ active.models.length }} models are in the current schema. Pick another
+          view, or tick models into this one.
+        </p>
+      </div>
+    </div>
+
     <GraphLegend v-if="status === 'ready'" />
 
     <VueFlow

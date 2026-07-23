@@ -37,6 +37,35 @@ self-referencing tree, a polymorphic `MorphTo`, two relations between the same
 pair, and a relation to a model outside the scan) and every column kind, so the
 whole pipeline is exercised by `composer serve` alone.
 
+### A schema big enough to hurt
+
+Seven models prove correctness but say nothing about how the viewer behaves at
+the size real applications reach. `composer serve:huge` generates one that does
+— 122 models and ~500 relations by default:
+
+```bash
+composer huge          # generate (models + their migration)
+composer serve:huge    # generate, rebuild the database, migrate, serve
+composer huge:clean    # remove it again
+```
+
+`workbench/scripts/generate-huge-models.php [count] [seed]` writes models into
+`workbench/app/Huge` and a migration into `workbench/database/migrations-huge`.
+Both are gitignored: the generator is deterministic, so the output is one
+command away and does not belong in review.
+
+The generated set is the switch — `WorkbenchServiceProvider` points the viewer
+at `workbench/app/Huge` whenever that directory has models in it, **except
+under `testing`**, where the suite's assertions depend on the small fixture.
+The migration lives outside `testbench.yaml`'s migration path for the same
+reason, so `composer test` and `composer build` never see it.
+
+Names come from twelve domain vocabularies rather than `Model1..Model120`, so
+the graph has clusters, hub models everything points at, and the uneven shape a
+real schema has. Half the models declare `$fillable`, some declare `$hidden`,
+and casts follow the column kinds — which is what gives an expanded card
+something to show.
+
 ### The two frontend hosts
 
 `pnpm dev` on its own still works and is the fastest loop for pure styling work,

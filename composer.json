@@ -49,6 +49,19 @@
             "Composer\\Config::disableProcessTimeout",
             "@php -r \"file_put_contents(__DIR__.'/.workbench-dev', 'http://localhost:5199');\"",
             "@php vendor/bin/testbench serve --ansi"
+        ],
+        "huge": [
+            "@php workbench/scripts/generate-huge-models.php"
+        ],
+        "huge:clean": [
+            "@php -r \"array_map('unlink', glob('workbench/app/Huge/*.php') ?: []); array_map('unlink', glob('workbench/database/migrations-huge/*.php') ?: []); @rmdir('workbench/app/Huge'); @rmdir('workbench/database/migrations-huge'); echo \\\"Removed the generated fixture.\\n\\\";\""
+        ],
+        "serve:huge": [
+            "Composer\\Config::disableProcessTimeout",
+            "@huge",
+            "@build",
+            "@php vendor/bin/testbench migrate --path=workbench/database/migrations-huge --realpath --force --ansi",
+            "@php vendor/bin/testbench serve --ansi"
         ]
     },
     "extra": {
