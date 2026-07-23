@@ -19,7 +19,7 @@ Not on Packagist, so install it straight from GitHub. From your application's
 root:
 
 ```sh
-composer config repositories.dissect vcs git@github.com:kadirtikil/dissect.git
+composer config repositories.dissect vcs https://github.com/kadirtikil/dissect.git
 composer require kdr-dev/dissect --dev
 ```
 
@@ -30,8 +30,8 @@ provider is auto-discovered, and there is nothing to publish or build. 🎉
 > or if no tag has been pushed yet — ask for the branch:
 > `composer require kdr-dev/dissect:dev-main --dev`.
 >
-> 🔑 Use `https://github.com/kadirtikil/dissect.git` as the repository URL if
-> you are not set up with an SSH key.
+> 🔑 SSH works too if you prefer it — swap the URL for
+> `git@github.com:kadirtikil/dissect.git`.
 
 ## ✅ Requirements
 
@@ -51,7 +51,7 @@ for you. To do it by hand instead, add this to your application's
 ```json
 {
     "repositories": [
-        { "type": "vcs", "url": "git@github.com:kadirtikil/dissect.git" }
+        { "type": "vcs", "url": "https://github.com/kadirtikil/dissect.git" }
     ]
 }
 ```
