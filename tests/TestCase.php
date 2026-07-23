@@ -19,6 +19,7 @@ abstract class TestCase extends BaseTestCase
         $app['config']->set('dissect.models_path', __DIR__.'/../workbench/app/Models');
         $app['config']->set('dissect.models_namespace', 'Workbench\\App\\Models');
         $app['config']->set('dissect.layout_path', $this->layoutPath($app));
+        $app['config']->set('dissect.views_path', $app->basePath('.dissect-test/views.json'));
 
         $app['config']->set('database.default', 'testing');
     }

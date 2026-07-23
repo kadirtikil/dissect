@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { markRaw, onBeforeUnmount, onMounted } from 'vue'
-import { VueFlow } from '@vue-flow/core'
+import { computed, markRaw, nextTick, onBeforeUnmount, onMounted, watch } from 'vue'
+import { VueFlow, useVueFlow } from '@vue-flow/core'
 import { Background } from '@vue-flow/background'
 import { Controls } from '@vue-flow/controls'
 import { MiniMap } from '@vue-flow/minimap'
@@ -17,11 +17,16 @@ import ModelNode from '@/components/ModelNode.vue'
 import GraphLegend from '@/components/GraphLegend.vue'
 import { useSchemaStore } from '@/stores/schema'
 import { useLayoutStore } from '@/stores/layout'
+import { useViewsStore } from '@/stores/views'
 import type { NodeDragEvent } from '@vue-flow/core'
 
 const store = useSchemaStore()
 const layout = useLayoutStore()
-const { nodes, edges, status, error } = storeToRefs(store)
+const views = useViewsStore()
+const { visibleNodes, visibleEdges, status, error } = storeToRefs(store)
+const { activeId, active } = storeToRefs(views)
+
+const { fitView, getSelectedNodes, removeSelectedElements } = useVueFlow()
 
 // markRaw: Vue must not try to make the component definition reactive, and a
 // stable object keeps Vue Flow from re-registering node types on every render.
@@ -33,6 +38,7 @@ onMounted(async () => {
   // Layout first: applySchema reads saved positions while placing nodes, so
   // loading it second would render the grid and then jump.
   await layout.load()
+  await views.load()
   await store.load()
 
   // Keeps the graph in step with the app: an edited relation or a migration
@@ -41,6 +47,38 @@ onMounted(async () => {
 })
 
 onBeforeUnmount(() => stopWatching?.())
+
+/**
+ * Switching view leaves the remaining nodes wherever they were on the full
+ * board — which, for a handful of models out of eighty, is mostly empty canvas.
+ * Refitting is what makes the switch read as "now showing these".
+ *
+ * Membership counts as a change too: a model ticked into the view sits wherever
+ * it sits on the whole board, which can be well outside the current viewport.
+ * Without the refit, adding one would look like nothing had happened.
+ */
+const shownModels = computed(
+  () => `${activeId.value ?? ''}:${active.value?.models.join(',') ?? ''}`,
+)
+
+watch(shownModels, async (_next, previous) => {
+  // The selection a view was just built from would otherwise stay lit on the
+  // nodes that survived the switch, reading as "these are special" when they
+  // are simply what the view contains.
+  if (previous.split(':')[0] !== (activeId.value ?? '')) removeSelectedElements()
+
+  await nextTick()
+  fitView({ padding: 0.2, duration: 200 })
+})
+
+/**
+ * Vue Flow owns the selection; the view menu needs it to offer "save these as
+ * a view". Mirrored into the store because the menu lives in the header, well
+ * outside the provider this canvas sets up.
+ */
+watch(getSelectedNodes, (selected) => {
+  views.selection = selected.map((n) => n.id)
+})
 
 /** Below this, a "drag" is an accidental nudge rather than a placement. */
 const DRAG_THRESHOLD_PX = 3
@@ -57,7 +95,7 @@ function onNodeDragStop(event: NodeDragEvent) {
   // Dragging a multi-selection moves several nodes; `nodes` carries all of
   // them, while `node` is only the one under the cursor.
   const moved = event.nodes?.length ? event.nodes : [event.node]
-  const knownIds = nodes.value.map((n) => n.id)
+  const knownIds = store.nodes.map((n) => n.id)
 
   for (const node of moved) {
     const from = dragOrigins.get(node.id)
@@ -95,8 +133,8 @@ function onNodeDragStop(event: NodeDragEvent) {
     <GraphLegend v-if="status === 'ready'" />
 
     <VueFlow
-      :nodes="nodes"
-      :edges="edges"
+      :nodes="visibleNodes"
+      :edges="visibleEdges"
       :node-types="nodeTypes"
       :min-zoom="0.1"
       :default-edge-options="{ type: 'default' }"

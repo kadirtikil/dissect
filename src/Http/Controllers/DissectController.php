@@ -8,6 +8,7 @@ use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Cache;
 use KdrDev\Dissect\LayoutRepository;
 use KdrDev\Dissect\SchemaExporter;
+use KdrDev\Dissect\ViewRepository;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class DissectController
@@ -18,6 +19,7 @@ class DissectController
     public function __construct(
         protected SchemaExporter $exporter,
         protected LayoutRepository $layout,
+        protected ViewRepository $views,
     ) {}
 
     /** The single page. Schema and layout are inlined, so it makes no XHR on boot. */
@@ -32,6 +34,7 @@ class DissectController
             'devEntry' => $devServer ? $devServer.'/resources/js/main.ts' : null,
             'schema' => $this->schema(),
             'layout' => $this->layout->get(),
+            'views' => $this->views->get(),
             'fingerprint' => $this->fingerprint(),
             // When set, assets come from a running Vite dev server rather than
             // dist/ — see config('dissect.dev_server').
@@ -71,6 +74,24 @@ class DissectController
         }
 
         return response()->json(['ok' => true, 'saved' => $this->layout->put($positions)]);
+    }
+
+    public function viewsJson(): JsonResponse
+    {
+        return response()
+            ->json($this->views->get())
+            ->header('Cache-Control', 'no-store');
+    }
+
+    public function saveViews(Request $request): JsonResponse
+    {
+        $views = $request->input('views');
+
+        if (! is_array($views)) {
+            return response()->json(['ok' => false, 'message' => 'views must be an array'], 422);
+        }
+
+        return response()->json(['ok' => true, 'saved' => $this->views->put($views)]);
     }
 
     /**

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import GraphCanvas from '@/components/GraphCanvas.vue'
+import ViewMenu from '@/components/ViewMenu.vue'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
@@ -9,14 +10,17 @@ import { storeToRefs } from 'pinia'
 import { computed, ref, watch } from 'vue'
 import { useSchemaStore } from '@/stores/schema'
 import { useLayoutStore } from '@/stores/layout'
+import { useViewsStore } from '@/stores/views'
 
 const isDark = useDark()
 const toggleDark = useToggle(isDark)
 
 const schema = useSchemaStore()
 const layout = useLayoutStore()
+const views = useViewsStore()
 const { stats, status, lastUpdated, expanded } = storeToRefs(schema)
 const { positions, saving, saveError } = storeToRefs(layout)
+const { active: activeView } = storeToRefs(views)
 
 const pinnedCount = computed(() => Object.keys(positions.value).length)
 
@@ -65,10 +69,19 @@ async function confirmReset() {
       <Separator orientation="vertical" class="mx-1 h-full" />
 
       <span v-if="status === 'ready'" class="font-mono text-xs text-muted-foreground">
-        {{ stats.models }} models · {{ stats.relations }} relations
-        <template v-if="stats.external"> · {{ stats.external }} external </template>
+        <!-- While a view is open the totals describe the schema, not what is on
+             screen, so the visible count is what leads. -->
+        <template v-if="activeView">
+          {{ stats.visible }} of {{ stats.models + stats.external }} models
+        </template>
+        <template v-else>
+          {{ stats.models }} models · {{ stats.relations }} relations
+          <template v-if="stats.external"> · {{ stats.external }} external </template>
+        </template>
       </span>
       <span v-else class="font-mono text-xs text-muted-foreground">Model relationships</span>
+
+      <ViewMenu v-if="status === 'ready'" />
 
       <!-- Only offer the reset once something has actually been placed. -->
       <div class="ml-auto flex items-center gap-2">

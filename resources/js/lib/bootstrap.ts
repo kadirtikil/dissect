@@ -1,4 +1,4 @@
-import type { Schema } from '@/types/schema'
+import type { GraphView, Schema } from '@/types/schema'
 import type { NodePosition } from '@/stores/layout'
 
 /**
@@ -12,8 +12,11 @@ import type { NodePosition } from '@/stores/layout'
 export interface Bootstrap {
   schema?: Schema
   layout?: { version: number; positions: Record<string, NodePosition> }
+  views?: { version: number; views: GraphView[] }
   /** Endpoint that persists positions. */
   saveUrl?: string
+  /** Endpoint that persists saved views. */
+  saveViewsUrl?: string
   /** Endpoint the schema can be re-fetched from once it goes stale. */
   schemaUrl?: string
   /** Endpoint returning the current change signal — see stores/schema.ts. */

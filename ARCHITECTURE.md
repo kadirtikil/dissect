@@ -59,7 +59,8 @@ both:
   GET /dissect                      pnpm dev
         │                                      │
   SchemaExporter ─┐                      public/schema.json
-  LayoutRepository┘                      public/layout.json
+  LayoutRepository│                      public/layout.json
+  ViewRepository ─┘                      public/views.json
         │                                      │
   app.blade.php                          index.html
         │                                      │
@@ -85,6 +86,7 @@ DissectServiceProvider    wiring; registers routes only when enabled
   │     │           └── {Postgres,MySql,Sqlite,SqlServer,Generic}TypeNormalizer
   │     └── MigrationState    "has a migration actually run?" — half the fingerprint
   ├── LayoutRepository        read/write/sanitise the layout file
+  ├── ViewRepository          read/write/sanitise the saved views
   └── DissectController   page, schema JSON, fingerprint, asset serving
 ```
 
@@ -153,12 +155,14 @@ framework or touching a database.
 ```
 main.ts                 mounts App; no router (see "Decisions")
 └── App.vue             header, stats, theme toggle, reset button
+    ├── ViewMenu        saved views: switch, edit membership, create, delete
     └── GraphCanvas     Vue Flow wiring, loading/error states, drag handling
         ├── ModelNode   one model: name, table, relation count, columns
         └── GraphLegend relation families
 
-stores/schema.ts        load → normalise → order → place
+stores/schema.ts        load → normalise → order → place → filter to the view
 stores/layout.ts        saved positions, debounce, prune, persist
+stores/views.ts         saved views, active view, persist
 lib/layout.ts           the grid: pure function of node index
 lib/relations.ts        relation type → family → colour
 lib/bootstrap.ts        the host seam
@@ -175,6 +179,34 @@ lib/bootstrap.ts        the host seam
 
 The grid deliberately ignores edges: position is a pure function of index, so
 the arrangement never shifts because a relation was added.
+
+### Views
+
+A view is a named set of model ids. The active one filters what the canvas
+draws — `visibleNodes` / `visibleEdges` in the schema store — and nothing else:
+placement, slot order and the layout pruning all keep working from the complete
+graph. An edge is drawn only when both of its models are in the view.
+
+Membership is all a view holds. Position stays in `layout.json`, so a model sits
+in the same spot whichever view is open, and there is still exactly one writer
+for the layout. Switching therefore only refits the viewport; per-view
+positions, if they are ever wanted, are an added optional field rather than a
+change to any of this.
+
+Which view is open is *not* in the file — it is per browser (localStorage). The
+file is committed and shared; what somebody happens to be reading is not.
+
+Membership is edited from a list of *every* model, not from the canvas alone.
+That is a requirement rather than a convenience: an active view hides the models
+it does not contain, so the one thing you cannot do on the canvas is add a model
+that is missing from the view. The list ticks a model in or out and saves as it
+goes; writes are queued, since ticking through a list produces one write per
+click and two landing out of order would persist the earlier edit. The last
+member cannot be unticked — an empty view is dropped on write, so that click
+would silently delete the view instead of editing it.
+
+Canvas selection remains the fast path: shift-drag, then either name the
+selection as a new view or add it to the open one.
 
 ---
 
@@ -217,6 +249,22 @@ clobber it. Stored at `base_path('.dissect/layout.json')` — not `vendor/`
 (wiped by composer) and not `storage/` (gitignored, which would defeat the point
 of a shareable layout).
 
+### `views.json` (authored — safe to commit and review)
+
+```json
+{
+  "version": 1,
+  "views": [{ "id": "billing", "name": "Billing", "models": ["Invoice", "Payment"] }]
+}
+```
+
+Stored at `base_path('.dissect/views.json')`, for the same reasons: "the billing
+models" is worth agreeing on once and reviewing in a pull request. `id` is a
+slug of the name and addresses the view; `models` are node ids (class
+basenames). Both hosts validate against the same rules — `ViewRepository` on the
+PHP side, `sanitiseViews()` in the dev-server plugin — so a file written by
+either is one the other accepts.
+
 ---
 
 ## Decisions worth not undoing
@@ -230,6 +278,8 @@ of a shareable layout).
 | **Routes local-only by default** | It exposes the full schema and writes a file |
 | **Relations folded into 4 families** | Eloquent has ~11 relation types; a categorical palette cannot carry that many. Polymorphic is also dashed, so family is never colour-alone |
 | **Edge labels hidden until hover** | 75 labels at fit-view zoom is noise, not information |
+| **Views hold membership, not positions** | One position per model means switching views never rearranges the board, and `layout.json` keeps a single writer |
+| **Expanded nodes float rather than re-flow** | The grid is a pure function of node index; growing a card in place would move every model below it out from under the cursor |
 
 ---
 
@@ -244,7 +294,7 @@ $this->app->bind(ColumnNormalizer::class, MyColumnNormalizer::class);
 ```
 
 Config (`config/dissect.php`): `enabled`, `path`, `middleware`,
-`models_path`, `layout_path`.
+`models_path`, `layout_path`, `views_path`.
 
 ---
 
@@ -258,6 +308,9 @@ Config (`config/dissect.php`): `enabled`, `path`, `middleware`,
 | Change what counts as a change | `SchemaExporter::fingerprint()`, `src/MigrationState.php` |
 | Change the poll interval | `POLL_INTERVAL_MS` in `resources/js/stores/schema.ts` |
 | Change the grid | `resources/js/lib/layout.ts` |
+| Change what a view stores | `src/ViewRepository.php`, `sanitiseViews()` in `vite-plugin-persistence.ts`, `resources/js/stores/views.ts` |
+| Change how a view is chosen or created | `resources/js/components/ViewMenu.vue` |
+| Change what an expanded card shows | `resources/js/components/ModelNode.vue` |
 | Change relation colours/families | `resources/js/lib/relations.ts` |
 | Change the theme | `resources/js/assets/main.css` (tokens), `vue-flow-theme.css` (canvas) |
 | Change the page shell | `resources/views/app.blade.php` |
@@ -271,7 +324,9 @@ Config (`config/dissect.php`): `enabled`, `path`, `middleware`,
   `RelationNormalizer` and `Fingerprint` have not.
 - `stores/schema.ts` mixes loading, normalising, ordering and placement. The
   pure parts want extracting into `lib/` so they can be unit-tested.
-- **No unit tests exist**, in either language, despite Vitest and Testbench both
-  being installed. The extractions above are what make them writable.
+- **Almost no unit tests exist**, in either language, despite Vitest and
+  Testbench both being installed. `tests/ViewRepositoryTest.php` covers the one
+  new trust boundary; the extractions above are what make the rest writable.
+  The Playwright suite in `e2e/` is what currently covers the frontend.
 - Only two drivers have been exercised against a real database (Postgres, via
   `echodms`); the others are covered by string-level checks only.

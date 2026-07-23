@@ -12,6 +12,7 @@ import type {
 import { familyFor } from '@/lib/relations'
 import { layoutGraph } from '@/lib/layout'
 import { useLayoutStore } from '@/stores/layout'
+import { useViewsStore } from '@/stores/views'
 import { bootstrap } from '@/lib/bootstrap'
 
 type Status = 'idle' | 'loading' | 'ready' | 'error'
@@ -71,12 +72,36 @@ export const useSchemaStore = defineStore('schema', () => {
     nodes.value.filter((n) => n.data?.external).map((n) => n.id),
   )
 
+  /**
+   * What the canvas actually draws: the whole graph, or just the models in the
+   * active view.
+   *
+   * Filtering happens here rather than in `applySchema` so that positions,
+   * slot order and the saved-layout pruning all keep working from the complete
+   * set — a view changes what you see, never what is stored.
+   */
+  const visibleNodes = computed(() => {
+    const members = useViewsStore().activeModels
+    return members ? nodes.value.filter((n) => members.has(n.id)) : nodes.value
+  })
+
+  /** An edge needs both ends on screen, or it points into nothing. */
+  const visibleEdges = computed(() => {
+    const members = useViewsStore().activeModels
+    return members
+      ? edges.value.filter((e) => members.has(e.source) && members.has(e.target))
+      : edges.value
+  })
+
   const stats = computed(() => ({
     // Scanned models only — externals are counted separately so the two
     // numbers sum to the node count rather than overlapping.
     models: nodes.value.length - externalModels.value.length,
     relations: edges.value.length,
     external: externalModels.value.length,
+    // What the active view is showing, so the header can say when the numbers
+    // above are not what is on screen.
+    visible: visibleNodes.value.length,
   }))
 
   function applySchema(schema: Schema) {
@@ -289,6 +314,8 @@ export const useSchemaStore = defineStore('schema', () => {
     error,
     nodes,
     edges,
+    visibleNodes,
+    visibleEdges,
     stats,
     externalModels,
     lastUpdated,

@@ -70,4 +70,17 @@ return [
 
     'layout_path' => base_path('.dissect/layout.json'),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Views file
+    |--------------------------------------------------------------------------
+    |
+    | Saved views — named subsets of the graph, so a large schema can be read
+    | one bounded context at a time. Committed and shared for the same reason
+    | the layout is: "the billing models" is worth agreeing on once.
+    |
+    */
+
+    'views_path' => base_path('.dissect/views.json'),
+
 ];

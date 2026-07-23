@@ -68,6 +68,10 @@ function onClick(event: MouseEvent) {
   pressedAt = null
   if (!from) return
 
+  // Shift and ⌘/Ctrl clicks are Vue Flow's multi-selection gestures — building
+  // a view out of six models should not leave six cards open behind it.
+  if (event.shiftKey || event.metaKey || event.ctrlKey) return
+
   const moved =
     Math.abs(from.x - event.clientX) > CLICK_SLOP_PX ||
     Math.abs(from.y - event.clientY) > CLICK_SLOP_PX

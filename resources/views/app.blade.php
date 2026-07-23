@@ -25,7 +25,9 @@
         window.__DISSECT__ = {
             schema: @json($schema),
             layout: @json($layout),
+            views: @json($views),
             saveUrl: @json(route('dissect.layout')),
+            saveViewsUrl: @json(route('dissect.views.save')),
             schemaUrl: @json(route('dissect.schema')),
             fingerprintUrl: @json(route('dissect.fingerprint')),
             fingerprint: @json($fingerprint),

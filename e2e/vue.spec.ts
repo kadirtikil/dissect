@@ -52,3 +52,94 @@ test('expands a card to its full attribute list, and collapses again', async ({ 
   await page.getByRole('button', { name: /Collapse 1 expanded/ }).click()
   await expect(card).toHaveAttribute('aria-expanded', 'false')
 })
+
+test('saves a selection as a view, switches to it and deletes it', async ({ page }) => {
+  await page.setViewportSize({ width: 1400, height: 900 })
+  await page.goto('/')
+  await expect(page.locator('.vue-flow__node')).toHaveCount(22)
+
+  // Box-select the first grid column's top two models. Coordinates come from
+  // the nodes themselves: the grid is stable, but hard-coding pixels would
+  // make this fail on any change to node height.
+  const first = (await page.locator('[data-id="AccessGrant"]').boundingBox())!
+  const second = (await page.locator('[data-id="Activity"]').boundingBox())!
+
+  await page.keyboard.down('Shift')
+  // Starts in the empty gutter left of the column — and deliberately drags
+  // across edges, which used to swallow the gesture.
+  await page.mouse.move(first.x - 90, second.y + second.height + 10)
+  await page.mouse.down()
+  await page.mouse.move(first.x + first.width + 10, first.y - 10, { steps: 12 })
+  await page.mouse.up()
+  await page.keyboard.up('Shift')
+
+  await expect(page.locator('.vue-flow__node.selected')).toHaveCount(2)
+  // The multi-select gesture must not also expand the cards it touches.
+  await expect(page.locator('.model-node.is-expanded')).toHaveCount(0)
+
+  await page.getByRole('button', { name: /^View:/ }).click()
+  await page.getByLabel('Name for the new view').fill('Grants')
+  await page.getByRole('button', { name: 'Save' }).click()
+
+  // The graph is now only the view's members, and the header says so.
+  await expect(page.locator('.vue-flow__node')).toHaveCount(2)
+  await expect(page.getByText('2 of 22 models')).toBeVisible()
+
+  // Views live in a file, and which one is open is remembered per browser.
+  await page.reload()
+  await expect(page.locator('.vue-flow__node')).toHaveCount(2)
+
+  await page.getByRole('button', { name: /^View: Grants/ }).click()
+  await page.getByRole('menuitem', { name: 'All models' }).click()
+  await expect(page.locator('.vue-flow__node')).toHaveCount(22)
+
+  // Deleting is two-step, and leaves views.json as the suite found it. The menu
+  // stays open across a switch, so there is nothing to reopen here.
+  await page.getByRole('button', { name: 'Delete Grants' }).click()
+  await page.getByRole('button', { name: 'Confirm deleting Grants' }).click()
+  await expect(page.getByRole('menuitem', { name: /Grants/ })).toHaveCount(0)
+})
+
+test('builds a view from the model list and extends it afterwards', async ({ page }) => {
+  await page.goto('/')
+  await expect(page.locator('.vue-flow__node')).toHaveCount(22)
+
+  // No canvas selection anywhere in this test: the list is the whole interface.
+  await page.getByRole('button', { name: /^View:/ }).click()
+  await page.getByLabel('Filter models').fill('user')
+  await page.getByRole('menuitemcheckbox', { name: /^User / }).click()
+  await page.getByLabel('Filter models').fill('team')
+  await page.getByRole('menuitemcheckbox', { name: /^Team / }).click()
+  await page.getByLabel('Name for the new view').fill('People')
+  await page.getByRole('button', { name: 'Save' }).click()
+
+  await expect(page.locator('.vue-flow__node')).toHaveCount(2)
+
+  // The point of the list: adding a model the active view is currently hiding,
+  // which by definition cannot be clicked on the canvas.
+  await page.getByLabel('Filter models').fill('workspace')
+  await page.getByRole('menuitemcheckbox', { name: /^Workspace / }).click()
+  await expect(page.locator('.vue-flow__node')).toHaveCount(3)
+  await expect(page.getByText('3 of 22 models')).toBeVisible()
+
+  // Ticking saves as it goes, so the addition outlives a reload.
+  await page.reload()
+  await expect(page.locator('.vue-flow__node')).toHaveCount(3)
+
+  // And back out again — "temporarily" is add, look, remove.
+  await page.getByRole('button', { name: /^View: People/ }).click()
+  await page.getByLabel('Filter models').fill('workspace')
+  await page.getByRole('menuitemcheckbox', { name: /^Workspace / }).click()
+  await expect(page.locator('.vue-flow__node')).toHaveCount(2)
+
+  // The last member cannot be unticked: an empty view is dropped on write, so
+  // that click would delete the view as a side effect of editing it.
+  await page.getByLabel('Filter models').fill('team')
+  await page.getByRole('menuitemcheckbox', { name: /^Team / }).click()
+  await page.getByLabel('Filter models').fill('user')
+  await expect(page.getByRole('menuitemcheckbox', { name: /^User / })).toBeDisabled()
+
+  await page.getByRole('button', { name: 'Delete People' }).click()
+  await page.getByRole('button', { name: 'Confirm deleting People' }).click()
+  await expect(page.locator('.vue-flow__node')).toHaveCount(22)
+})

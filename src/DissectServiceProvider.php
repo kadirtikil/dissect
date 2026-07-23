@@ -38,6 +38,10 @@ class DissectServiceProvider extends ServiceProvider
         $this->app->singleton(LayoutRepository::class, fn () => new LayoutRepository(
             (string) config('dissect.layout_path', base_path('.dissect/layout.json')),
         ));
+
+        $this->app->singleton(ViewRepository::class, fn () => new ViewRepository(
+            (string) config('dissect.views_path', base_path('.dissect/views.json')),
+        ));
     }
 
     public function boot(): void

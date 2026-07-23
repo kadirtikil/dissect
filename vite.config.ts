@@ -5,7 +5,7 @@ import vue from '@vitejs/plugin-vue'
 import vueJsx from '@vitejs/plugin-vue-jsx'
 import vueDevTools from 'vite-plugin-vue-devtools'
 import tailwindcss from '@tailwindcss/vite'
-import { layoutPersistence } from './vite-plugin-layout'
+import { layoutPersistence, viewsPersistence } from './vite-plugin-persistence'
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -15,6 +15,7 @@ export default defineConfig({
     vueDevTools(),
     tailwindcss(),
     layoutPersistence(),
+    viewsPersistence(),
   ],
   resolve: {
     alias: {

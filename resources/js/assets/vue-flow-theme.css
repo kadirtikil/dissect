@@ -131,6 +131,19 @@
  * selected node's own edges to 1000 — and expanding a card selects it, so those
  * are exactly the edges that would cross it.
  */
+/*
+ * Every edge carries an invisible 20px-wide path so it can be hovered. Across
+ * 75 relations those hitboxes cover most of the canvas, and a box-selection
+ * that starts on one never reaches the pane — so selecting models for a view
+ * failed depending on where the drag happened to begin.
+ *
+ * Vue Flow marks the pane while the selection key is held, which is exactly the
+ * window in which edge hovering does not matter.
+ */
+.vue-flow__pane.selection .vue-flow__edge {
+  pointer-events: none;
+}
+
 .vue-flow__nodes:has(.model-node.is-expanded) {
   z-index: 1001;
 }
