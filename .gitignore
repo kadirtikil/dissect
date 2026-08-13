@@ -62,3 +62,6 @@ PROJECT-LOG.md
 # one command away.
 workbench/app/Huge/
 workbench/database/migrations-huge/
+
+# PHPUnit writes this on every run; it is a local cache, not a source file.
+.phpunit.result.cache
