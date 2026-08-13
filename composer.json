@@ -9,6 +9,17 @@
         "visualisation"
     ],
     "license": "MIT",
+    "authors": [
+        {
+            "name": "Kadir Tikil",
+            "homepage": "https://github.com/kadirtikil"
+        }
+    ],
+    "homepage": "https://github.com/kadirtikil/dissect",
+    "support": {
+        "issues": "https://github.com/kadirtikil/dissect/issues",
+        "source": "https://github.com/kadirtikil/dissect"
+    },
     "require": {
         "php": "^8.2",
         "illuminate/database": "^11.33|^12.0|^13.0",

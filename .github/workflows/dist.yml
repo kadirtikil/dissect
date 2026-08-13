@@ -1,0 +1,115 @@
+name: dist
+
+# The package serves dist/ straight from the installed copy — that is the whole
+# reason it is committed, and the whole reason one `composer require` is enough.
+# It also makes one mistake catastrophic and invisible: a tag whose dist/ does
+# not match its sources ships a stale UI to everybody who installs it, and
+# nothing at install time can tell.
+#
+# README.md warns about this in prose. This is the same warning, enforced.
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  in-sync:
+    runs-on: ubuntu-latest
+    name: dist/ is not older than its sources
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # The check compares commit dates, so a shallow clone would have
+          # nothing to compare.
+          fetch-depth: 0
+
+      # Deliberately a history check rather than a rebuild-and-diff.
+      #
+      # Byte-comparing a fresh build against the committed one is the stricter
+      # test, but it only holds while CI's toolchain matches the one that
+      # produced dist/ — a Node or Vite bump then reports a version difference
+      # as a stale bundle, and a check that cries wolf gets switched off. This
+      # catches the mistake that actually happens (frontend changed, dist/ not
+      # rebuilt) and cannot produce a false alarm.
+      - name: Fail if the frontend moved after the bundle did
+        run: |
+          sources=$(git log -1 --format=%ct -- \
+            resources/js vite.config.ts vite-plugin-persistence.ts \
+            package.json pnpm-lock.yaml)
+          bundle=$(git log -1 --format=%ct -- dist)
+
+          if [ -z "$bundle" ]; then
+            echo "::error::dist/ has never been committed. The package serves it directly."
+            exit 1
+          fi
+
+          if [ "$sources" -gt "$bundle" ]; then
+            echo "::error::dist/ is stale — the frontend changed after it was last built."
+            echo
+            echo "The package serves this directory straight from the installed copy,"
+            echo "so committing it out of date ships a UI nobody can reproduce."
+            echo
+            echo "    pnpm build && git add dist && git commit"
+            echo
+            echo "Most recent frontend change:"
+            git log -1 --format='  %h %ad %s' --date=short -- resources/js vite.config.ts
+            echo "Most recent dist/ build:"
+            git log -1 --format='  %h %ad %s' --date=short -- dist
+            exit 1
+          fi
+
+          echo "dist/ is in step with resources/js."
+
+  # Guards the other half of the install promise: that what Composer receives
+  # actually contains the package, and does not contain the workbench, the test
+  # suite or the toolchain. `git archive` is exactly what GitHub serves.
+  payload:
+    runs-on: ubuntu-latest
+    name: installed payload is complete and clean
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Inspect what a `composer require` would receive
+        run: |
+          git archive --format=tar HEAD > payload.tar
+          tar -tf payload.tar > files.txt
+
+          echo "Payload size: $(du -h payload.tar | cut -f1)"
+          echo
+
+          fail=0
+
+          # Without these the package installs and does nothing.
+          for required in \
+            dist/dissect.js \
+            dist/dissect.css \
+            composer.json \
+            src/DissectServiceProvider.php \
+            config/dissect.php \
+            routes/web.php \
+            resources/views/app.blade.php
+          do
+            if ! grep -qx "$required" files.txt; then
+              echo "::error::missing from the installed package: $required"
+              fail=1
+            fi
+          done
+
+          # Development weight that export-ignore is supposed to strip. Each of
+          # these has shipped by accident at least once.
+          for unwanted in workbench/ tests/ e2e/ node_modules/ public/ .github/; do
+            if grep -q "^$unwanted" files.txt; then
+              echo "::error::development files are shipping to installers: $unwanted"
+              fail=1
+            fi
+          done
+
+          exit $fail

@@ -13,6 +13,7 @@
 /playwright-report      export-ignore
 /test-results           export-ignore
 /.claude                export-ignore
+/.github                export-ignore
 /.vscode                export-ignore
 /.editorconfig          export-ignore
 /.gitattributes         export-ignore
@@ -22,7 +23,7 @@
 /eslint.config.ts       export-ignore
 /playwright.config.ts   export-ignore
 /vite.config.ts         export-ignore
-/vite-plugin-layout.ts  export-ignore
+/vite-plugin-persistence.ts export-ignore
 /vitest.config.ts       export-ignore
 /tsconfig.json          export-ignore
 /tsconfig.app.json      export-ignore
