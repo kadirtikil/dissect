@@ -6,6 +6,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Cache;
+use KdrDev\Dissect\Exceptions\StateFileException;
 use KdrDev\Dissect\LayoutRepository;
 use KdrDev\Dissect\Routes\RouteExporter;
 use KdrDev\Dissect\SchemaExporter;
@@ -105,7 +106,11 @@ class DissectController
             return response()->json(['ok' => false, 'message' => 'positions must be an object'], 422);
         }
 
-        return response()->json(['ok' => true, 'saved' => $this->layout->put($positions)]);
+        try {
+            return response()->json(['ok' => true, 'saved' => $this->layout->put($positions)]);
+        } catch (StateFileException $e) {
+            return $this->refused($e);
+        }
     }
 
     public function viewsJson(): JsonResponse
@@ -123,7 +128,24 @@ class DissectController
             return response()->json(['ok' => false, 'message' => 'views must be an array'], 422);
         }
 
-        return response()->json(['ok' => true, 'saved' => $this->views->put($views)]);
+        try {
+            return response()->json(['ok' => true, 'saved' => $this->views->put($views)]);
+        } catch (StateFileException $e) {
+            return $this->refused($e);
+        }
+    }
+
+    /**
+     * A write the repository declined to make, because making it would have
+     * destroyed what was already in the file.
+     *
+     * 409 rather than 500: nothing is broken and there is nothing to retry —
+     * the file on disk simply is not this version's to rewrite. The page keeps
+     * the edit on screen and reports that it was not saved.
+     */
+    protected function refused(StateFileException $e): JsonResponse
+    {
+        return response()->json(['ok' => false, 'message' => $e->getMessage()], 409);
     }
 
     /**

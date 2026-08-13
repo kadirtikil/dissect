@@ -97,15 +97,57 @@ DISSECT_MODELS_PATH=src/Domain
 DISSECT_MODELS_NAMESPACE="Acme\\Domain"
 ```
 
-### 🔐 Enabling outside local
+### 🔐 What actually keeps this off your production boxes
 
-The viewer serves your entire schema and writes a file to your project root.
-If you turn it on beyond `local`, gate it:
+Worth being precise, because it is easy to assume more protection than there
+is. The provider is auto-discovered and boots on **every request in every
+environment** where the package is installed. One thing decides whether the
+routes register:
+
+```php
+config('dissect.enabled') === null
+    ? app()->environment('local')   // the default
+    : (bool) config('dissect.enabled');
+```
+
+So the gate is **`APP_ENV`**. Two things have to hold, and dissect controls
+neither of them:
+
+1. Production deploys with `composer install --no-dev`, so a `--dev` install is
+   genuinely absent. This is your deploy command, not something the package can
+   enforce.
+2. `APP_ENV` is not `local` there, and `DISSECT_ENABLED` was not left switched
+   on after somebody debugged something.
+
+Break either — a staging box left at `APP_ENV=local`, a deploy that installs dev
+dependencies — and the viewer is live. Unauthenticated, it serves your full
+schema, every route, every validation rule, and accepts two POSTs that write
+into your project root.
+
+If you enable it anywhere but your own machine, the middleware is the control
+that holds when the environment check does not:
 
 ```php
 'enabled' => true,
 'middleware' => ['web', 'auth', 'can:view-schema'],
 ```
+
+### 🧷 Upgrades and your files
+
+`.dissect/layout.json` and `.dissect/views.json` are yours, and they live in
+your project rather than `vendor/`, so `composer update` cannot touch them.
+
+Both files record the format version they were written in, and dissect will not
+rewrite a file written by a **newer** version than the one you are running — it
+reads it, renders what it understands, and refuses the save with a message
+rather than quietly replacing your layout with the subset it recognised. If a
+future release does change the format, your file is copied to
+`.dissect/layout.json.v1.bak` before the first migrating write. An unparseable
+file is copied to `.dissect/layout.json.corrupt.bak` before being replaced.
+
+Nothing here needs an upgrade step from you. It is worth knowing the refusal
+exists, so that "layout not saved" on a machine running an older dissect reads
+as a version mismatch rather than a bug.
 
 ## 🗂️ Views
 

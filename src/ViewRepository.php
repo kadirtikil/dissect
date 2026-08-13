@@ -2,7 +2,8 @@
 
 namespace KdrDev\Dissect;
 
-use JsonException;
+use KdrDev\Dissect\Concerns\VersionedStateFile;
+use KdrDev\Dissect\Exceptions\StateFileException;
 
 /**
  * Reads and writes the saved views — named subsets of the graph.
@@ -17,6 +18,11 @@ use JsonException;
  */
 class ViewRepository
 {
+    use VersionedStateFile;
+
+    /** Format of the file this version reads and writes. See VersionedStateFile. */
+    public const VERSION = 1;
+
     /** Bounds on what will be accepted, so the file cannot be grown without limit. */
     protected const MAX_VIEWS = 100;
 
@@ -29,20 +35,12 @@ class ViewRepository
     /** @return array{version: int, views: array<int, array{id: string, name: string, models: array<int, string>}>} */
     public function get(): array
     {
-        if (! is_file($this->path)) {
-            return ['version' => 1, 'views' => []];
-        }
-
-        try {
-            $decoded = json_decode((string) file_get_contents($this->path), true, 512, JSON_THROW_ON_ERROR);
-        } catch (JsonException) {
-            // A corrupt views file must never blank the page — the graph is
-            // perfectly usable with no views at all.
-            return ['version' => 1, 'views' => []];
-        }
+        // A missing or corrupt views file must never blank the page — the graph
+        // is perfectly usable with no views at all.
+        $decoded = $this->decode();
 
         return [
-            'version' => 1,
+            'version' => self::VERSION,
             'views' => $this->sanitise($decoded['views'] ?? []),
         ];
     }
@@ -50,26 +48,16 @@ class ViewRepository
     /**
      * @param  array<mixed>  $views
      * @return int Number of views written.
+     *
+     * @throws StateFileException when the existing file must not be overwritten.
      */
     public function put(array $views): int
     {
+        $this->guardWrite();
+
         $clean = $this->sanitise($views);
 
-        $directory = dirname($this->path);
-        if (! is_dir($directory)) {
-            mkdir($directory, 0755, true);
-        }
-
-        $payload = json_encode(
-            ['version' => 1, 'views' => $clean],
-            JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR
-        );
-
-        // Write-then-rename: an interrupted write leaves the previous file
-        // intact rather than a truncated one nothing can parse.
-        $temp = $this->path.'.tmp';
-        file_put_contents($temp, $payload.PHP_EOL);
-        rename($temp, $this->path);
+        $this->writeAtomically(['version' => self::VERSION, 'views' => $clean]);
 
         return count($clean);
     }

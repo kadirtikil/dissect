@@ -2,36 +2,35 @@
 
 namespace KdrDev\Dissect;
 
-use JsonException;
+use KdrDev\Dissect\Concerns\VersionedStateFile;
+use KdrDev\Dissect\Exceptions\StateFileException;
 
 /**
  * Reads and writes the hand-arranged node positions.
  *
  * The file is plain JSON in the application (not in vendor/, which composer
  * wipes, and not in storage/, which is gitignored) so a team can commit and
- * review a layout the same way they review code.
+ * review a layout the same way they review code. Living outside vendor/ is also
+ * what makes it survive `composer update`.
  */
 class LayoutRepository
 {
+    use VersionedStateFile;
+
+    /** Format of the file this version reads and writes. See VersionedStateFile. */
+    public const VERSION = 1;
+
     public function __construct(protected string $path) {}
 
     /** @return array{version: int, positions: array<string, array{x: int, y: int}>} */
     public function get(): array
     {
-        if (! is_file($this->path)) {
-            return ['version' => 1, 'positions' => []];
-        }
-
-        try {
-            $decoded = json_decode((string) file_get_contents($this->path), true, 512, JSON_THROW_ON_ERROR);
-        } catch (JsonException) {
-            // A corrupt layout must never blank the page — fall back to the
-            // computed grid instead.
-            return ['version' => 1, 'positions' => []];
-        }
+        // A missing or corrupt layout must never blank the page — fall back to
+        // the computed grid instead.
+        $decoded = $this->decode();
 
         return [
-            'version' => 1,
+            'version' => self::VERSION,
             'positions' => $this->sanitise($decoded['positions'] ?? []),
         ];
     }
@@ -39,26 +38,16 @@ class LayoutRepository
     /**
      * @param  array<string, mixed>  $positions
      * @return int Number of positions written.
+     *
+     * @throws StateFileException when the existing file must not be overwritten.
      */
     public function put(array $positions): int
     {
+        $this->guardWrite();
+
         $clean = $this->sanitise($positions);
 
-        $directory = dirname($this->path);
-        if (! is_dir($directory)) {
-            mkdir($directory, 0755, true);
-        }
-
-        $payload = json_encode(
-            ['version' => 1, 'positions' => $clean],
-            JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR
-        );
-
-        // Write-then-rename: an interrupted write leaves the previous layout
-        // intact rather than a truncated file nothing can parse.
-        $temp = $this->path.'.tmp';
-        file_put_contents($temp, $payload.PHP_EOL);
-        rename($temp, $this->path);
+        $this->writeAtomically(['version' => self::VERSION, 'positions' => $clean]);
 
         return count($clean);
     }

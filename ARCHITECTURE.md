@@ -138,6 +138,7 @@ DissectServiceProvider    wiring; registers routes only when enabled
   │     └── RouteFingerprint    "has anything behind the route table been edited?"
   ├── LayoutRepository        read/write/sanitise the layout file
   ├── ViewRepository          read/write/sanitise the saved views
+  │     └── Concerns\VersionedStateFile   refuse newer formats, back up older ones
   └── DissectController   page, schema JSON, routes JSON, fingerprint, assets
 ```
 
@@ -471,6 +472,31 @@ basenames). Both hosts validate against the same rules — `ViewRepository` on t
 PHP side, `sanitiseViews()` in the dev-server plugin — so a file written by
 either is one the other accepts.
 
+### The `version` field is load-bearing
+
+Both authored files are rewritten **in full** on every save, and both are read
+through a `sanitise()` that silently drops anything it does not recognise. Those
+two properties are individually reasonable and jointly dangerous: read a file
+written by a future format, and the next save replaces it with whatever subset
+the running version understood — once, without a warning, and the atomic rename
+makes it stick.
+
+`Concerns\VersionedStateFile` is what stops that, and both repositories use it:
+
+| File's version | Behaviour |
+|---|---|
+| Newer than `VERSION` | Readable, **never writable**. `put()` throws `StateFileException`; the controller answers 409 and the page reports "not saved" |
+| Older than `VERSION` | Copied to `<path>.v<n>.bak` before the first migrating write. Never overwritten — the first copy is the one taken before any new-format write |
+| Equal | Ordinary write, no copy |
+| Unparseable | Copied to `<path>.corrupt.bak`, then replaced |
+| Missing or nonsense | Treated as format 1, so a typo cannot lock somebody out of their own file |
+
+The refusal direction matters more than the migration one. A migration is code
+you will write deliberately when you bump the format; the refusal protects
+people you will never hear from — a teammate on an older install, someone who
+rolled back a release — and it only works if it is already in the version they
+are running. `tests/StateVersioningTest.php` pins all of it.
+
 ---
 
 ## Decisions worth not undoing
@@ -481,7 +507,8 @@ either is one the other accepts.
 | **Assets served by a route, not `vendor:publish`** | Nothing to re-publish after `composer update` |
 | **Standalone Blade page, not Inertia** | No dependency on the host's frontend build, Vue version or Tailwind version; the host's design tokens cannot collide with ours |
 | **No vue-router** | The package mounts at an arbitrary prefix, so a path-matching router finds no route and renders nothing |
-| **Routes local-only by default** | It exposes the full schema and writes a file |
+| **Routes local-only by default** | It exposes the full schema and writes a file. The gate is `APP_ENV`, not install-time: the provider is auto-discovered and boots wherever the package is installed, so `middleware` is the control that holds when the environment check does not |
+| **A newer state file is never overwritten** | Both authored files are rewritten in full and sanitised on read, so saving over a format this version does not understand is silent data loss. Refusing has to ship *before* the format changes to be worth anything |
 | **Relations folded into 4 families** | Eloquent has ~11 relation types; a categorical palette cannot carry that many. Polymorphic is also dashed, so family is never colour-alone |
 | **Edge labels hidden until hover** | 75 labels at fit-view zoom is noise, not information |
 | **Views hold membership, not positions** | One position per model means switching views never rearranges the board, and `layout.json` keeps a single writer |

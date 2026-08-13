@@ -73,14 +73,35 @@ class ViewerTest extends TestCase
             ->assertJson(['ok' => false]);
     }
 
+    #[Test]
+    public function it_reports_a_layout_written_by_a_newer_version_instead_of_replacing_it(): void
+    {
+        // The upgrade hazard, end to end: a developer running an older dissect
+        // against a layout a teammate saved with a newer one gets a refusal the
+        // page can show, not a 500 and not a silently truncated file.
+        $path = $this->layoutPath($this->app);
+        mkdir(dirname($path), 0755, true);
+        file_put_contents($path, json_encode(['version' => 99, 'positions' => ['Post' => ['x' => 7, 'y' => 9]]]));
+
+        $this->post('/dissect/layout', ['positions' => ['Post' => ['x' => 1, 'y' => 1]]])
+            ->assertStatus(409)
+            ->assertJson(['ok' => false]);
+
+        $this->assertSame(
+            ['Post' => ['x' => 7, 'y' => 9]],
+            json_decode((string) file_get_contents($path), true)['positions'],
+        );
+    }
+
     protected function tearDown(): void
     {
         $path = $this->layoutPath($this->app);
 
-        if (is_file($path)) {
-            unlink($path);
-            @rmdir(dirname($path));
+        foreach (glob($path.'*') ?: [] as $file) {
+            unlink($file);
         }
+
+        @rmdir(dirname($path));
 
         parent::tearDown();
     }

@@ -10,6 +10,15 @@ return [
     | The viewer exposes your full schema and writes a layout file, so it is
     | restricted to local environments by default. Override deliberately.
     |
+    | Be clear about what the default actually checks: unset means "on when
+    | APP_ENV is local". It is not a build-time or install-time guarantee — the
+    | service provider is auto-discovered and boots on every request wherever
+    | the package is installed, so a production box running APP_ENV=local, or a
+    | deploy that installs dev dependencies, serves the viewer.
+    |
+    | Treat the middleware below as the control that holds when this one does
+    | not.
+    |
     */
 
     'enabled' => env('DISSECT_ENABLED', null),
