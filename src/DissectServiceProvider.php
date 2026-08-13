@@ -5,6 +5,16 @@ namespace KdrDev\Dissect;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Database\DatabaseManager;
 use Illuminate\Database\Eloquent\ModelInspector;
+use Illuminate\Routing\Router;
+use KdrDev\Dissect\Routes\ActionResolver;
+use KdrDev\Dissect\Routes\Ast\ClassSource;
+use KdrDev\Dissect\Routes\ModelLinker;
+use KdrDev\Dissect\Routes\RequestAnalyzer;
+use KdrDev\Dissect\Routes\ResponseAnalyzer;
+use KdrDev\Dissect\Routes\RouteCollector;
+use KdrDev\Dissect\Routes\RouteExporter;
+use KdrDev\Dissect\Routes\RouteFingerprint;
+use KdrDev\Dissect\Routes\RuleNormalizer;
 use KdrDev\Dissect\Types\TypeNormalizerManager;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
@@ -33,6 +43,43 @@ class DissectServiceProvider extends ServiceProvider
             $app->make(MigrationState::class),
             (string) config('dissect.models_path', 'app/Models'),
             config('dissect.models_namespace'),
+        ));
+
+        $this->app->singleton(RouteCollector::class, fn (Application $app) => new RouteCollector(
+            $app->make(Router::class),
+        ));
+
+        $this->app->singleton(ActionResolver::class, fn () => new ActionResolver);
+
+        $this->app->singleton(ClassSource::class, fn () => new ClassSource);
+
+        $this->app->singleton(RuleNormalizer::class, fn () => new RuleNormalizer);
+
+        $this->app->singleton(ModelLinker::class, fn (Application $app) => new ModelLinker(
+            $app->make(SchemaExporter::class),
+        ));
+
+        $this->app->singleton(RequestAnalyzer::class, fn (Application $app) => new RequestAnalyzer(
+            $app->make(ClassSource::class),
+            $app->make(RuleNormalizer::class),
+            $app->make(ModelLinker::class),
+        ));
+
+        $this->app->singleton(RouteFingerprint::class, fn () => new RouteFingerprint(
+            (array) config('dissect.routes.watch_paths', ['app', 'routes']),
+        ));
+
+        $this->app->singleton(ResponseAnalyzer::class, fn (Application $app) => new ResponseAnalyzer(
+            $app->make(ClassSource::class),
+            $app->make(ModelLinker::class),
+        ));
+
+        $this->app->singleton(RouteExporter::class, fn (Application $app) => new RouteExporter(
+            $app->make(RouteCollector::class),
+            $app->make(ActionResolver::class),
+            $app->make(RequestAnalyzer::class),
+            $app->make(ResponseAnalyzer::class),
+            $app->make(RouteFingerprint::class),
         ));
 
         $this->app->singleton(LayoutRepository::class, fn () => new LayoutRepository(

@@ -23,7 +23,7 @@ import type { NodeDragEvent } from '@vue-flow/core'
 const store = useSchemaStore()
 const layout = useLayoutStore()
 const views = useViewsStore()
-const { visibleNodes, visibleEdges, status, error } = storeToRefs(store)
+const { visibleNodes, visibleEdges, status, error, focusRequest } = storeToRefs(store)
 const { activeId, active } = storeToRefs(views)
 
 const { fitView, getSelectedNodes, removeSelectedElements } = useVueFlow()
@@ -69,6 +69,22 @@ watch(shownModels, async (_next, previous) => {
 
   await nextTick()
   fitView({ padding: 0.2, duration: 200 })
+})
+
+/**
+ * Somebody followed a model link from an endpoint.
+ *
+ * Landing on the canvas with the model somewhere off screen is the same as not
+ * having followed anything, so the viewport goes to it. A hidden model — one
+ * the active view filters out — has nothing to fit, and zooming to an empty
+ * spot would be worse than staying put.
+ */
+watch(focusRequest, async (request) => {
+  if (!request) return
+  await nextTick()
+  if (!visibleNodes.value.some((n) => n.id === request.id)) return
+
+  fitView({ nodes: [request.id], padding: 0.6, maxZoom: 1.2, duration: 300 })
 })
 
 /**

@@ -149,6 +149,27 @@ class SchemaExporter
         return $models;
     }
 
+    /**
+     * The table behind each discovered model.
+     *
+     * Deliberately much cheaper than {@see export()}: no inspection, no schema
+     * query, just the name every model can report about itself. It exists so
+     * the route exporter can turn an `exists:authors,id` rule into the node id
+     * `Author` without paying for the whole graph to find out.
+     *
+     * @return array<class-string<Model>, string>
+     */
+    public function tables(): array
+    {
+        $tables = [];
+
+        foreach ($this->discoverModels() as $class) {
+            $tables[$class] = $this->tableFor($class);
+        }
+
+        return $tables;
+    }
+
     /** @return iterable<SplFileInfo> */
     protected function modelFiles(): iterable
     {

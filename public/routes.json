@@ -1,0 +1,315 @@
+{
+    "_comment": "Fixture for the standalone Vite host (pnpm dev). Under the Laravel package this comes from GET /dissect/routes.json instead. Model ids here deliberately match public/schema.json, so the endpoint-to-graph links resolve.",
+    "routes": [
+        {
+            "id": "GET:api/documents",
+            "methods": ["GET"],
+            "uri": "api/documents",
+            "name": "documents.index",
+            "domain": null,
+            "middleware": ["api", "auth:sanctum"],
+            "group": "app",
+            "action": {
+                "type": "controller",
+                "class": "App\\Http\\Controllers\\DocumentController",
+                "method": "index",
+                "label": "DocumentController@index"
+            },
+            "parameters": [],
+            "request": {
+                "source": "inline-validate",
+                "class": null,
+                "confidence": "inferred",
+                "fields": [
+                    {
+                        "path": "folder_id",
+                        "type": "integer",
+                        "required": false,
+                        "rules": ["nullable", "integer", "exists:folders,id"],
+                        "model": "Folder",
+                        "column": "id"
+                    },
+                    {
+                        "path": "status",
+                        "type": "string",
+                        "required": false,
+                        "rules": ["nullable", "in:draft,published"],
+                        "model": null,
+                        "column": null
+                    }
+                ]
+            },
+            "response": {
+                "source": "resource-collection",
+                "class": "App\\Http\\Resources\\DocumentResource",
+                "status": null,
+                "confidence": "certain",
+                "fields": [
+                    { "path": "id", "kind": "scalar", "model": "Document", "column": "id", "conditional": false },
+                    { "path": "title", "kind": "scalar", "model": "Document", "column": "title", "conditional": false },
+                    { "path": "status", "kind": "scalar", "model": "Document", "column": "status", "conditional": false },
+                    { "path": "folder", "kind": "object", "model": "Folder", "column": null, "conditional": true },
+                    { "path": "folder.name", "kind": "scalar", "model": "Folder", "column": "name", "conditional": false }
+                ]
+            },
+            "models": ["Document", "Folder"]
+        },
+        {
+            "id": "POST:api/documents",
+            "methods": ["POST"],
+            "uri": "api/documents",
+            "name": "documents.store",
+            "domain": null,
+            "middleware": ["api", "auth:sanctum"],
+            "group": "app",
+            "action": {
+                "type": "controller",
+                "class": "App\\Http\\Controllers\\DocumentController",
+                "method": "store",
+                "label": "DocumentController@store"
+            },
+            "parameters": [],
+            "request": {
+                "source": "form-request",
+                "class": "App\\Http\\Requests\\StoreDocumentRequest",
+                "confidence": "certain",
+                "fields": [
+                    {
+                        "path": "title",
+                        "type": "string",
+                        "required": true,
+                        "rules": ["required", "string", "max:255"],
+                        "model": null,
+                        "column": null
+                    },
+                    {
+                        "path": "document_type_id",
+                        "type": "integer",
+                        "required": true,
+                        "rules": ["required", "integer", "exists:document_types,id"],
+                        "model": "DocumentType",
+                        "column": "id"
+                    },
+                    {
+                        "path": "tags[].name",
+                        "type": "string",
+                        "required": true,
+                        "rules": ["required", "string", "max:50"],
+                        "model": null,
+                        "column": null
+                    }
+                ]
+            },
+            "response": {
+                "source": "resource",
+                "class": "App\\Http\\Resources\\DocumentResource",
+                "status": 201,
+                "confidence": "certain",
+                "fields": [
+                    { "path": "id", "kind": "scalar", "model": "Document", "column": "id", "conditional": false },
+                    { "path": "title", "kind": "scalar", "model": "Document", "column": "title", "conditional": false }
+                ]
+            },
+            "models": ["Document", "DocumentType"]
+        },
+        {
+            "id": "GET:api/documents/{document}",
+            "methods": ["GET"],
+            "uri": "api/documents/{document}",
+            "name": "documents.show",
+            "domain": null,
+            "middleware": ["api", "auth:sanctum"],
+            "group": "app",
+            "action": {
+                "type": "controller",
+                "class": "App\\Http\\Controllers\\DocumentController",
+                "method": "show",
+                "label": "DocumentController@show"
+            },
+            "parameters": [
+                { "name": "document", "optional": false, "field": null, "pattern": null, "model": "Document" }
+            ],
+            "request": { "source": "none", "class": null, "confidence": "certain", "fields": [] },
+            "response": {
+                "source": "resource",
+                "class": "App\\Http\\Resources\\DocumentResource",
+                "status": null,
+                "confidence": "certain",
+                "fields": [
+                    { "path": "id", "kind": "scalar", "model": "Document", "column": "id", "conditional": false },
+                    { "path": "title", "kind": "scalar", "model": "Document", "column": "title", "conditional": false },
+                    { "path": "variants[]", "kind": "array", "model": "Variant", "column": null, "conditional": true },
+                    { "path": "variants[].name", "kind": "scalar", "model": "Variant", "column": "name", "conditional": false }
+                ]
+            },
+            "models": ["Document", "Variant"]
+        },
+        {
+            "id": "DELETE:api/documents/{document}",
+            "methods": ["DELETE"],
+            "uri": "api/documents/{document}",
+            "name": "documents.destroy",
+            "domain": null,
+            "middleware": ["api", "auth:sanctum"],
+            "group": "app",
+            "action": {
+                "type": "controller",
+                "class": "App\\Http\\Controllers\\DocumentController",
+                "method": "destroy",
+                "label": "DocumentController@destroy"
+            },
+            "parameters": [
+                { "name": "document", "optional": false, "field": null, "pattern": null, "model": "Document" }
+            ],
+            "request": { "source": "none", "class": null, "confidence": "certain", "fields": [] },
+            "response": {
+                "source": "json",
+                "class": "Illuminate\\Http\\JsonResponse",
+                "status": 204,
+                "confidence": "inferred",
+                "fields": [
+                    { "path": "deleted", "kind": "scalar", "model": null, "column": null, "conditional": false }
+                ]
+            },
+            "models": ["Document"]
+        },
+        {
+            "id": "GET:api/workspaces/{workspace}/members",
+            "methods": ["GET"],
+            "uri": "api/workspaces/{workspace}/members",
+            "name": "workspaces.members",
+            "domain": null,
+            "middleware": ["api", "auth:sanctum"],
+            "group": "app",
+            "action": {
+                "type": "controller",
+                "class": "App\\Http\\Controllers\\WorkspaceMemberController",
+                "method": "index",
+                "label": "WorkspaceMemberController@index"
+            },
+            "parameters": [
+                { "name": "workspace", "optional": false, "field": null, "pattern": null, "model": "Workspace" }
+            ],
+            "request": { "source": "none", "class": null, "confidence": "certain", "fields": [] },
+            "response": {
+                "source": "resource-collection",
+                "class": "App\\Http\\Resources\\UserResource",
+                "status": null,
+                "confidence": "inferred",
+                "fields": [
+                    { "path": "id", "kind": "scalar", "model": "User", "column": "id", "conditional": false },
+                    { "path": "name", "kind": "scalar", "model": "User", "column": "name", "conditional": false },
+                    { "path": "email", "kind": "scalar", "model": "User", "column": "email", "conditional": true }
+                ]
+            },
+            "models": ["User", "Workspace"]
+        },
+        {
+            "id": "POST:workspaces",
+            "methods": ["POST"],
+            "uri": "workspaces",
+            "name": "workspaces.store",
+            "domain": null,
+            "middleware": ["web", "throttle:10,1"],
+            "group": "app",
+            "action": {
+                "type": "controller",
+                "class": "App\\Http\\Controllers\\WorkspaceController",
+                "method": "store",
+                "label": "WorkspaceController@store"
+            },
+            "parameters": [],
+            "request": {
+                "source": "inline-validate",
+                "class": null,
+                "confidence": "inferred",
+                "fields": [
+                    {
+                        "path": "name",
+                        "type": "string",
+                        "required": true,
+                        "rules": ["required", "string", "max:255"],
+                        "model": null,
+                        "column": null
+                    },
+                    {
+                        "path": "created_by",
+                        "type": "integer",
+                        "required": true,
+                        "rules": ["required", "integer", "exists:users,id"],
+                        "model": "User",
+                        "column": "id"
+                    }
+                ]
+            },
+            "response": {
+                "source": "redirect",
+                "class": "Illuminate\\Http\\RedirectResponse",
+                "status": null,
+                "confidence": "certain",
+                "fields": []
+            },
+            "models": ["User"]
+        },
+        {
+            "id": "GET:workspaces",
+            "methods": ["GET"],
+            "uri": "workspaces",
+            "name": "workspaces.index",
+            "domain": null,
+            "middleware": ["web"],
+            "group": "app",
+            "action": {
+                "type": "controller",
+                "class": "App\\Http\\Controllers\\WorkspaceController",
+                "method": "index",
+                "label": "WorkspaceController@index"
+            },
+            "parameters": [],
+            "request": { "source": "none", "class": null, "confidence": "certain", "fields": [] },
+            "response": {
+                "source": "view",
+                "class": "Illuminate\\Contracts\\View\\View",
+                "status": null,
+                "confidence": "certain",
+                "fields": []
+            },
+            "models": []
+        },
+        {
+            "id": "GET:sanctum/csrf-cookie",
+            "methods": ["GET"],
+            "uri": "sanctum/csrf-cookie",
+            "name": "sanctum.csrf-cookie",
+            "domain": null,
+            "middleware": ["web"],
+            "group": "vendor",
+            "action": {
+                "type": "controller",
+                "class": "Laravel\\Sanctum\\Http\\Controllers\\CsrfCookieController",
+                "method": "show",
+                "label": "CsrfCookieController@show"
+            },
+            "parameters": [],
+            "request": { "source": "none", "class": null, "confidence": "certain", "fields": [] },
+            "response": { "source": "unknown", "class": null, "status": null, "confidence": "unknown", "fields": [] },
+            "models": []
+        },
+        {
+            "id": "GET:up",
+            "methods": ["GET"],
+            "uri": "up",
+            "name": null,
+            "domain": null,
+            "middleware": ["web"],
+            "group": "framework",
+            "action": { "type": "closure", "class": null, "method": null, "label": "web.php:14" },
+            "parameters": [],
+            "request": { "source": "none", "class": null, "confidence": "certain", "fields": [] },
+            "response": { "source": "unknown", "class": null, "status": null, "confidence": "unknown", "fields": [] },
+            "models": []
+        }
+    ],
+    "generated_at": "2026-08-13T00:00:00+00:00",
+    "fingerprint": "standalonefixture"
+}

@@ -18,7 +18,9 @@ workbench:
   health: false
   discovers:
     web: true
-    api: false
+    # The fixture endpoints the route exporter is developed against live in
+    # workbench/routes/api.php.
+    api: true
     commands: true
     components: false
     factories: false

@@ -47,6 +47,14 @@ class WorkbenchServiceProvider extends ServiceProvider
         config([
             'dissect.models_path' => $useHuge ? $huge : $root.'/workbench/app/Models',
             'dissect.models_namespace' => $useHuge ? 'Workbench\\App\\Huge' : 'Workbench\\App\\Models',
+
+            // Same reason as the models path: base_path() is the throwaway
+            // skeleton, so the defaults ('app', 'routes') would watch a tree
+            // holding none of the fixture controllers or route files.
+            'dissect.routes.watch_paths' => [
+                $root.'/workbench/app',
+                $root.'/workbench/routes',
+            ],
             // Workbench does not report the 'local' environment, and the viewer
             // is local-only by default.
             'dissect.enabled' => true,

@@ -4,6 +4,8 @@ import { Handle, Position, type NodeProps } from '@vue-flow/core'
 import type { ModelNodeData, SchemaColumn } from '@/types/schema'
 import { LAYOUT_DIRECTION, MAX_VISIBLE_COLUMNS } from '@/lib/layout'
 import { useSchemaStore } from '@/stores/schema'
+import { useRoutesStore } from '@/stores/routes'
+import { useUiStore } from '@/stores/ui'
 
 // Handles must face the way the ranks flow, or edges loop back on themselves.
 const targetPosition = LAYOUT_DIRECTION === 'LR' ? Position.Left : Position.Top
@@ -15,6 +17,37 @@ const props = defineProps<NodeProps<ModelNodeData>>()
 
 const store = useSchemaStore()
 const expanded = computed(() => store.expanded.has(props.id))
+
+/**
+ * Ringed because an endpoint on the routes surface touches this model.
+ *
+ * Read from the store rather than carried on the node's data: the nodes array
+ * is replaced wholesale by applySchema, so putting it there would mean
+ * rebuilding every node each time a different endpoint is selected.
+ */
+const highlighted = computed(() => store.highlighted.has(props.id))
+
+const routes = useRoutesStore()
+const ui = useUiStore()
+
+/**
+ * Endpoints touching this model, or null when the list has not been fetched.
+ *
+ * Null is offered as a link anyway: the whole point of the card's link is to go
+ * and look, and refusing to show it until routes.json has been loaded would
+ * mean it only ever appears to somebody who has already been there.
+ */
+const endpointCount = computed(() =>
+  routes.loaded ? (routes.countByModel[props.id] ?? 0) : null,
+)
+
+/** The reverse of the "touches" chip on an endpoint. */
+function openEndpoints(event: MouseEvent) {
+  // The card itself toggles on click; this is a different intent.
+  event.stopPropagation()
+  routes.filterByModel(props.id)
+  ui.setMode('routes')
+}
 
 // MAX_VISIBLE_COLUMNS is shared with the layout, which reserves vertical space
 // from the same number — diverging here would overlap the node below. Expanded
@@ -98,6 +131,7 @@ function onKeydown(event: KeyboardEvent) {
         ? 'border-dashed border-border/70 bg-card/60'
         : 'border-border shadow-sm hover:shadow-md',
       expanded ? 'is-expanded w-[260px] shadow-lg' : 'w-[200px]',
+      highlighted ? 'is-highlighted' : '',
     ]"
     role="button"
     tabindex="0"
@@ -179,6 +213,21 @@ function onKeydown(event: KeyboardEvent) {
       </li>
     </ul>
 
+    <!-- The way out to the other surface. Only on an expanded card: a collapsed
+         one is a shape on a board, and adding a control to two hundred of them
+         would cost more than it gives. -->
+    <button
+      v-if="expanded && !data.external"
+      class="mt-1 flex items-center gap-1 border-t pt-1 font-mono text-[10px] text-muted-foreground hover:text-foreground"
+      :aria-label="`Show endpoints touching ${data.label}`"
+      @pointerdown.stop
+      @click="openEndpoints"
+    >
+      Endpoints
+      <span v-if="endpointCount !== null" class="tabular-nums">· {{ endpointCount }}</span>
+      <span aria-hidden="true">↗</span>
+    </button>
+
     <Handle type="target" :position="targetPosition" />
     <Handle type="source" :position="sourcePosition" />
   </div>
@@ -189,6 +238,16 @@ function onKeydown(event: KeyboardEvent) {
   /* Vue Flow's .selected styling targets its own node wrapper, which this
      custom node replaces, so selection is styled here instead. */
   outline: none;
+}
+
+/* Arrived at from an endpoint. Deliberately a different colour from selection:
+   one is "you picked this", the other is "this is what that endpoint touches",
+   and both can be true of different nodes at the same time. */
+.model-node.is-highlighted {
+  border-color: var(--accent);
+  box-shadow:
+    0 0 0 1px var(--accent),
+    0 0 20px -2px color-mix(in oklch, var(--accent) 55%, transparent);
 }
 
 :global(.vue-flow__node.selected) .model-node {
