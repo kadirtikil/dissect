@@ -1,6 +1,6 @@
 {
     "name": "kdr-dev/dissect",
-    "description": "Visualise your Eloquent models and their relationships as an interactive graph. Keep track of your datamodels.",
+    "description": "Visualise your Eloquent models and their relationships as an interactive graph. Keep track of what route is exposed and how it's requests & responses are build.",
     "keywords": [
         "laravel",
         "eloquent",
