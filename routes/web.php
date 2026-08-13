@@ -5,6 +5,7 @@ use KdrDev\Dissect\Http\Controllers\DissectController;
 
 Route::get('/', [DissectController::class, 'index'])->name('dissect.index');
 Route::get('/schema.json', [DissectController::class, 'schemaJson'])->name('dissect.schema');
+Route::get('/routes.json', [DissectController::class, 'routesJson'])->name('dissect.routes');
 Route::get('/fingerprint', [DissectController::class, 'fingerprintJson'])->name('dissect.fingerprint');
 Route::post('/layout', [DissectController::class, 'saveLayout'])->name('dissect.layout');
 Route::get('/views.json', [DissectController::class, 'viewsJson'])->name('dissect.views');

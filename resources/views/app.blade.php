@@ -29,6 +29,9 @@
             saveUrl: @json(route('dissect.layout')),
             saveViewsUrl: @json(route('dissect.views.save')),
             schemaUrl: @json(route('dissect.schema')),
+            {{-- Not the payload, only where to get it: the endpoint list is
+                 fetched when somebody opens it. --}}
+            routesUrl: @json(route('dissect.routes')),
             fingerprintUrl: @json(route('dissect.fingerprint')),
             fingerprint: @json($fingerprint),
             csrfToken: @json(csrf_token()),

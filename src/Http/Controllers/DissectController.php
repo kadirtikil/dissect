@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Cache;
 use KdrDev\Dissect\LayoutRepository;
+use KdrDev\Dissect\Routes\RouteExporter;
 use KdrDev\Dissect\SchemaExporter;
 use KdrDev\Dissect\ViewRepository;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
@@ -16,8 +17,11 @@ class DissectController
     /** Computed at most once per request — index() needs it twice. */
     protected ?string $fingerprint = null;
 
+    protected ?string $routeFingerprint = null;
+
     public function __construct(
         protected SchemaExporter $exporter,
+        protected RouteExporter $routes,
         protected LayoutRepository $layout,
         protected ViewRepository $views,
     ) {}
@@ -48,13 +52,23 @@ class DissectController
      * and a migration that has actually run — without rebuilding the graph on
      * every check, and with no file watcher process required.
      */
-    public function fingerprintJson(): JsonResponse
+    public function fingerprintJson(Request $request): JsonResponse
     {
+        $payload = ['fingerprint' => $this->fingerprint()];
+
+        // The route signal stats a much wider set of files than the model one,
+        // so it is only computed for a client that has opened the endpoint list
+        // and has something to do with the answer. A page that never leaves the
+        // graph pays nothing for it.
+        if ($request->boolean('routes')) {
+            $payload['routes'] = $this->routeFingerprint();
+        }
+
         // The whole point is to see the current value; a cached 200 would make
         // the page believe nothing had changed for as long as the browser
         // decided to hold on to it.
         return response()
-            ->json(['fingerprint' => $this->fingerprint()])
+            ->json($payload)
             ->header('Cache-Control', 'no-store');
     }
 
@@ -62,6 +76,24 @@ class DissectController
     {
         return response()
             ->json($this->schema())
+            ->header('Cache-Control', 'no-store');
+    }
+
+    /**
+     * The endpoint list.
+     *
+     * Fetched when the routes surface is first opened rather than inlined
+     * alongside the schema: reflecting every controller costs more than
+     * inspecting every model, and the page's promise of booting without a round
+     * trip is about the graph, which is what it opens on.
+     */
+    public function routesJson(): JsonResponse
+    {
+        // The signal travels with the payload it describes. Nothing inlines it
+        // at render time the way the schema fingerprint is inlined, so without
+        // this the client would have no baseline to poll against.
+        return response()
+            ->json($this->routes() + ['fingerprint' => $this->routeFingerprint()])
             ->header('Cache-Control', 'no-store');
     }
 
@@ -143,6 +175,26 @@ class DissectController
     protected function fingerprint(): string
     {
         return $this->fingerprint ??= $this->exporter->fingerprint();
+    }
+
+    protected function routeFingerprint(): string
+    {
+        return $this->routeFingerprint ??= $this->routes->fingerprint();
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function routes(): array
+    {
+        // Dearer to build than the schema — every controller, form request and
+        // resource behind the table gets reflected and parsed — so the cache
+        // matters more here, not less.
+        return Cache::remember(
+            'dissect.routes.'.$this->routeFingerprint(),
+            now()->addHour(),
+            fn () => $this->routes->export(),
+        );
     }
 
     /**

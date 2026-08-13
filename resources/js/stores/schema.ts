@@ -13,6 +13,7 @@ import { familyFor } from '@/lib/relations'
 import { layoutGraph } from '@/lib/layout'
 import { useLayoutStore } from '@/stores/layout'
 import { useViewsStore } from '@/stores/views'
+import { useRoutesStore } from '@/stores/routes'
 import { bootstrap } from '@/lib/bootstrap'
 
 type Status = 'idle' | 'loading' | 'ready' | 'error'
@@ -66,6 +67,34 @@ export const useSchemaStore = defineStore('schema', () => {
    * the end instead of reshuffling the whole board.
    */
   let slotOrder: string[] = []
+
+  /**
+   * Models the routes surface is pointing at — ringed on the canvas.
+   *
+   * Kept apart from Vue Flow's own selection: selection is a gesture somebody
+   * made on the canvas and feeds view membership, whereas this is an answer to
+   * "which models does that endpoint touch". Conflating them would let opening
+   * an endpoint quietly rewrite what a new view would contain.
+   */
+  const highlighted = ref<Set<string>>(new Set())
+
+  /**
+   * A request to bring one model into view. A counter rather than a plain id,
+   * so asking for the same model twice still moves the viewport — the second
+   * click means the same thing as the first.
+   */
+  const focusRequest = ref<{ id: string; seq: number } | null>(null)
+  let focusSeq = 0
+
+  function highlight(ids: string[]) {
+    highlighted.value = new Set(ids)
+  }
+
+  /** Ring these models and centre the first of them. */
+  function focusModels(ids: string[]) {
+    highlight(ids)
+    if (ids.length) focusRequest.value = { id: ids[0]!, seq: ++focusSeq }
+  }
 
   /** Models referenced by a relation but missing from `nodes`. */
   const externalModels = computed(() =>
@@ -269,10 +298,22 @@ export const useSchemaStore = defineStore('schema', () => {
       if (checking || document.hidden) return
       checking = true
 
+      const routes = useRoutesStore()
+
       try {
-        const res = await fetch(url!, { cache: 'no-store' })
+        // The route signal stats a far wider tree than the model one, so it is
+        // only asked for once somebody has actually opened the endpoint list.
+        const res = await fetch(routes.loaded ? `${url!}?routes=1` : url!, { cache: 'no-store' })
         if (!res.ok) return
-        const next = (await res.json())?.fingerprint
+
+        const payload = await res.json()
+        const next = payload?.fingerprint
+
+        if (typeof payload?.routes === 'string' && payload.routes !== routes.fingerprint) {
+          // Independent of the schema half: a controller can change without any
+          // model or migration moving, and the reverse is just as common.
+          await routes.refresh()
+        }
 
         if (typeof next !== 'string' || next === fingerprint.value) return
 
@@ -320,6 +361,10 @@ export const useSchemaStore = defineStore('schema', () => {
     externalModels,
     lastUpdated,
     expanded,
+    highlighted,
+    focusRequest,
+    highlight,
+    focusModels,
     toggleExpanded,
     collapseAll,
     load,

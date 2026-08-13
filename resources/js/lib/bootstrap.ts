@@ -19,6 +19,12 @@ export interface Bootstrap {
   saveViewsUrl?: string
   /** Endpoint the schema can be re-fetched from once it goes stale. */
   schemaUrl?: string
+  /**
+   * Endpoint returning the route table. Only the URL is inlined, never the
+   * payload: reflecting every controller costs more than inspecting every
+   * model, and the page opens on the graph.
+   */
+  routesUrl?: string
   /** Endpoint returning the current change signal — see stores/schema.ts. */
   fingerprintUrl?: string
   /** The signal as of page render; polling compares against this. */

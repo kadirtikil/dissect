@@ -12,6 +12,7 @@ so your team sees the same picture.
 - 🔒 Local-only by default; the viewer exposes your full schema, so it stays off in production unless you switch it on deliberately.
 - 🗂️ Save **views** — named subsets of the graph — so a schema too big to read at once can be read one bounded context at a time.
 - 🔎 Click any card to expand it: every column, with its key, unique, nullable, guarded, hidden and cast flags.
+- 🛣️ Switch to **Routes** for your HTTP surface — every endpoint, what it accepts, what it returns, and which models each one touches.
 
 ## 🚀 Quick start
 
@@ -85,6 +86,7 @@ Three settings are config-file only:
 - **`middleware`** — defaults to `['web']`. Add your auth middleware here if you enable the viewer outside local.
 - **`layout_path`** — defaults to `base_path('.dissect/layout.json')`. Deliberately not in `storage/` (gitignored) or `vendor/` (wiped by `composer install`), because the layout is meant to be committed and shared.
 - **`views_path`** — defaults to `base_path('.dissect/views.json')`, for the same reason: "the billing models" is worth agreeing on once and reviewing in a pull request.
+- **`routes.watch_paths`** — defaults to `['app', 'routes']`. Which directories are watched to notice that the endpoint list has gone stale. Narrow it to the directories that actually hold HTTP code if your `app/` is large.
 
 ### 📁 Models outside `app/Models`
 
@@ -116,11 +118,53 @@ switch to whenever you like.
 - 🧭 A model keeps the same position in every view, so switching hides models rather than rearranging the board.
 - 🤝 The file is plain JSON and meant to be committed, so your team gets the same views you do. Which one *you* have open is remembered per browser, not in the file.
 
+## 🛣️ Routes
+
+The **Routes** tab is the other half of the same question. The graph says what
+your data looks like; this says how you reach it — and, crucially, joins the
+two: every endpoint lists the models it touches, and every field says which
+column it came from.
+
+```
+POST api/invoices                      Request   StoreInvoiceRequest
+auth:sanctum · throttle:60,1             customer_id  integer  req  Customer.id
+                                         lines[].sku  string   req
+Response  resource · 201               Touches
+  id          Invoice.id                 Customer ↗  Invoice ↗  InvoiceLine ↗
+  customer    object  sometimes  Customer
+  lines[]     array   Comment
+```
+
+- 🔗 Click a model in **Touches** to jump to it on the graph, ringed and centred. Expand a model card and click **Endpoints** to go back the other way.
+- 🔎 Filter by path, route name, controller or verb; facet by method and by whose code it is (`app` / `vendor` / `framework`). Nothing is hidden from the export — the facets narrow it.
+- 🗂️ With a saved view open, the endpoint list narrows to the models in it.
+- 🐢 `routes.json` is fetched when you first open the tab, not inlined — so the graph still boots with no round trips.
+
+### 🎯 Where the shapes come from
+
+Requests are read from a `FormRequest`'s `rules()` where one is type-hinted, and
+from an inline `$request->validate([…])` otherwise. Responses are read from the
+return type and the `toArray()` of whatever `JsonResource` it names, nested
+resources included.
+
+Nothing in Laravel can be *asked* what an endpoint returns, so some of this is
+read from your source rather than run. Each shape says which:
+
+| Confidence | Meaning |
+| --- | --- |
+| `certain` | The framework itself produced it — `rules()` ran, or the resource declared its model with `@mixin`. |
+| `inferred` | Read from the source. Usually `rules()` could not run outside a request, or `PostResource` was assumed to describe a `Post`. |
+| `unknown` | The class was found but its shape could not be read. Treat it as incomplete. |
+
+A confidently wrong API description is worse than none, so this is shown rather
+than smoothed over.
+
 ## 🔍 How it works
 
 - **Schema** is built by `SchemaExporter` from Laravel's `ModelInspector` and cached against a fingerprint of your models directory, so the reflection and schema queries run once per model-file change rather than once per request.
+- **Routes** are read from the router itself; the request and response shapes behind them are read from your source with [nikic/php-parser](https://github.com/nikic/PHP-Parser), never by executing it. Cached against its own fingerprint, and only computed once you open the tab.
 - **The page** inlines schema, layout and views into the initial HTML, so it makes no XHR on boot.
-- **Live updates** work by polling that fingerprint — edit a model, and the graph refreshes without a file watcher.
+- **Live updates** work by polling that fingerprint — edit a model, and the graph refreshes without a file watcher. Edit a controller or a form request, and the endpoint list does the same.
 - **Assets** are served straight from the package's `dist/` directory by a route with an allow-list of two filenames. Nothing to publish, nothing to re-publish after an upgrade.
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for the full design.
@@ -136,6 +180,7 @@ pnpm install
 
 composer serve      # build the workbench app and serve it
 composer test       # PHPUnit
+pnpm test:unit      # Vitest
 pnpm test:e2e       # Playwright
 pnpm build          # compile the frontend into dist/
 
@@ -145,6 +190,9 @@ composer huge:clean # and remove it again
 
 The fixture in `workbench/app/Models` is small on purpose — it covers every
 relation family and column kind, and the tests assert against it. 🐘
+`workbench/app/Http` and `workbench/routes` do the same job for the endpoint
+list: a form request whose `rules()` cannot be run, a resource with no model
+behind it, a closure route, an invokable controller.
 `composer serve:huge` generates the opposite fixture, a schema large enough to
 show what layout, the minimap and saved views do under load.
 

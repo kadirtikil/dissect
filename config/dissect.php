@@ -45,6 +45,28 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Routes
+    |--------------------------------------------------------------------------
+    |
+    | The endpoint list is read from the router itself, so there is nothing to
+    | configure about which routes exist. What does need saying is where the
+    | code behind them lives: a route can change because a route file changed,
+    | or a controller did, or a form request gained a rule, and these are the
+    | directories watched for that.
+    |
+    | Widening this costs a file stat per file on each check; narrowing it to
+    | the directories that actually hold HTTP code is the cheaper end.
+    |
+    */
+
+    'routes' => [
+
+        'watch_paths' => ['app', 'routes'],
+
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Vite dev server
     |--------------------------------------------------------------------------
     |
