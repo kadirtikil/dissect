@@ -12,7 +12,7 @@ test('opens the endpoint list on demand and groups it by controller', async ({ p
   await page.goto('/')
   await expect(page.locator('.vue-flow__node')).toHaveCount(22)
 
-  await page.getByRole('tab', { name: 'routes' }).click()
+  await page.getByRole('button', { name: 'Routes', exact: true }).click()
 
   await expect(page.getByText(/\d+ of \d+ endpoints/)).toBeVisible()
   await expect(page.getByRole('button', { name: /DocumentController/ })).toBeVisible()
@@ -21,7 +21,7 @@ test('opens the endpoint list on demand and groups it by controller', async ({ p
 
 test('narrows the list by search and by facet, and clears again', async ({ page }) => {
   await page.goto('/')
-  await page.getByRole('tab', { name: 'routes' }).click()
+  await page.getByRole('button', { name: 'Routes', exact: true }).click()
 
   const rows = page.locator('li button')
   // The list is fetched when the surface opens, so counting before it lands
@@ -43,7 +43,7 @@ test('narrows the list by search and by facet, and clears again', async ({ page 
 
 test('describes an endpoint down to the column each field comes from', async ({ page }) => {
   await page.goto('/')
-  await page.getByRole('tab', { name: 'routes' }).click()
+  await page.getByRole('button', { name: 'Routes', exact: true }).click()
 
   await page.locator('li button', { hasText: 'api/documents' }).filter({ hasText: 'POST' }).click()
 
@@ -58,7 +58,7 @@ test('describes an endpoint down to the column each field comes from', async ({ 
 
 test('admits when a shape was inferred rather than read from the framework', async ({ page }) => {
   await page.goto('/')
-  await page.getByRole('tab', { name: 'routes' }).click()
+  await page.getByRole('button', { name: 'Routes', exact: true }).click()
 
   await page.locator('li button', { hasText: 'workspaces' }).filter({ hasText: 'POST' }).click()
 
@@ -72,14 +72,14 @@ test('follows an endpoint to the model it touches, and back again', async ({ pag
   await page.goto('/')
   await expect(page.locator('.vue-flow__node')).toHaveCount(22)
 
-  await page.getByRole('tab', { name: 'routes' }).click()
+  await page.getByRole('button', { name: 'Routes', exact: true }).click()
   await page.locator('li button', { hasText: 'api/documents/{document}' }).filter({ hasText: 'GET' }).click()
 
   await page.locator('section', { hasText: 'TOUCHES' }).getByRole('button', { name: 'Variant' }).click()
 
   // The jump switches surface as well as centring: landing on the canvas with
   // the model off screen is the same as not having followed anything.
-  await expect(page.getByRole('tab', { name: 'models' })).toHaveAttribute('aria-selected', 'true')
+  await expect(page.getByRole('button', { name: 'Models', exact: true })).toHaveAttribute('aria-current', 'page')
   await expect(page.locator('.model-node.is-highlighted')).toHaveCount(1)
   await expect(page.locator('.model-node.is-highlighted')).toContainText('Variant')
 
@@ -91,21 +91,21 @@ test('follows an endpoint to the model it touches, and back again', async ({ pag
   await card.click()
   await card.getByRole('button', { name: /Show endpoints touching Document/ }).click()
 
-  await expect(page.getByRole('tab', { name: 'routes' })).toHaveAttribute('aria-selected', 'true')
+  await expect(page.getByRole('button', { name: 'Routes', exact: true })).toHaveAttribute('aria-current', 'page')
   await expect(page.getByRole('button', { name: /Stop filtering to Document/ })).toBeVisible()
   await expect(page.locator('li button')).toHaveCount(4)
 })
 
 test('remembers which surface was open across a reload', async ({ page }) => {
   await page.goto('/')
-  await page.getByRole('tab', { name: 'routes' }).click()
+  await page.getByRole('button', { name: 'Routes', exact: true }).click()
   await expect(page.getByText(/\d+ of \d+ endpoints/)).toBeVisible()
 
   await page.reload()
 
   // Per browser, deliberately not in a committed file — the same call the
   // active saved view makes.
-  await expect(page.getByRole('tab', { name: 'routes' })).toHaveAttribute('aria-selected', 'true')
+  await expect(page.getByRole('button', { name: 'Routes', exact: true })).toHaveAttribute('aria-current', 'page')
 
-  await page.getByRole('tab', { name: 'models' }).click()
+  await page.getByRole('button', { name: 'Models', exact: true }).click()
 })

@@ -1,18 +1,14 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
+import { isPageId, type PageId } from '@/pages/registry'
 
 /**
  * Which page is on screen.
  *
- * Called a page rather than a mode because these are becoming surfaces of their
- * own behind a sidebar, and a third is already planned. `PageId` is the id a
- * page is addressed by everywhere — in the store, in the URL, and (shortly) in
- * the registry a new surface is added to.
+ * Knows no page by name: what exists is the registry's business, and this only
+ * asks whether an id is one of them. Adding a surface is an entry there and
+ * nothing here.
  */
-export type PageId = 'models' | 'routes'
-
-const PAGES: readonly PageId[] = ['models', 'routes']
-
 const DEFAULT_PAGE: PageId = 'models'
 
 /**
@@ -63,7 +59,7 @@ export const useNavigationStore = defineStore('navigation', () => {
 function fromHash(): PageId | null {
   const id = window.location.hash.replace(/^#\/?/, '')
 
-  return PAGES.includes(id as PageId) ? (id as PageId) : null
+  return isPageId(id) ? id : null
 }
 
 function syncHash(page: PageId, replace: boolean) {
@@ -93,7 +89,7 @@ function stored(): PageId | null {
   try {
     const id = localStorage.getItem(STORAGE_KEY)
 
-    return PAGES.includes(id as PageId) ? (id as PageId) : null
+    return isPageId(id) ? id : null
   } catch {
     return null
   }

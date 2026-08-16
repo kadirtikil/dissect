@@ -64,10 +64,15 @@ test('saves a selection as a view, switches to it and deletes it', async ({ page
   const first = (await page.locator('[data-id="AccessGrant"]').boundingBox())!
   const second = (await page.locator('[data-id="Activity"]').boundingBox())!
 
+  // Clamped to the pane: the gutter left of the column is only canvas as far as
+  // the sidebar, and a drag starting outside it never reaches Vue Flow at all.
+  const pane = (await page.locator('.vue-flow__pane').boundingBox())!
+  const gutterX = Math.max(first.x - 90, pane.x + 8)
+
   await page.keyboard.down('Shift')
   // Starts in the empty gutter left of the column — and deliberately drags
   // across edges, which used to swallow the gesture.
-  await page.mouse.move(first.x - 90, second.y + second.height + 10)
+  await page.mouse.move(gutterX, second.y + second.height + 10)
   await page.mouse.down()
   await page.mouse.move(first.x + first.width + 10, first.y - 10, { steps: 12 })
   await page.mouse.up()
