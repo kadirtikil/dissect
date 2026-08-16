@@ -6,11 +6,11 @@ import MethodBadge from '@/components/MethodBadge.vue'
 import FieldTree from '@/components/FieldTree.vue'
 import { useRoutesStore } from '@/stores/routes'
 import { useSchemaStore } from '@/stores/schema'
-import { useUiStore } from '@/stores/ui'
+import { useNavigationStore } from '@/stores/navigation'
 
 const store = useRoutesStore()
 const schema = useSchemaStore()
-const ui = useUiStore()
+const nav = useNavigationStore()
 const { selected } = storeToRefs(store)
 
 /** Node ids the graph actually has — a chip for a model outside the scan would
@@ -26,11 +26,12 @@ const known = computed(() => new Set(schema.nodes.map((n) => n.id)))
  */
 function openModel(id: string) {
   schema.focusModels([id])
-  ui.setMode('models')
+  nav.go('models')
 }
 
 const bodyless = computed(
-  () => selected.value?.response?.source === 'view' || selected.value?.response?.source === 'redirect',
+  () =>
+    selected.value?.response?.source === 'view' || selected.value?.response?.source === 'redirect',
 )
 
 const requestSummary = computed(() => {
@@ -176,10 +177,7 @@ const requestSummary = computed(() => {
 
       <!-- A view or a redirect has no payload to describe. "No fields found"
            would read as a failure to look, rather than as the answer. -->
-      <p
-        v-else-if="bodyless"
-        class="mt-1 font-mono text-[11px] text-muted-foreground/70 italic"
-      >
+      <p v-else-if="bodyless" class="mt-1 font-mono text-[11px] text-muted-foreground/70 italic">
         {{ selected.response.source === 'view' ? 'Renders a view' : 'Redirects' }} — no JSON body.
       </p>
 

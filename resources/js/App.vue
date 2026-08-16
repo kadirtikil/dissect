@@ -13,7 +13,7 @@ import { useSchemaStore } from '@/stores/schema'
 import { useLayoutStore } from '@/stores/layout'
 import { useViewsStore } from '@/stores/views'
 import { useRoutesStore } from '@/stores/routes'
-import { useUiStore } from '@/stores/ui'
+import { useNavigationStore } from '@/stores/navigation'
 
 const isDark = useDark()
 const toggleDark = useToggle(isDark)
@@ -22,12 +22,12 @@ const schema = useSchemaStore()
 const layout = useLayoutStore()
 const views = useViewsStore()
 const routes = useRoutesStore()
-const ui = useUiStore()
+const nav = useNavigationStore()
 const { stats, status, lastUpdated, expanded } = storeToRefs(schema)
 const { positions, saving, saveError } = storeToRefs(layout)
 const { active: activeView } = storeToRefs(views)
 const { stats: routeStats, status: routeStatus } = storeToRefs(routes)
-const { mode } = storeToRefs(ui)
+const { current: page } = storeToRefs(nav)
 
 const pinnedCount = computed(() => Object.keys(positions.value).length)
 
@@ -75,23 +75,25 @@ async function confirmReset() {
 
       <Separator orientation="vertical" class="mx-1 h-full" />
 
-      <!-- Two surfaces, no router: the package mounts at an arbitrary prefix,
-           so a path-matching router would find no route at all. -->
+      <!-- Two surfaces, and still no router. The page is registered as exactly
+           one GET route with no SPA fallback behind it, so a path-matching
+           router would 404 on reload however the prefix were resolved — the
+           navigation store addresses pages by fragment instead. -->
       <div class="flex items-center gap-0.5 rounded-md bg-muted p-0.5" role="tablist">
         <button
-          v-for="tab in (['models', 'routes'] as const)"
+          v-for="tab in ['models', 'routes'] as const"
           :key="tab"
           class="rounded-sm px-2 py-1 font-mono text-xs capitalize"
-          :class="mode === tab ? 'bg-background shadow-sm' : 'text-muted-foreground'"
+          :class="page === tab ? 'bg-background shadow-sm' : 'text-muted-foreground'"
           role="tab"
-          :aria-selected="mode === tab"
-          @click="ui.setMode(tab)"
+          :aria-selected="page === tab"
+          @click="nav.go(tab)"
         >
           {{ tab }}
         </button>
       </div>
 
-      <template v-if="mode === 'models'">
+      <template v-if="page === 'models'">
         <span v-if="status === 'ready'" class="font-mono text-xs text-muted-foreground">
           <!-- While a view is open the totals describe the schema, not what is on
                screen, so the visible count is what leads. -->
@@ -138,7 +140,7 @@ async function confirmReset() {
              board is hard to read — this is the way back out without hunting
              for each one. -->
         <Button
-          v-if="mode === 'models' && expanded.size"
+          v-if="page === 'models' && expanded.size"
           variant="ghost"
           size="sm"
           class="font-mono text-xs"
@@ -150,7 +152,7 @@ async function confirmReset() {
         </Button>
 
         <Button
-          v-if="mode === 'models' && pinnedCount"
+          v-if="page === 'models' && pinnedCount"
           :variant="confirming ? 'destructive' : 'ghost'"
           size="sm"
           class="font-mono text-xs"
@@ -177,11 +179,11 @@ async function confirmReset() {
       <!-- The canvas stays mounted while the routes surface is open: it owns
            the schema load and the change poller, and remounting it would drop
            the viewport somebody arranged as well as restarting both. -->
-      <GraphCanvas v-show="mode === 'models'" />
+      <GraphCanvas v-show="page === 'models'" />
 
       <!-- Mounted on first use, though — that is what makes routes.json a
            fetch somebody asked for rather than a cost every page load pays. -->
-      <RoutesPanel v-if="mode === 'routes'" />
+      <RoutesPanel v-if="page === 'routes'" />
     </main>
   </div>
 </template>

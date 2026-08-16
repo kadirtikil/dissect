@@ -5,7 +5,7 @@ import type { ModelNodeData, SchemaColumn } from '@/types/schema'
 import { LAYOUT_DIRECTION, MAX_VISIBLE_COLUMNS } from '@/lib/layout'
 import { useSchemaStore } from '@/stores/schema'
 import { useRoutesStore } from '@/stores/routes'
-import { useUiStore } from '@/stores/ui'
+import { useNavigationStore } from '@/stores/navigation'
 
 // Handles must face the way the ranks flow, or edges loop back on themselves.
 const targetPosition = LAYOUT_DIRECTION === 'LR' ? Position.Left : Position.Top
@@ -28,7 +28,7 @@ const expanded = computed(() => store.expanded.has(props.id))
 const highlighted = computed(() => store.highlighted.has(props.id))
 
 const routes = useRoutesStore()
-const ui = useUiStore()
+const nav = useNavigationStore()
 
 /**
  * Endpoints touching this model, or null when the list has not been fetched.
@@ -37,16 +37,14 @@ const ui = useUiStore()
  * and look, and refusing to show it until routes.json has been loaded would
  * mean it only ever appears to somebody who has already been there.
  */
-const endpointCount = computed(() =>
-  routes.loaded ? (routes.countByModel[props.id] ?? 0) : null,
-)
+const endpointCount = computed(() => (routes.loaded ? (routes.countByModel[props.id] ?? 0) : null))
 
 /** The reverse of the "touches" chip on an endpoint. */
 function openEndpoints(event: MouseEvent) {
   // The card itself toggles on click; this is a different intent.
   event.stopPropagation()
   routes.filterByModel(props.id)
-  ui.setMode('routes')
+  nav.go('routes')
 }
 
 // MAX_VISIBLE_COLUMNS is shared with the layout, which reserves vertical space
