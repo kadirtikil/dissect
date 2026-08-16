@@ -4,12 +4,13 @@ import { storeToRefs } from 'pinia'
 import RouteFilters from '@/components/RouteFilters.vue'
 import RouteList from '@/components/RouteList.vue'
 import RouteDetail from '@/components/RouteDetail.vue'
+import { PAGE_CONTEXT } from '@/lib/toolbar'
 import { useRoutesStore } from '@/stores/routes'
 import { useSchemaStore } from '@/stores/schema'
 
 const store = useRoutesStore()
 const schema = useSchemaStore()
-const { status, error, highlightedModels } = storeToRefs(store)
+const { status, error, highlightedModels, stats } = storeToRefs(store)
 
 /**
  * Keeps the canvas in step with what is selected here.
@@ -28,6 +29,16 @@ onMounted(() => store.load())
 
 <template>
   <div class="flex h-full w-full">
+    <!-- No guard needed: this panel only exists while its own page is open. -->
+    <Teleport defer :to="PAGE_CONTEXT">
+      <span class="font-mono text-xs text-muted-foreground">
+        <template v-if="status === 'ready'">
+          {{ stats.visible }} of {{ stats.total }} endpoints
+        </template>
+        <template v-else>HTTP surface</template>
+      </span>
+    </Teleport>
+
     <div
       v-if="status === 'loading'"
       class="grid flex-1 place-items-center font-mono text-xs text-muted-foreground"

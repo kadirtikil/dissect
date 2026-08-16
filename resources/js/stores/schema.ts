@@ -122,6 +122,14 @@ export const useSchemaStore = defineStore('schema', () => {
       : edges.value
   })
 
+  /**
+   * When the export behind the current graph was built.
+   *
+   * Distinct from `lastUpdated`, which is when this browser noticed a change —
+   * the overview wants the age of the data, not the age of the tab.
+   */
+  const generatedAt = computed(() => lastSchema.value?.generated_at ?? null)
+
   const stats = computed(() => ({
     // Scanned models only — externals are counted separately so the two
     // numbers sum to the node count rather than overlapping.
@@ -358,6 +366,7 @@ export const useSchemaStore = defineStore('schema', () => {
     visibleNodes,
     visibleEdges,
     stats,
+    generatedAt,
     externalModels,
     lastUpdated,
     expanded,

@@ -106,6 +106,11 @@ export interface SchemaEdge {
 export interface Schema {
   nodes: SchemaNode[]
   edges: SchemaEdge[]
+  /**
+   * When the exporter built this payload. Optional because a host may be
+   * running a version of the package from before it was emitted.
+   */
+  generated_at?: string
 }
 
 /**
