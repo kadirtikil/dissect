@@ -1,9 +1,22 @@
-import { test, expect } from '@playwright/test'
+import { test, expect, type Page } from '@playwright/test'
+
+/**
+ * The graph is no longer what the app opens on, so a test that works with it
+ * has to ask for it.
+ *
+ * Counting nodes would pass either way — the canvas stays mounted behind the
+ * overview, so its nodes are in the DOM throughout — but nothing on it can be
+ * clicked or measured while it is hidden, which is the trap this avoids.
+ */
+async function openGraph(page: Page) {
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Models', exact: true }).click()
+}
 
 // See here how to get started:
 // https://playwright.dev/docs/intro
 test('renders the schema graph on the app root url', async ({ page }) => {
-  await page.goto('/')
+  await openGraph(page)
   await expect(page.getByText('dissect')).toBeVisible()
 
   // 20 scanned models + 2 referenced-but-unscanned placeholders.
@@ -14,7 +27,7 @@ test('renders the schema graph on the app root url', async ({ page }) => {
 })
 
 test('lays models out in columns of five', async ({ page }) => {
-  await page.goto('/')
+  await openGraph(page)
   // Wait on the count, not on .first() — the graph is populated by an async
   // fetch, and the nodes do not exist at all until it resolves.
   await expect(page.locator('.vue-flow__node')).toHaveCount(22)
@@ -33,7 +46,7 @@ test('lays models out in columns of five', async ({ page }) => {
 })
 
 test('expands a card to its full attribute list, and collapses again', async ({ page }) => {
-  await page.goto('/')
+  await openGraph(page)
   await expect(page.locator('.vue-flow__node')).toHaveCount(22)
 
   // Document has more columns than a collapsed card lists, so the truncation
@@ -55,7 +68,7 @@ test('expands a card to its full attribute list, and collapses again', async ({ 
 
 test('saves a selection as a view, switches to it and deletes it', async ({ page }) => {
   await page.setViewportSize({ width: 1400, height: 900 })
-  await page.goto('/')
+  await openGraph(page)
   await expect(page.locator('.vue-flow__node')).toHaveCount(22)
 
   // Box-select the first grid column's top two models. Coordinates come from
@@ -106,7 +119,7 @@ test('saves a selection as a view, switches to it and deletes it', async ({ page
 })
 
 test('builds a view from the model list and extends it afterwards', async ({ page }) => {
-  await page.goto('/')
+  await openGraph(page)
   await expect(page.locator('.vue-flow__node')).toHaveCount(22)
 
   // No canvas selection anywhere in this test: the list is the whole interface.

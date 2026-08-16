@@ -57,7 +57,7 @@ async function confirmReset() {
   store.relayout()
 }
 
-const { fitView, getSelectedNodes, removeSelectedElements } = useVueFlow()
+const { fitView, getSelectedNodes, removeSelectedElements, dimensions } = useVueFlow()
 
 // markRaw: Vue must not try to make the component definition reactive, and a
 // stable object keeps Vue Flow from re-registering node types on every render.
@@ -101,6 +101,35 @@ watch(shownModels, async (_next, previous) => {
   await nextTick()
   fitView({ padding: 0.2, duration: 200 })
 })
+
+/**
+ * The first fit has to wait until this canvas is actually on screen.
+ *
+ * It is mounted for the whole session, so the schema can finish loading while
+ * another page is showing — and a `display: none` container has no dimensions
+ * for Vue Flow to fit against, leaving the board wherever the default viewport
+ * happened to put it. Only the first fit is deferred: refitting on every return
+ * would throw away the viewport somebody arranged, which is the entire reason
+ * this component stays mounted.
+ */
+const fitted = ref(false)
+
+// Vue Flow measures the pane with a ResizeObserver, so its dimensions arrive a
+// beat after the container is shown — waiting on them rather than on nextTick
+// is the difference between fitting the board and fitting nothing.
+const measured = computed(() => dimensions.value.width > 0 && dimensions.value.height > 0)
+
+watch(
+  [page, status, measured],
+  async ([current, ready, sized]) => {
+    if (fitted.value || current !== 'models' || ready !== 'ready' || !sized) return
+
+    await nextTick()
+    fitView({ padding: 0.2 })
+    fitted.value = true
+  },
+  { immediate: true },
+)
 
 /**
  * Somebody followed a model link from an endpoint.
@@ -170,57 +199,57 @@ function onNodeDragStop(event: NodeDragEvent) {
          Withheld by hand because this canvas stays mounted while another
          surface is on screen — a page that unmounts gets the same for free. -->
     <template v-if="page === 'models'">
-    <Teleport defer :to="PAGE_CONTEXT">
-      <span v-if="status === 'ready'" class="font-mono text-xs text-muted-foreground">
-        <!-- While a view is open the totals describe the schema, not what is on
+      <Teleport defer :to="PAGE_CONTEXT">
+        <span v-if="status === 'ready'" class="font-mono text-xs text-muted-foreground">
+          <!-- While a view is open the totals describe the schema, not what is on
              screen, so the visible count is what leads. -->
-        <template v-if="active">
-          {{ stats.visible }} of {{ stats.models + stats.external }} models
-        </template>
-        <template v-else>
-          {{ stats.models }} models · {{ stats.relations }} relations
-          <template v-if="stats.external"> · {{ stats.external }} external </template>
-        </template>
-      </span>
-      <span v-else class="font-mono text-xs text-muted-foreground">Model relationships</span>
+          <template v-if="active">
+            {{ stats.visible }} of {{ stats.models + stats.external }} models
+          </template>
+          <template v-else>
+            {{ stats.models }} models · {{ stats.relations }} relations
+            <template v-if="stats.external"> · {{ stats.external }} external </template>
+          </template>
+        </span>
+        <span v-else class="font-mono text-xs text-muted-foreground">Model relationships</span>
 
-      <ViewMenu v-if="status === 'ready'" />
-    </Teleport>
+        <ViewMenu v-if="status === 'ready'" />
+      </Teleport>
 
-    <Teleport defer :to="PAGE_ACTIONS">
-      <!-- Expanded cards float over their neighbours, so with several open the
+      <Teleport defer :to="PAGE_ACTIONS">
+        <!-- Expanded cards float over their neighbours, so with several open the
            board is hard to read — this is the way back out without hunting for
            each one. -->
-      <Button
-        v-if="expanded.size"
-        variant="ghost"
-        size="sm"
-        class="font-mono text-xs"
-        :aria-label="`Collapse ${expanded.size} expanded models`"
-        @click="store.collapseAll()"
-      >
-        <ChevronsDownUp class="size-3.5" />
-        Collapse · {{ expanded.size }}
-      </Button>
+        <Button
+          v-if="expanded.size"
+          variant="ghost"
+          size="sm"
+          class="font-mono text-xs"
+          :aria-label="`Collapse ${expanded.size} expanded models`"
+          @click="store.collapseAll()"
+        >
+          <ChevronsDownUp class="size-3.5" />
+          Collapse · {{ expanded.size }}
+        </Button>
 
-      <!-- Only offer the reset once something has actually been placed. -->
-      <Button
-        v-if="pinnedCount"
-        :variant="confirming ? 'destructive' : 'ghost'"
-        size="sm"
-        class="font-mono text-xs"
-        :disabled="saving"
-        :aria-label="
-          confirming
-            ? 'Confirm resetting the saved layout'
-            : `Reset saved layout (${pinnedCount} placed)`
-        "
-        @click="confirming ? confirmReset() : askReset()"
-      >
-        <RotateCcw class="size-3.5" />
-        {{ confirming ? 'Reset layout?' : `Reset layout · ${pinnedCount}` }}
-      </Button>
-    </Teleport>
+        <!-- Only offer the reset once something has actually been placed. -->
+        <Button
+          v-if="pinnedCount"
+          :variant="confirming ? 'destructive' : 'ghost'"
+          size="sm"
+          class="font-mono text-xs"
+          :disabled="saving"
+          :aria-label="
+            confirming
+              ? 'Confirm resetting the saved layout'
+              : `Reset saved layout (${pinnedCount} placed)`
+          "
+          @click="confirming ? confirmReset() : askReset()"
+        >
+          <RotateCcw class="size-3.5" />
+          {{ confirming ? 'Reset layout?' : `Reset layout · ${pinnedCount}` }}
+        </Button>
+      </Teleport>
     </template>
 
     <div

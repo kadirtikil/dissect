@@ -9,12 +9,23 @@ import { isPageId, type PageId } from '@/pages/registry'
  * asks whether an id is one of them. Adding a surface is an entry there and
  * nothing here.
  */
-const DEFAULT_PAGE: PageId = 'models'
+/**
+ * Where somebody with no history lands: the overview, which is what the tool is
+ * for saying. Anyone who has been here before is returned to the surface they
+ * left, so the daily case does not pay a click to get past an introduction it
+ * has already read.
+ */
+const DEFAULT_PAGE: PageId = 'landing'
 
 /**
  * Persisted per browser, deliberately not in a committed file — the same call
  * already made for which saved view is open. What somebody happens to be
  * looking at is theirs, not the team's.
+ *
+ * Still spelled "mode" after the rename to pages. The values it holds mean
+ * exactly what they always did, so a new key would buy nothing but throw away
+ * every existing reader's place — a migration whose only effect is the harm it
+ * was written to avoid.
  */
 const STORAGE_KEY = 'dissect:mode'
 

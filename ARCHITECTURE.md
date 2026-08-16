@@ -265,9 +265,11 @@ resources that embed each other from unrolling forever.
 
 ```
 main.ts                 mounts App; no router (see "Decisions")
-└── App.vue             header, mode switch, stats, theme toggle, reset button
-    ├── ViewMenu        saved views: switch, edit membership, create, delete
+└── App.vue             the shell: sidebar, page header, the open page
+    ├── AppSidebar      brand, one nav button per registry entry, theme toggle
+    ├── LandingPage     the overview: counts, entry points, freshness
     ├── GraphCanvas     Vue Flow wiring, loading/error states, drag handling
+    │   ├── ViewMenu    saved views: switch, edit membership, create, delete
     │   ├── ModelNode   one model: name, table, relation count, columns
     │   └── GraphLegend relation families
     └── RoutesPanel     list ▏ detail
@@ -280,7 +282,9 @@ stores/schema.ts        load → normalise → order → place → filter to the
 stores/layout.ts        saved positions, debounce, prune, persist
 stores/views.ts         saved views, active view, persist
 stores/routes.ts        lazy load, filter state, selection
-stores/ui.ts            which surface is open, persisted per browser
+stores/navigation.ts    which page is open: fragment, then storage, then default
+pages/registry.ts       every page there is — the one file a new surface is added to
+lib/toolbar.ts          where a page hangs its own header controls
 lib/layout.ts           the grid: pure function of node index
 lib/relations.ts        relation type → family → colour
 lib/httpMethods.ts      verb → colour, on the same ramp
@@ -288,12 +292,24 @@ lib/routeFilters.ts     pure predicates + facet counts (the unit-tested part)
 lib/bootstrap.ts        the host seam
 ```
 
-### The two surfaces
+### Pages
 
-`GraphCanvas` stays mounted while the routes panel is open (`v-show`): it owns
-the schema load and the change poller, and remounting it would drop the viewport
-somebody arranged as well as restarting both. `RoutesPanel` is `v-if`, which is
-what makes `routes.json` a fetch somebody asked for.
+Every surface is an entry in `pages/registry.ts` — id, label, icon, and either a
+lazy import or the `persistent` flag. The sidebar, the navigation store and the
+shell all read from it, so adding a surface is that entry plus the page itself.
+
+`GraphCanvas` is the exception the flag exists for: the shell holds it directly
+and hides it with `v-show`. It owns the schema load and the change poller — the
+one the routes surface also depends on — and remounting it would drop the
+viewport somebody arranged as well as restarting both. Because it can therefore
+finish loading while another page is on screen, and a hidden container has no
+dimensions to fit against, its first `fitView` waits on Vue Flow's measured
+dimensions rather than on mount. Every other page mounts on arrival and unmounts
+on leaving, which is what keeps `routes.json` a fetch somebody asked for.
+
+A page contributes its own header controls by teleporting them into one of the
+two regions in `lib/toolbar.ts`. The shell owns the mount points and knows
+nothing about what lands in them.
 
 The cross-link runs in both directions and is what stops this being two screens
 that happen to share a header:
@@ -506,7 +522,8 @@ are running. `tests/StateVersioningTest.php` pins all of it.
 | **`dist/` is committed** | The package serves it directly. One `composer require`, no build step in the host app. `.gitignore` and Tailwind's `@source not` both encode this |
 | **Assets served by a route, not `vendor:publish`** | Nothing to re-publish after `composer update` |
 | **Standalone Blade page, not Inertia** | No dependency on the host's frontend build, Vue version or Tailwind version; the host's design tokens cannot collide with ours |
-| **No vue-router** | The package mounts at an arbitrary prefix, so a path-matching router finds no route and renders nothing |
+| **No vue-router** | The page is registered as exactly one GET route with no SPA fallback, so a reload on a path-matching route 404s however the mount prefix is resolved. Pages are addressed by fragment instead (`stores/navigation.ts`), which never reaches the server. Three flat pages with no params also buy nothing from a router |
+| **The graph is not mounted by the page registry** | It starts the change poller the routes surface also depends on. Mount it lazily like the others and live updates elsewhere stop until somebody visits the graph. `pages/registry.ts` carries the warning next to the flag |
 | **Routes local-only by default** | It exposes the full schema and writes a file. The gate is `APP_ENV`, not install-time: the provider is auto-discovered and boots wherever the package is installed, so `middleware` is the control that holds when the environment check does not |
 | **A newer state file is never overwritten** | Both authored files are rewritten in full and sanitised on read, so saving over a format this version does not understand is silent data loss. Refusing has to ship *before* the format changes to be worth anything |
 | **Relations folded into 4 families** | Eloquent has ~11 relation types; a categorical palette cannot carry that many. Polymorphic is also dashed, so family is never colour-alone |
@@ -542,6 +559,9 @@ Config (`config/dissect.php`): `enabled`, `path`, `middleware`,
 
 | Task | File |
 |---|---|
+| Add a surface (page) | `resources/js/pages/registry.ts` — one entry, plus the page component |
+| Change a page's own header controls | that page's component, teleporting into `resources/js/lib/toolbar.ts` |
+| Change which page opens by default | `DEFAULT_PAGE` in `resources/js/stores/navigation.ts` |
 | Support another database's types | `src/Types/` — add a normalizer, register it in `TypeNormalizerManager::make()` |
 | Change what a column shows | `src/ColumnNormalizer.php`, then `ModelNode.vue` |
 | Change how models are found | `SchemaExporter::discoverModels()` |
