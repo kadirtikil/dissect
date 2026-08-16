@@ -1,18 +1,15 @@
 <script setup lang="ts">
 import GraphCanvas from '@/components/GraphCanvas.vue'
 import RoutesPanel from '@/components/RoutesPanel.vue'
-import ViewMenu from '@/components/ViewMenu.vue'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
-import { ChevronsDownUp, Moon, RotateCcw, Sun } from '@lucide/vue'
+import { Moon, Sun } from '@lucide/vue'
 import { useDark, useToggle } from '@vueuse/core'
 import { storeToRefs } from 'pinia'
-import { computed, ref, watch } from 'vue'
+import { ref, watch } from 'vue'
 import { useSchemaStore } from '@/stores/schema'
 import { useLayoutStore } from '@/stores/layout'
-import { useViewsStore } from '@/stores/views'
-import { useRoutesStore } from '@/stores/routes'
 import { useNavigationStore } from '@/stores/navigation'
 
 const isDark = useDark()
@@ -20,20 +17,17 @@ const toggleDark = useToggle(isDark)
 
 const schema = useSchemaStore()
 const layout = useLayoutStore()
-const views = useViewsStore()
-const routes = useRoutesStore()
 const nav = useNavigationStore()
-const { stats, status, lastUpdated, expanded } = storeToRefs(schema)
-const { positions, saving, saveError } = storeToRefs(layout)
-const { active: activeView } = storeToRefs(views)
-const { stats: routeStats, status: routeStatus } = storeToRefs(routes)
+const { lastUpdated } = storeToRefs(schema)
+const { saveError } = storeToRefs(layout)
 const { current: page } = storeToRefs(nav)
-
-const pinnedCount = computed(() => Object.keys(positions.value).length)
 
 // The graph re-exports itself when models or migrations change. That can be a
 // single new column somewhere off-screen, so say so briefly — otherwise a live
 // update is indistinguishable from nothing having happened.
+//
+// Not a graph-page control despite coming from the schema: the poller runs for
+// the whole session, so the news can arrive while another surface is open.
 const justUpdated = ref(false)
 let updateTimer: ReturnType<typeof setTimeout> | undefined
 
@@ -43,26 +37,6 @@ watch(lastUpdated, (at) => {
   clearTimeout(updateTimer)
   updateTimer = setTimeout(() => (justUpdated.value = false), 2500)
 })
-
-// Two-step rather than a modal: resetting throws away hand-placed nodes, but a
-// dialog for a one-key action is heavier than the decision warrants.
-const confirming = ref(false)
-let revertTimer: ReturnType<typeof setTimeout> | undefined
-
-function askReset() {
-  confirming.value = true
-  clearTimeout(revertTimer)
-  // Don't leave the button armed indefinitely if the user walks away.
-  revertTimer = setTimeout(() => (confirming.value = false), 4000)
-}
-
-async function confirmReset() {
-  clearTimeout(revertTimer)
-  confirming.value = false
-  await layout.reset()
-  // Positions are gone; re-place every node back onto the grid.
-  schema.relayout()
-}
 </script>
 
 <template>
@@ -93,31 +67,13 @@ async function confirmReset() {
         </button>
       </div>
 
-      <template v-if="page === 'models'">
-        <span v-if="status === 'ready'" class="font-mono text-xs text-muted-foreground">
-          <!-- While a view is open the totals describe the schema, not what is on
-               screen, so the visible count is what leads. -->
-          <template v-if="activeView">
-            {{ stats.visible }} of {{ stats.models + stats.external }} models
-          </template>
-          <template v-else>
-            {{ stats.models }} models · {{ stats.relations }} relations
-            <template v-if="stats.external"> · {{ stats.external }} external </template>
-          </template>
-        </span>
-        <span v-else class="font-mono text-xs text-muted-foreground">Model relationships</span>
+      <!-- Whatever the open page has to say about itself — see lib/toolbar.
+           `contents` rather than a box of its own: the page's controls become
+           direct children of this header, spaced by its own gap, so a page
+           contributing nothing costs no gap and a page contributing something
+           sits exactly where a hand-written control would have. -->
+      <div id="dissect-page-context" class="contents"></div>
 
-        <ViewMenu v-if="status === 'ready'" />
-      </template>
-
-      <span v-else class="font-mono text-xs text-muted-foreground">
-        <template v-if="routeStatus === 'ready'">
-          {{ routeStats.visible }} of {{ routeStats.total }} endpoints
-        </template>
-        <template v-else>HTTP surface</template>
-      </span>
-
-      <!-- Only offer the reset once something has actually been placed. -->
       <div class="ml-auto flex items-center gap-2">
         <span
           v-if="justUpdated"
@@ -128,6 +84,8 @@ async function confirmReset() {
           updated
         </span>
 
+        <!-- Global, not a graph control: a layout write that was refused is
+             worth knowing about from whichever surface you are on. -->
         <span
           v-if="saveError"
           class="font-mono text-[10px] text-destructive"
@@ -136,37 +94,7 @@ async function confirmReset() {
           not saved
         </span>
 
-        <!-- Expanded cards float over their neighbours, so with several open the
-             board is hard to read — this is the way back out without hunting
-             for each one. -->
-        <Button
-          v-if="page === 'models' && expanded.size"
-          variant="ghost"
-          size="sm"
-          class="font-mono text-xs"
-          :aria-label="`Collapse ${expanded.size} expanded models`"
-          @click="schema.collapseAll()"
-        >
-          <ChevronsDownUp class="size-3.5" />
-          Collapse · {{ expanded.size }}
-        </Button>
-
-        <Button
-          v-if="page === 'models' && pinnedCount"
-          :variant="confirming ? 'destructive' : 'ghost'"
-          size="sm"
-          class="font-mono text-xs"
-          :disabled="saving"
-          :aria-label="
-            confirming
-              ? 'Confirm resetting the saved layout'
-              : `Reset saved layout (${pinnedCount} placed)`
-          "
-          @click="confirming ? confirmReset() : askReset()"
-        >
-          <RotateCcw class="size-3.5" />
-          {{ confirming ? 'Reset layout?' : `Reset layout · ${pinnedCount}` }}
-        </Button>
+        <div id="dissect-page-actions" class="contents"></div>
       </div>
 
       <Button variant="ghost" size="icon" aria-label="Toggle theme" @click="toggleDark()">

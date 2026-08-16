@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, markRaw, nextTick, onBeforeUnmount, onMounted, watch } from 'vue'
+import { computed, markRaw, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { VueFlow, useVueFlow } from '@vue-flow/core'
 import { Background } from '@vue-flow/background'
 import { Controls } from '@vue-flow/controls'
@@ -15,16 +15,47 @@ import '@/assets/vue-flow-theme.css'
 
 import ModelNode from '@/components/ModelNode.vue'
 import GraphLegend from '@/components/GraphLegend.vue'
+import ViewMenu from '@/components/ViewMenu.vue'
+import { Button } from '@/components/ui/button'
+import { ChevronsDownUp, RotateCcw } from '@lucide/vue'
+import { PAGE_ACTIONS, PAGE_CONTEXT } from '@/lib/toolbar'
 import { useSchemaStore } from '@/stores/schema'
 import { useLayoutStore } from '@/stores/layout'
 import { useViewsStore } from '@/stores/views'
+import { useNavigationStore } from '@/stores/navigation'
 import type { NodeDragEvent } from '@vue-flow/core'
 
 const store = useSchemaStore()
 const layout = useLayoutStore()
 const views = useViewsStore()
-const { visibleNodes, visibleEdges, status, error, focusRequest } = storeToRefs(store)
+const nav = useNavigationStore()
+const { visibleNodes, visibleEdges, status, error, focusRequest, stats, expanded } =
+  storeToRefs(store)
 const { activeId, active } = storeToRefs(views)
+const { positions, saving } = storeToRefs(layout)
+const { current: page } = storeToRefs(nav)
+
+const pinnedCount = computed(() => Object.keys(positions.value).length)
+
+// Two-step rather than a modal: resetting throws away hand-placed nodes, but a
+// dialog for a one-key action is heavier than the decision warrants.
+const confirming = ref(false)
+let revertTimer: ReturnType<typeof setTimeout> | undefined
+
+function askReset() {
+  confirming.value = true
+  clearTimeout(revertTimer)
+  // Don't leave the button armed indefinitely if the user walks away.
+  revertTimer = setTimeout(() => (confirming.value = false), 4000)
+}
+
+async function confirmReset() {
+  clearTimeout(revertTimer)
+  confirming.value = false
+  await layout.reset()
+  // Positions are gone; re-place every node back onto the grid.
+  store.relayout()
+}
 
 const { fitView, getSelectedNodes, removeSelectedElements } = useVueFlow()
 
@@ -132,6 +163,66 @@ function onNodeDragStop(event: NodeDragEvent) {
 <template>
   <!-- Vue Flow needs an explicitly sized container or it renders zero-height. -->
   <div class="relative h-full w-full">
+    <!-- Declared in here to keep this component single-root, which is what lets
+         the shell hide it with v-show. Teleport moves the content out either
+         way, so where it is written costs nothing.
+
+         Withheld by hand because this canvas stays mounted while another
+         surface is on screen — a page that unmounts gets the same for free. -->
+    <template v-if="page === 'models'">
+    <Teleport defer :to="PAGE_CONTEXT">
+      <span v-if="status === 'ready'" class="font-mono text-xs text-muted-foreground">
+        <!-- While a view is open the totals describe the schema, not what is on
+             screen, so the visible count is what leads. -->
+        <template v-if="active">
+          {{ stats.visible }} of {{ stats.models + stats.external }} models
+        </template>
+        <template v-else>
+          {{ stats.models }} models · {{ stats.relations }} relations
+          <template v-if="stats.external"> · {{ stats.external }} external </template>
+        </template>
+      </span>
+      <span v-else class="font-mono text-xs text-muted-foreground">Model relationships</span>
+
+      <ViewMenu v-if="status === 'ready'" />
+    </Teleport>
+
+    <Teleport defer :to="PAGE_ACTIONS">
+      <!-- Expanded cards float over their neighbours, so with several open the
+           board is hard to read — this is the way back out without hunting for
+           each one. -->
+      <Button
+        v-if="expanded.size"
+        variant="ghost"
+        size="sm"
+        class="font-mono text-xs"
+        :aria-label="`Collapse ${expanded.size} expanded models`"
+        @click="store.collapseAll()"
+      >
+        <ChevronsDownUp class="size-3.5" />
+        Collapse · {{ expanded.size }}
+      </Button>
+
+      <!-- Only offer the reset once something has actually been placed. -->
+      <Button
+        v-if="pinnedCount"
+        :variant="confirming ? 'destructive' : 'ghost'"
+        size="sm"
+        class="font-mono text-xs"
+        :disabled="saving"
+        :aria-label="
+          confirming
+            ? 'Confirm resetting the saved layout'
+            : `Reset saved layout (${pinnedCount} placed)`
+        "
+        @click="confirming ? confirmReset() : askReset()"
+      >
+        <RotateCcw class="size-3.5" />
+        {{ confirming ? 'Reset layout?' : `Reset layout · ${pinnedCount}` }}
+      </Button>
+    </Teleport>
+    </template>
+
     <div
       v-if="status === 'loading'"
       class="absolute inset-0 z-20 grid place-items-center font-mono text-xs text-muted-foreground"
