@@ -50,9 +50,30 @@ class ViewerTest extends TestCase
     }
 
     #[Test]
+    public function it_serves_every_chunk_the_entry_imports(): void
+    {
+        // The lazily loaded pages are fetched by the browser, not by the Blade
+        // view, so a chunk the allow-list does not cover fails only once
+        // somebody opens that page. Reading the imports out of the built entry
+        // means a page added later is covered without touching this test.
+        $entry = file_get_contents(dirname(__DIR__, 2).'/dist/dissect.js');
+
+        preg_match_all('/["\'`]\.\/(dissect-[A-Za-z0-9]+\.js)["\'`]/', (string) $entry, $matches);
+
+        $chunks = array_unique($matches[1]);
+
+        $this->assertNotEmpty($chunks, 'the entry should split its pages into chunks');
+
+        foreach ($chunks as $chunk) {
+            $this->get('/dissect/assets/'.$chunk)->assertOk();
+        }
+    }
+
+    #[Test]
     public function it_serves_no_asset_outside_the_allow_list(): void
     {
         $this->get('/dissect/assets/index.html')->assertNotFound();
+        $this->get('/dissect/assets/dissect-Missing.js')->assertNotFound();
     }
 
     #[Test]

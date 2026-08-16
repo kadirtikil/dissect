@@ -163,14 +163,23 @@ class DissectController
             'dissect.css' => 'text/css',
         ];
 
-        abort_unless(isset($allowed[$file]), 404);
+        // The lazily loaded pages are split into their own chunks, which the
+        // entry imports by name at runtime. Their names are decided by the
+        // build, not by the caller, so they are matched by shape rather than
+        // enumerated — still an allow-list: no separator can appear in it.
+        $type = $allowed[$file]
+            ?? (preg_match('/^dissect-[A-Za-z0-9]+\.js$/', $file) === 1
+                ? 'application/javascript'
+                : null);
+
+        abort_unless($type !== null, 404);
 
         $path = dirname(__DIR__, 3).'/dist/'.$file;
 
         abort_unless(is_file($path), 404, 'Asset missing — the package was installed without its build output.');
 
         return response()->file($path, [
-            'Content-Type' => $allowed[$file],
+            'Content-Type' => $type,
             'Cache-Control' => 'public, max-age=31536000, immutable',
         ]);
     }
