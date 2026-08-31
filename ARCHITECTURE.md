@@ -44,6 +44,27 @@ be run, a resource with no `@mixin` and no matching model, a resource nesting
 another two levels deep, an invokable controller, a closure route, an optional
 constrained parameter, and validation written inline in the action.
 
+### A queue with something on it
+
+An idle development queue is empty, which is the one state the live surface
+cannot be judged from. `dissect:seed-queue` writes the shapes worth looking at
+straight into the queue tables — waiting, reserved, delayed, two failures and a
+half-finished batch:
+
+```bash
+php vendor/bin/testbench dissect:seed-queue
+php vendor/bin/testbench dissect:seed-queue --clear
+```
+
+Rows are written rather than dispatched on purpose: dispatching `PublishPost`
+needs a `Post` row for it to carry, and the command's job is to produce a queue,
+not to arrange the database into a state where one can be produced.
+
+The workbench points the `database` queue driver at its own SQLite connection —
+including the failer and the batch repository, which each carry a connection of
+their own and would otherwise read a database with no tables in it. Never under
+`testing`, for the same reason the generated model fixture is not.
+
 ### A schema big enough to hurt
 
 Seven models prove correctness but say nothing about how the viewer behaves at
@@ -106,7 +127,8 @@ both:
         └──────────► main.ts ◄─────────────────┘
                         │
   RouteExporter ────────┤ (fetched on demand)  public/routes.json
-  JobExporter ──────────┘ (fetched on demand)  public/jobs.json
+  JobExporter ──────────┤ (fetched on demand)  public/jobs.json
+  QueueSnapshot ────────┘ (polled, never cached) public/queue.json
 ```
 
 `routes.json` and `jobs.json` are the odd ones out: only their URLs are inlined,
@@ -145,6 +167,12 @@ DissectServiceProvider    wiring; registers routes only when enabled
   │     ├── DispatchScanner     php-parser: every place a job is put on the queue
   │     ├── RouteMap            a dispatch site's surroundings → a route id
   │     └── ProjectPath         the one spelling of a path both sides join on
+  ├── QueueSnapshot           what is on the queue *right now* — never cached
+  │     ├── QueueReaderFactory  driver → a reader, or the reason there isn't one
+  │     │     ├── DatabaseQueueReader  three predicates over the jobs table
+  │     │     └── RedisQueueReader     a list and two sorted sets, per queue
+  │     ├── PayloadDecoder      the envelope only — never the serialised command
+  │     └── QueueHistory        the failed job provider and the batch repository
   ├── LayoutRepository        read/write/sanitise the layout file
   ├── ViewRepository          read/write/sanitise the saved views
   │     └── Concerns\VersionedStateFile   refuse newer formats, back up older ones
@@ -344,6 +372,57 @@ A job with an empty `dispatched_by` is reported as exactly that — no site was
 found — which is either dead code or a dynamic dispatch, and the surface must
 not claim to know which.
 
+### The queue
+
+Everything above is derived from source: cached against a file-stat signal,
+true until somebody edits a file, and re-read when a fingerprint moves. The
+queue is not. It is runtime state — it changes second to second, no fingerprint
+can describe it, and the honest response is to read it on every request and let
+the client poll.
+
+That is a **second freshness contract**, and it is kept visibly separate rather
+than folded into the jobs surface. The job list says what *can* be queued; this
+says what *is*. They answer to different clocks, so they are different pages,
+and `/queue.json` is the one endpoint here with no cache behind it.
+
+**Three tenses, because that is how anybody asks about a queue.**
+
+| Tense | What it holds | Database | Redis |
+|---|---|---|---|
+| **now** | waiting to be picked up | `reserved_at is null` and its time has come | the list |
+| **now** | reserved by a worker | `reserved_at is not null` | the `:reserved` sorted set |
+| **next** | delayed until later | `available_at` in the future | the `:delayed` sorted set |
+| **past** | failed, and batched | the failed job provider, the batch repository | the same |
+
+**The past is the half that has to be honest.** Laravel records *nothing* about
+a job that succeeded — it is queued, it runs, it is deleted. So "what was in the
+queue" is what went wrong and what was batched, and `records_completions: false`
+travels on the wire so the client does not have to know that on its own. An
+empty history means nothing failed, never that nothing ran.
+
+**The serialised command is never unserialised.** A payload carries
+`data.command`, a serialised instance of the application's own job. Restoring it
+would construct application objects, run their `__wakeup`, and on a
+`SerializesModels` job go to the database for every model it carries — a viewer
+that describes a queue must not be able to do any of that. The JSON envelope
+answers every question the surface asks, and `displayName` in it is already the
+class the Jobs surface lists, which is what joins a live row to its definition.
+The payload is not reported either: the envelope is safe to describe, the
+command is somebody's data. `tests/Feature/QueueTest.php` pins this with a
+command whose `__wakeup` would set a flag.
+
+**A driver that cannot be enumerated says so, with the reason.** Only `database`
+and `redis` can be listed. SQS can report an approximate depth but cannot show a
+message without receiving it, `sync` never queues anything, and `null` discards
+— and a missing `jobs` table is a fourth case with something the reader can
+actually do about it. Showing an empty queue for any of them would be a lie
+about an empty queue. The same rule applies one level down: a failed job store
+that cannot be read reports *why* rather than reporting nothing.
+
+The history is read even when the queue is not, because failures are stored by
+the application rather than by the driver — an SQS application still knows what
+went wrong.
+
 ---
 
 ## Frontend side
@@ -362,16 +441,19 @@ main.ts                 mounts App; no router (see "Decisions")
     │   ├── RouteList      grouped by controller, collapsible
     │   └── RouteDetail    verbs, middleware, params, request, response, touches
     │       └── FieldTree  a flat path list rendered as a tree
-    └── JobsPanel       list ▏ detail
-        ├── JobFilters     search + kind/queue chips, and the undispatched count
-        ├── JobList        grouped by queue, collapsible
-        └── JobDetail      queue, retries, payload, middleware, dispatchers, carries
+    ├── JobsPanel       list ▏ detail
+    │   ├── JobFilters     search + kind/queue chips, and the undispatched count
+    │   ├── JobList        grouped by queue, collapsible
+    │   └── JobDetail      queue, retries, payload, middleware, dispatchers, carries
+    └── QueuePanel      depth, then the three tenses; polls while it is open
+        └── QueueSection   one tense as a table, or why it could not be read
 
 stores/schema.ts        load → normalise → order → place → filter to the view
 stores/layout.ts        saved positions, debounce, prune, persist
 stores/views.ts         saved views, active view, persist
 stores/routes.ts        lazy load, filter state, selection
 stores/jobs.ts          the same, for the queue surface
+stores/queue.ts         the odd one: polled runtime state, nothing to cache
 stores/navigation.ts    which page is open: fragment, then storage, then default
 pages/registry.ts       every page there is — the one file a new surface is added to
 lib/toolbar.ts          where a page hangs its own header controls
@@ -381,6 +463,7 @@ lib/httpMethods.ts      verb → colour, on the same ramp
 lib/routeFilters.ts     pure predicates + facet counts (the unit-tested part)
 lib/jobFilters.ts       the same shape again: queue bucketing, facets, grouping
 lib/jobKinds.ts         kind → colour, on the same ramp; and how a queue was named
+lib/elapsed.ts          "2m ago" / "in 4h" — a queue is read in relative time
 lib/bootstrap.ts        the host seam
 ```
 
@@ -609,6 +692,50 @@ closure the way the routes surface does, and the line addresses the call.
 Like `routes.json` there is no authored counterpart: jobs are entirely derived,
 so nothing is committed and nothing has to be sanitised on write.
 
+### `queue.json` (runtime state — never cached, never written)
+
+```jsonc
+{
+  "connection": "database",
+  "driver": "database",
+  "connections": ["sync", "database", "redis"],   // for the switcher
+  "readable": true,
+  "refusal": null,                    // why not, when readable is false
+  "queues": [
+    { "name": "invoices", "waiting": 4, "delayed": 1, "reserved": 1 }
+  ],
+  "now":  { "waiting": {section}, "reserved": {section} },
+  "next": { "delayed": {section} },
+  "past": { "failed": {section}, "batches": [{batch}] },
+  "limit": 50,
+  "records_completions": false,       // Laravel keeps no trace of a job that worked
+  "read_at": "…"
+}
+```
+
+A section is `{ rows, total, truncated, unreadable }` — `total` is the real
+depth and `rows` is the page of it that was fetched, which are not the same
+number on a queue worth worrying about. `unreadable` is a sentence, and only the
+history ever sets it.
+
+A row carries the envelope and nothing else:
+
+```jsonc
+{
+  "id": "1471", "uuid": "…",
+  "job": "App\\Jobs\\SendInvoice",   // ← the join to jobs.json
+  "name": "SendInvoice",
+  "queue": "invoices",
+  "attempts": 1, "maxTries": 3,
+  "queued_at": "…", "available_at": "…", "reserved_at": "…",
+  "failed_at": "…", "exception": "RuntimeException: …"  // failed rows only
+}
+```
+
+There is deliberately no `payload` and no `batch` id: the first is somebody's
+data, and the second only exists inside the serialised command, which is never
+opened.
+
 ### `layout.json` (authored — safe to commit and review)
 
 ```json
@@ -670,7 +797,7 @@ are running. `tests/StateVersioningTest.php` pins all of it.
 | **`dist/` is committed** | The package serves it directly. One `composer require`, no build step in the host app. `.gitignore` and Tailwind's `@source not` both encode this |
 | **Assets served by a route, not `vendor:publish`** | Nothing to re-publish after `composer update` |
 | **Standalone Blade page, not Inertia** | No dependency on the host's frontend build, Vue version or Tailwind version; the host's design tokens cannot collide with ours |
-| **No vue-router** | The page is registered as exactly one GET route with no SPA fallback, so a reload on a path-matching route 404s however the mount prefix is resolved. Pages are addressed by fragment instead (`stores/navigation.ts`), which never reaches the server. Four flat pages with no params also buy nothing from a router |
+| **No vue-router** | The page is registered as exactly one GET route with no SPA fallback, so a reload on a path-matching route 404s however the mount prefix is resolved. Pages are addressed by fragment instead (`stores/navigation.ts`), which never reaches the server. Five flat pages with no params also buy nothing from a router |
 | **The graph is not mounted by the page registry** | It starts the change poller the routes surface also depends on. Mount it lazily like the others and live updates elsewhere stop until somebody visits the graph. `pages/registry.ts` carries the warning next to the flag |
 | **Routes local-only by default** | It exposes the full schema and writes a file. The gate is `APP_ENV`, not install-time: the provider is auto-discovered and boots wherever the package is installed, so `middleware` is the control that holds when the environment check does not |
 | **A newer state file is never overwritten** | Both authored files are rewritten in full and sanitised on read, so saving over a format this version does not understand is silent data loss. Refusing has to ship *before* the format changes to be worth anything |
@@ -689,6 +816,12 @@ are running. `tests/StateVersioningTest.php` pins all of it.
 | **`queue_source` is on the wire** | A job using `Queueable` cannot declare `public $queue`, so the queue usually comes from the constructor or the dispatch site. Where the answer came from changes how much it can be trusted, and two sites disagreeing is reported as `mixed` rather than resolved |
 | **Route ids and paths have one spelling each** | The jobs↔routes join is a string comparison. `RouteExporter::id()` is public and `ProjectPath` is shared for exactly that reason — two definitions that merely agree today is a cross-link that breaks silently |
 | **The job list is grouped by queue, not by kind** | The queue is the unit a *worker* is configured in, so it is the one with an operational answer. Grouping by kind would sort the list by what the classes are rather than by where they run |
+| **The queue is a page of its own, not a pane on Jobs** | They are two freshness contracts. One is cached against a file signal and true until somebody edits a file; the other is runtime state read on every request. A header reading "6 jobs · 3 waiting" would be mixing two clocks |
+| **`/queue.json` is never cached** | A fingerprint cannot describe runtime state, and a queue that looked the same for an hour because a cache said so would be worse than no surface at all |
+| **The serialised command is never unserialised** | Restoring it constructs the application's own objects, runs `__wakeup`, and on a `SerializesModels` job hits the database for every model it carries. The JSON envelope answers everything the surface asks |
+| **The payload is never reported** | The envelope is safe to describe; the command is argument values and model ids that nobody decided to put on a page |
+| **An unreadable driver is reported with its reason** | Two of Laravel's drivers can be enumerated and the rest cannot. Showing an empty queue for SQS would be a lie about an empty queue — and the same rule applies to a failed job store that cannot be read |
+| **`records_completions` is on the wire** | Laravel records nothing about a job that succeeded. An empty history means nothing failed, and the client should not have to know that on its own |
 | **Highlight is not selection** | Canvas selection is a gesture that feeds view membership; opening an endpoint must not quietly change what a new view would contain |
 
 ---
@@ -705,7 +838,8 @@ $this->app->bind(ColumnNormalizer::class, MyColumnNormalizer::class);
 
 Config (`config/dissect.php`): `enabled`, `path`, `middleware`,
 `models_path`, `models_namespace`, `layout_path`, `views_path`,
-`routes.watch_paths`, `jobs.paths`, `jobs.watch_paths`.
+`routes.watch_paths`, `jobs.paths`, `jobs.watch_paths`, `queue.rows`,
+`queue.poll_interval`.
 
 ---
 
@@ -735,6 +869,11 @@ Config (`config/dissect.php`): `enabled`, `path`, `middleware`,
 | Change how the job list is filtered or grouped | `resources/js/lib/jobFilters.ts` |
 | Change what a job's detail pane shows | `resources/js/components/JobDetail.vue` |
 | Change kind colours, or how a queue's origin is worded | `resources/js/lib/jobKinds.ts` |
+| Support another queue driver | `src/Queue/` — a `Contracts\QueueReader`, registered in `QueueReaderFactory::make()` |
+| Change what a live queue row reports | `src/Queue/PayloadDecoder.php` |
+| Change where the history comes from | `src/Queue/QueueHistory.php` |
+| Change how often the queue is polled | `queue.poll_interval` in config |
+| Change how many rows a queue section lists | `queue.rows` in config |
 | Change verb colours | `resources/js/lib/httpMethods.ts` |
 | Change where queueable classes are found | `jobs.paths` in config, then `src/Jobs/JobDiscovery.php` |
 | Change what a job reports about itself | `src/Jobs/JobInspector.php` |
@@ -769,6 +908,18 @@ Config (`config/dissect.php`): `enabled`, `path`, `middleware`,
   trait, fall back to whatever the literal says — which may be nothing.
 - **`ResponseAnalyzer` does not follow a resource's `with()` or `additional()`**,
   so wrapper keys a payload actually carries are missing from the shape.
+- **The Redis reader is not exercised by the suite.** It needs a running
+  server, so `tests/Feature/QueueTest.php` covers the database driver and the
+  contract both implement. The Redis path is string-level review only — the same
+  position the less-common type normalizers are in.
+- **A clustered Redis connection is reported as unreadable.** Laravel hash-tags
+  the queue key on a cluster through a method that is not public, and reading
+  the untagged names would quietly report an empty queue.
+- **`RedisQueueReader` enumerates queues with `KEYS`**, which is what the
+  framework does when it asks itself the same question, but it is not free on a
+  large keyspace.
+- **A live row does not say which batch it belongs to.** The batch id lives
+  inside the serialised command, which is never opened.
 - **A dispatch behind a variable is invisible.** `$job::dispatch()` and
   `dispatch($job)` name a class only the running application knows, so those
   sites are not found and the job may report as undispatched.

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { storeToRefs } from 'pinia'
-import { ArrowRight, Boxes, Route, Timer } from '@lucide/vue'
+import { Activity, ArrowRight, Boxes, Route, Timer } from '@lucide/vue'
 import { useSchemaStore } from '@/stores/schema'
 import { useLayoutStore } from '@/stores/layout'
 import { useViewsStore } from '@/stores/views'
@@ -144,6 +144,24 @@ const generated = computed(() => {
             <template v-else>
               Everything that reaches a worker, which queue it lands on, and what dispatches it.
             </template>
+          </span>
+        </button>
+
+        <button
+          class="group rounded-md border bg-card px-4 py-4 text-left transition-shadow hover:shadow-md"
+          @click="nav.go('queue')"
+        >
+          <span class="flex items-center gap-2 font-mono text-sm font-semibold">
+            <Activity class="size-4" />
+            Queue
+            <ArrowRight class="size-3.5 opacity-0 transition-opacity group-hover:opacity-60" />
+          </span>
+          <!-- No count, and not for the usual reason: this one is runtime state
+               rather than a description of code, and reading it on the way past
+               would make the overview do work that goes stale by the time it is
+               on screen. -->
+          <span class="mt-1 block font-mono text-[11px] text-muted-foreground">
+            What is on the queue right now, what is due next, and what failed.
           </span>
         </button>
       </div>

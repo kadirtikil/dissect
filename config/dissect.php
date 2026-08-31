@@ -104,6 +104,33 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Queue
+    |--------------------------------------------------------------------------
+    |
+    | The live half of the queue surface: what is actually on a queue right now.
+    | Unlike everything else here it is runtime state, so it is never cached and
+    | the client polls it.
+    |
+    | Only the `database` and `redis` drivers can be enumerated. SQS cannot list
+    | a message without receiving it, `sync` never queues anything, and `null`
+    | discards. Those are reported with the reason rather than as an empty
+    | queue, which would be a lie.
+    |
+    | `rows` caps how many jobs are listed per section. The counts are always
+    | exact — a queue 40,000 deep reports 40,000 and shows you the first page.
+    |
+    */
+
+    'queue' => [
+
+        'rows' => 50,
+
+        'poll_interval' => 5000,
+
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Vite dev server
     |--------------------------------------------------------------------------
     |

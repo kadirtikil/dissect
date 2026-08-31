@@ -6,12 +6,17 @@ use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Database\DatabaseManager;
 use Illuminate\Database\Eloquent\ModelInspector;
+use Illuminate\Queue\QueueManager;
 use Illuminate\Routing\Router;
 use KdrDev\Dissect\Jobs\DispatchScanner;
 use KdrDev\Dissect\Jobs\JobDiscovery;
 use KdrDev\Dissect\Jobs\JobExporter;
 use KdrDev\Dissect\Jobs\JobInspector;
 use KdrDev\Dissect\Jobs\RouteMap;
+use KdrDev\Dissect\Queue\PayloadDecoder;
+use KdrDev\Dissect\Queue\QueueHistory;
+use KdrDev\Dissect\Queue\QueueReaderFactory;
+use KdrDev\Dissect\Queue\QueueSnapshot;
 use KdrDev\Dissect\Routes\ActionResolver;
 use KdrDev\Dissect\Routes\Ast\ClassSource;
 use KdrDev\Dissect\Routes\ModelLinker;
@@ -118,6 +123,24 @@ class DissectServiceProvider extends ServiceProvider
             // mechanism, different question, so it must not be the same
             // instance.
             new RouteFingerprint((array) config('dissect.jobs.watch_paths', ['app', 'routes'])),
+        ));
+
+        $this->app->singleton(PayloadDecoder::class, fn () => new PayloadDecoder);
+
+        $this->app->singleton(QueueReaderFactory::class, fn (Application $app) => new QueueReaderFactory(
+            $app->make(QueueManager::class),
+            $app->make(DatabaseManager::class),
+            $app->make(PayloadDecoder::class),
+        ));
+
+        $this->app->singleton(QueueHistory::class, fn (Application $app) => new QueueHistory(
+            $app,
+            $app->make(PayloadDecoder::class),
+        ));
+
+        $this->app->singleton(QueueSnapshot::class, fn (Application $app) => new QueueSnapshot(
+            $app->make(QueueReaderFactory::class),
+            $app->make(QueueHistory::class),
         ));
 
         $this->app->singleton(LayoutRepository::class, fn () => new LayoutRepository(

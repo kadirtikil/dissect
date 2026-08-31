@@ -1,5 +1,5 @@
 import type { Component } from 'vue'
-import { Boxes, House, Route, Timer } from '@lucide/vue'
+import { Activity, Boxes, House, Route, Timer } from '@lucide/vue'
 
 /**
  * Every surface dissect has, in the order the sidebar lists them.
@@ -8,7 +8,7 @@ import { Boxes, House, Route, Timer } from '@lucide/vue'
  * the sidebar, the navigation store and the shell all pick it up. None of them
  * knows any page by name.
  */
-export type PageId = 'landing' | 'models' | 'routes' | 'jobs'
+export type PageId = 'landing' | 'models' | 'routes' | 'jobs' | 'queue'
 
 export interface PageEntry {
   id: PageId
@@ -50,6 +50,12 @@ export const pages: readonly PageEntry[] = [
     label: 'Jobs',
     icon: Timer,
     component: () => import('@/components/JobsPanel.vue'),
+  },
+  {
+    id: 'queue',
+    label: 'Queue',
+    icon: Activity,
+    component: () => import('@/components/QueuePanel.vue'),
   },
 ]
 
