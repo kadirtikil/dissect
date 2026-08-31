@@ -130,6 +130,20 @@ export const useRoutesStore = defineStore('routes', () => {
     selectedId.value = null
   }
 
+  /**
+   * Arriving from somewhere that named one endpoint — a job's list of what
+   * dispatches it.
+   *
+   * Filters are cleared first, and the view scope with them: landing on this
+   * surface with the endpoint you asked for filtered out of it is the one thing
+   * a link like this must not do.
+   */
+  function focusEndpoint(id: string) {
+    clearFilters()
+    scopeToView.value = false
+    selectedId.value = id
+  }
+
   function clearFilters() {
     search.value = ''
     methods.value = []
@@ -219,6 +233,7 @@ export const useRoutesStore = defineStore('routes', () => {
     toggleMethod,
     toggleGroup,
     filterByModel,
+    focusEndpoint,
     clearFilters,
     load,
     refresh,

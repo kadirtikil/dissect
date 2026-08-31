@@ -14,6 +14,7 @@ import { layoutGraph } from '@/lib/layout'
 import { useLayoutStore } from '@/stores/layout'
 import { useViewsStore } from '@/stores/views'
 import { useRoutesStore } from '@/stores/routes'
+import { useJobsStore } from '@/stores/jobs'
 import { bootstrap } from '@/lib/bootstrap'
 
 type Status = 'idle' | 'loading' | 'ready' | 'error'
@@ -307,11 +308,20 @@ export const useSchemaStore = defineStore('schema', () => {
       checking = true
 
       const routes = useRoutesStore()
+      const jobs = useJobsStore()
 
       try {
-        // The route signal stats a far wider tree than the model one, so it is
-        // only asked for once somebody has actually opened the endpoint list.
-        const res = await fetch(routes.loaded ? `${url!}?routes=1` : url!, { cache: 'no-store' })
+        // Both of the derived surfaces walk a far wider tree than the model
+        // signal does, so each half is asked for only once somebody has
+        // actually opened the surface that needs it. A session on the graph
+        // asks for neither; a session on one asks for one.
+        const asked = [routes.loaded ? 'routes=1' : null, jobs.loaded ? 'jobs=1' : null].filter(
+          (part) => part !== null,
+        )
+
+        const res = await fetch(asked.length ? `${url!}?${asked.join('&')}` : url!, {
+          cache: 'no-store',
+        })
         if (!res.ok) return
 
         const payload = await res.json()
@@ -321,6 +331,13 @@ export const useSchemaStore = defineStore('schema', () => {
           // Independent of the schema half: a controller can change without any
           // model or migration moving, and the reverse is just as common.
           await routes.refresh()
+        }
+
+        // Independent again, and of the route half too: adding a dispatch to a
+        // controller moves this signal and the route one, while adding a
+        // property to a job moves only this one.
+        if (typeof payload?.jobs === 'string' && payload.jobs !== jobs.fingerprint) {
+          await jobs.refresh()
         }
 
         if (typeof next !== 'string' || next === fingerprint.value) return

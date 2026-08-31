@@ -13,6 +13,7 @@ so your team sees the same picture.
 - 🗂️ Save **views** — named subsets of the graph — so a schema too big to read at once can be read one bounded context at a time.
 - 🔎 Click any card to expand it: every column, with its key, unique, nullable, guarded, hidden and cast flags.
 - 🛣️ Switch to **Routes** for your HTTP surface — every endpoint, what it accepts, what it returns, and which models each one touches.
+- ⏱️ Switch to **Jobs** for everything that reaches a worker — which queue it lands on, how hard it retries, what it carries, and the endpoint that dispatches it.
 
 ## 🚀 Quick start
 
@@ -81,12 +82,14 @@ config file is usually unnecessary.
 | `DISSECT_MODELS_PATH` | `app/Models` | Directory scanned for models. Relative paths resolve from the base path; absolute paths are used as given. |
 | `DISSECT_MODELS_NAMESPACE` | inferred | Set this when your namespace does not follow the conventional `app/Models` → `App\Models` mapping. |
 
-Three settings are config-file only:
+The rest are config-file only:
 
 - **`middleware`** — defaults to `['web']`. Add your auth middleware here if you enable the viewer outside local.
 - **`layout_path`** — defaults to `base_path('.dissect/layout.json')`. Deliberately not in `storage/` (gitignored) or `vendor/` (wiped by `composer install`), because the layout is meant to be committed and shared.
 - **`views_path`** — defaults to `base_path('.dissect/views.json')`, for the same reason: "the billing models" is worth agreeing on once and reviewing in a pull request.
 - **`routes.watch_paths`** — defaults to `['app', 'routes']`. Which directories are watched to notice that the endpoint list has gone stale. Narrow it to the directories that actually hold HTTP code if your `app/` is large.
+- **`jobs.paths`** — defaults to `['app/Jobs', 'app/Listeners', 'app/Mail', 'app/Notifications']`. Where queueable classes are looked for. There is no namespace setting to match: each class is read from the `namespace` line in its own file, so an unconventional layout just needs the directory adding.
+- **`jobs.watch_paths`** — defaults to `['app', 'routes']`. Where dispatch sites are looked for, and the change signal for the job list. This is the widest walk the package does — every file is *parsed*, not just stat'd — so narrowing it is worth more here than anywhere else.
 
 ### 📁 Models outside `app/Models`
 
@@ -201,12 +204,59 @@ read from your source rather than run. Each shape says which:
 A confidently wrong API description is worse than none, so this is shown rather
 than smoothed over.
 
+## ⏱️ Jobs
+
+The **Jobs** tab answers the question a `202 Accepted` leaves behind: what is
+going to happen next, where, and carrying what. Jobs, queued listeners,
+mailables and queued notifications all end up on the same worker, so they are
+all here — found by the `ShouldQueue` interface rather than by which folder they
+sit in.
+
+```
+SendInvoice                            Queue     invoices
+Job                                      set in the constructor
+                                       Retries   3 tries · 10, 60s · 120s timeout
+Payload                                Handling  batchable · after commit
+  invoice   App\Models\Invoice
+            carries Invoice            Dispatched by                          2
+                                         InvoiceController@store  dispatch()
+Carries                                  app/Http/…/InvoiceController.php:61
+  Invoice ↗                              POST:api/invoices ↗
+```
+
+- 🔗 **Dispatched by** links back to the endpoint that queues the job, and **Carries** jumps to the model on the graph. Expand a model card and click **Jobs** to go the other way.
+- 🧭 Grouped by queue, because the queue is the unit you point a *worker* at.
+- ⌀ Anything nothing was found to dispatch is flagged — dead code, or dispatched dynamically. It is the finding you cannot get from `queue:work`.
+- 🔎 Facet by kind and by queue; filter by name, class, queue or what dispatches it.
+- 🐢 `jobs.json` is fetched when you first open the tab, for the same reason `routes.json` is.
+
+### 🎯 Where the queue name comes from
+
+A job that uses Laravel's `Queueable` trait **cannot** declare a `public $queue`
+property — PHP rejects it as an incompatible redefinition — so most jobs name
+their queue somewhere else. All of those places are read, and the tab says which
+one answered:
+
+| Source | Meaning |
+| --- | --- |
+| `property` | A declared `$queue`. The usual form for a queued listener, which inherits nothing that claims the name. |
+| `constructor` | `$this->onQueue('…')` among the constructor's own statements. Not one inside an `if`: a queue that depends on the arguments is not one this can report. |
+| `dispatch` | The class named none, and exactly one dispatch site chained `->onQueue('…')`. |
+| `mixed` | Two sites named two different queues. Picking one would invent a fact. |
+| `default` | Nothing anywhere named one. |
+
+Nothing is executed to find this out. `backoff()` and `middleware()` are read as
+source too — a `middleware()` returning `new WithoutOverlapping($this->order->id)`
+on an unconstructed job would be a fatal error, and describing your code must
+never be able to cause one.
+
 ## 🔍 How it works
 
 - **Schema** is built by `SchemaExporter` from Laravel's `ModelInspector` and cached against a fingerprint of your models directory, so the reflection and schema queries run once per model-file change rather than once per request.
 - **Routes** are read from the router itself; the request and response shapes behind them are read from your source with [nikic/php-parser](https://github.com/nikic/PHP-Parser), never by executing it. Cached against its own fingerprint, and only computed once you open the tab.
+- **Jobs** are found by interface across the configured directories, then every file under `jobs.watch_paths` is parsed for the places each one is dispatched — again read, never run. Its own fingerprint, its own cache, and only computed once you open the tab.
 - **The page** inlines schema, layout and views into the initial HTML, so it makes no XHR on boot.
-- **Live updates** work by polling that fingerprint — edit a model, and the graph refreshes without a file watcher. Edit a controller or a form request, and the endpoint list does the same.
+- **Live updates** work by polling that fingerprint — edit a model, and the graph refreshes without a file watcher. Edit a controller or a form request, and the endpoint list does the same; add a dispatch, and so does the job list.
 - **Assets** are served straight from the package's `dist/` directory by a route with an allow-list of two filenames. Nothing to publish, nothing to re-publish after an upgrade.
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for the full design.

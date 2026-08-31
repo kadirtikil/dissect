@@ -32,6 +32,7 @@
             {{-- Not the payload, only where to get it: the endpoint list is
                  fetched when somebody opens it. --}}
             routesUrl: @json(route('dissect.routes')),
+            jobsUrl: @json(route('dissect.jobs')),
             fingerprintUrl: @json(route('dissect.fingerprint')),
             fingerprint: @json($fingerprint),
             csrfToken: @json(csrf_token()),

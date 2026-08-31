@@ -105,11 +105,13 @@ both:
         │                                      │
         └──────────► main.ts ◄─────────────────┘
                         │
-  RouteExporter ────────┘ (fetched on demand)  public/routes.json
+  RouteExporter ────────┤ (fetched on demand)  public/routes.json
+  JobExporter ──────────┘ (fetched on demand)  public/jobs.json
 ```
 
-`routes.json` is the odd one out: only its URL is inlined, and the payload is
-fetched the first time somebody opens the endpoint list. See "Routes" below.
+`routes.json` and `jobs.json` are the odd ones out: only their URLs are inlined,
+and each payload is fetched the first time somebody opens the surface that needs
+it. See "Routes" and "Jobs" below.
 
 `resources/js/lib/bootstrap.ts` is that seam. It returns whatever the server
 inlined, or an empty object; every consumer treats the fields as optional and
@@ -136,6 +138,13 @@ DissectServiceProvider    wiring; registers routes only when enabled
   │     ├── ModelLinker         table, class or convention → a schema.json node id
   │     ├── Ast\ClassSource     php-parser: a method's body, without running it
   │     └── RouteFingerprint    "has anything behind the route table been edited?"
+  ├── JobExporter             orchestrates: discover → inspect → scan → link
+  │     ├── JobDiscovery        queueable classes, found by interface not by folder
+  │     ├── JobInspector        queue, retries, payload, middleware — read, never run
+  │     │     └── Confidence      the weakest grade of everything it had to read
+  │     ├── DispatchScanner     php-parser: every place a job is put on the queue
+  │     ├── RouteMap            a dispatch site's surroundings → a route id
+  │     └── ProjectPath         the one spelling of a path both sides join on
   ├── LayoutRepository        read/write/sanitise the layout file
   ├── ViewRepository          read/write/sanitise the saved views
   │     └── Concerns\VersionedStateFile   refuse newer formats, back up older ones
@@ -174,15 +183,23 @@ The endpoint list has a third source with a third lifecycle:
 |---|---|---|
 | Routes | route, controller, form request and resource files | newest mtime + file count across `routes.watch_paths` |
 
+The job list has a fourth, on the same mechanism as the third:
+
+| Half of the graph | Comes from | Signal |
+|---|---|---|
+| Jobs | job, listener, mailable, controller and route files | newest mtime + file count across `jobs.watch_paths` |
+
 That one is deliberately coarser than the other two: a route can move because
 any of four kinds of file changed, so the signal is a file stat over whole
 directories. It may move when nothing visible changed — which costs a cache
 miss — but it must never sit still when something did, because that is a stale
 page nobody knows is stale.
 
-It is also **only computed when asked for**. `/fingerprint` returns the route
-half only for `?routes=1`, which the client sends once the endpoint list has
-been opened. A session that stays on the graph never pays for the wider walk.
+Both are also **only computed when asked for**. `/fingerprint` returns the route
+half only for `?routes=1` and the job half only for `?jobs=1`, which the client
+sends once the surface in question has been opened. A session that stays on the
+graph never pays for either walk, and a session on one of them never pays for
+the other.
 
 The client polls `/fingerprint` every 3s (paused while the tab is hidden,
 checked immediately when it returns) and re-fetches `schema.json` when the value
@@ -259,6 +276,74 @@ honestly, never guess silently. The UI renders it.
 comes back and what is inside it" for almost every payload, and stops a pair of
 resources that embed each other from unrolling forever.
 
+### Jobs
+
+The endpoint list answers "how do you reach this data". The job list answers the
+question a 202 leaves behind: what is going to happen next, where, and carrying
+what. It is the same kind of surface — derived from source, cached against a
+file-stat signal, fetched when opened — and it joins to both of the others.
+
+**Found by interface, never by folder.** A job, a queued listener, a mailable
+and a notification are four different shapes that all implement `ShouldQueue`
+and all arrive at the same worker. `jobs.paths` says where to look;
+`ShouldQueue` decides what counts. `kind` is then read from what the class *is*
+— its ancestry for a mailable or a notification, and for a listener the event
+dispatcher's own registrations, since nothing about a listener class says it is
+one. A mailable kept outside `app/Mail` is still a mailable.
+
+The class behind each file is read from the file's **own `namespace`
+declaration**, unlike model discovery, which infers it from the path. Four
+directories in an application free to put any of them anywhere is four namespace
+settings to get wrong, and the answer is already written at the top of every
+file.
+
+**`$queue` is usually not a property.** A job that uses `Queueable` *cannot*
+declare `public $queue` — PHP rejects it as an incompatible redefinition of the
+trait's own property — so almost every job names its queue with
+`$this->onQueue('…')` in its constructor. Reading only the property would report
+`default` for most real jobs, which is not a smaller answer but a wrong one. So
+both are read, and `queue_source` says which answered:
+
+| `queue_source` | Means |
+|---|---|
+| `property` | A declared `$queue` — the usual form for a listener, which inherits nothing that claims the name |
+| `constructor` | `$this->onQueue('…')` among the constructor's own statements. Not one inside an `if`: a queue that depends on the arguments is not a queue this can report |
+| `dispatch` | The class said nothing; exactly one dispatch site chained `->onQueue('…')` |
+| `mixed` | Sites named two different queues. Picking one would invent a fact, and "it depends who dispatches it" is worth knowing |
+| `default` | Nothing anywhere named one |
+
+**Two node shapes, one rule.** Laravel has a great many ways to queue something
+— `Job::dispatch()`, `dispatch(new Job)`, `Bus::batch([...])`, `->chain([...])`,
+`Mail::to($u)->queue(...)`, `$user->notify(...)`. Enumerating them means missing
+the next one, so `DispatchScanner` looks for only two things — a static
+`dispatch*()` call and a `new` — and keeps a hit **only when the class is one
+discovery already found**. That is `ModelLinker`'s discipline applied to call
+sites: match against the set of things that exist rather than guess from the
+shape of the call. The cost is that constructing a queueable without dispatching
+it reads as a dispatch, which for a `ShouldQueue` class is almost always a
+dispatch through an API this deliberately does not know about.
+
+**Nothing is executed.** `backoff()` and `middleware()` are the two declarations
+that can be written as methods, and both are read as syntax. `middleware()`
+routinely returns middleware built from the job's own state —
+`new WithoutOverlapping($this->order->id)` — which on an unconstructed instance
+is a fatal error, not a catchable one. `confidence` grades the result on the
+same ladder the request and response shapes use, and `Confidence` keeps the
+weakest grade of everything that had to be read.
+
+**The two joins are the point.** `models` carries the class basenames the graph
+uses as node keys, read from the constructor signature — which is literally what
+gets serialised onto the queue. `dispatched_by[].route` carries a route id from
+`routes.json`. `RouteMap` builds that second one by addressing both sides the
+same way: a controller by its fully qualified `Class@method`, a closure by where
+it is written, which is the only identity a closure has. Both spellings run
+through `ProjectPath`, because two copies of "relative to the application root"
+that merely agree today is a join waiting to break.
+
+A job with an empty `dispatched_by` is reported as exactly that — no site was
+found — which is either dead code or a dynamic dispatch, and the surface must
+not claim to know which.
+
 ---
 
 ## Frontend side
@@ -272,16 +357,21 @@ main.ts                 mounts App; no router (see "Decisions")
     │   ├── ViewMenu    saved views: switch, edit membership, create, delete
     │   ├── ModelNode   one model: name, table, relation count, columns
     │   └── GraphLegend relation families
-    └── RoutesPanel     list ▏ detail
-        ├── RouteFilters   search + facet chips with counts
-        ├── RouteList      grouped by controller, collapsible
-        └── RouteDetail    verbs, middleware, params, request, response, touches
-            └── FieldTree  a flat path list rendered as a tree
+    ├── RoutesPanel     list ▏ detail
+    │   ├── RouteFilters   search + facet chips with counts
+    │   ├── RouteList      grouped by controller, collapsible
+    │   └── RouteDetail    verbs, middleware, params, request, response, touches
+    │       └── FieldTree  a flat path list rendered as a tree
+    └── JobsPanel       list ▏ detail
+        ├── JobFilters     search + kind/queue chips, and the undispatched count
+        ├── JobList        grouped by queue, collapsible
+        └── JobDetail      queue, retries, payload, middleware, dispatchers, carries
 
 stores/schema.ts        load → normalise → order → place → filter to the view
 stores/layout.ts        saved positions, debounce, prune, persist
 stores/views.ts         saved views, active view, persist
 stores/routes.ts        lazy load, filter state, selection
+stores/jobs.ts          the same, for the queue surface
 stores/navigation.ts    which page is open: fragment, then storage, then default
 pages/registry.ts       every page there is — the one file a new surface is added to
 lib/toolbar.ts          where a page hangs its own header controls
@@ -289,6 +379,8 @@ lib/layout.ts           the grid: pure function of node index
 lib/relations.ts        relation type → family → colour
 lib/httpMethods.ts      verb → colour, on the same ramp
 lib/routeFilters.ts     pure predicates + facet counts (the unit-tested part)
+lib/jobFilters.ts       the same shape again: queue bucketing, facets, grouping
+lib/jobKinds.ts         kind → colour, on the same ramp; and how a queue was named
 lib/bootstrap.ts        the host seam
 ```
 
@@ -319,8 +411,14 @@ that happen to share a header:
   selection**, which is a gesture somebody made on the canvas and feeds view
   membership — conflating them would let opening an endpoint quietly rewrite
   what a new view would contain.
-- An expanded `ModelNode` offers `Endpoints · N`, which switches the other way
-  with the list filtered to that model.
+- An expanded `ModelNode` offers `Endpoints · N` and `Jobs · N`, which switch
+  the other way with the list filtered to that model — what reaches this data
+  over HTTP, and what reaches it from a worker.
+- A job's dispatch site offers the endpoint it sits in, and a model card's job
+  count is the same link read backwards. `focusEndpoint` and `focusJob` clear
+  the filters *and* the view scope before selecting: landing on a surface with
+  the thing you asked for filtered out of it is the one thing such a link must
+  not do.
 
 The watcher that mirrors the selection lives in `RoutesPanel`, not in the store:
 `stores/schema.ts` already reaches for the routes store to poll the route
@@ -461,6 +559,56 @@ follow.
 There is no authored counterpart file. Routes are entirely derived, so nothing
 is committed and nothing has to be sanitised on write.
 
+### `jobs.json` (generated — never hand-edited, never written)
+
+```jsonc
+{
+  "jobs": [{
+    "id": "App\\Jobs\\SendInvoice",         // the FQCN; unlike a route it is unique on its own
+    "class": "App\\Jobs\\SendInvoice",
+    "name": "SendInvoice",
+    "kind": "job",                        // job | listener | mailable | notification
+    "queue": "invoices",
+    "queue_source": "constructor",        // property | constructor | dispatch | mixed | default
+    "connection": null,
+    "retry": {
+      "tries": 3, "timeout": 120, "maxExceptions": 2,
+      "backoff": [10, 60],                // one int, a list or a method — all reported as a list
+      "retryUntil": false                 // whether one is set, not when: it is computed at queue time
+    },
+    "traits": { "batchable": true, "unique": false,
+                "encrypted": false, "afterCommit": true },
+    "payload": [                          // the constructor signature — what goes on the wire
+      { "name": "invoice", "type": "App\\Models\\Invoice", "model": "Invoice",
+        "optional": false, "variadic": false, "default": null }
+    ],
+    "middleware": ["WithoutOverlapping"], // class basenames, read from source
+    "events": [],                         // what a listener is registered against
+    "confidence": "inferred",             // certain | inferred | unknown
+    "dispatched_by": [{
+      "file": "app/Http/Controllers/InvoiceController.php",
+      "line": 61,
+      "label": "InvoiceController@store", // or "api.php:22" for a closure
+      "context": "App\\Http\\Controllers\\InvoiceController@store",  // the join key
+      "method": "dispatch",               // the call that queued it: dispatch, queue, notify, batch…
+      "queue": null, "connection": null,  // only when chained as a literal
+      "delayed": false, "afterCommit": true,
+      "route": "POST:api/invoices"        // ← the join to routes.json
+    }],
+    "models": ["Invoice"]                 // ← the join to schema.json
+  }],
+  "generated_at": "…",
+  "fingerprint": "…"
+}
+```
+
+`label` names the action the site sits in; `line` is where the dispatch itself
+is written. For a closure those differ on purpose — the label addresses the
+closure the way the routes surface does, and the line addresses the call.
+
+Like `routes.json` there is no authored counterpart: jobs are entirely derived,
+so nothing is committed and nothing has to be sanitised on write.
+
 ### `layout.json` (authored — safe to commit and review)
 
 ```json
@@ -522,7 +670,7 @@ are running. `tests/StateVersioningTest.php` pins all of it.
 | **`dist/` is committed** | The package serves it directly. One `composer require`, no build step in the host app. `.gitignore` and Tailwind's `@source not` both encode this |
 | **Assets served by a route, not `vendor:publish`** | Nothing to re-publish after `composer update` |
 | **Standalone Blade page, not Inertia** | No dependency on the host's frontend build, Vue version or Tailwind version; the host's design tokens cannot collide with ours |
-| **No vue-router** | The page is registered as exactly one GET route with no SPA fallback, so a reload on a path-matching route 404s however the mount prefix is resolved. Pages are addressed by fragment instead (`stores/navigation.ts`), which never reaches the server. Three flat pages with no params also buy nothing from a router |
+| **No vue-router** | The page is registered as exactly one GET route with no SPA fallback, so a reload on a path-matching route 404s however the mount prefix is resolved. Pages are addressed by fragment instead (`stores/navigation.ts`), which never reaches the server. Four flat pages with no params also buy nothing from a router |
 | **The graph is not mounted by the page registry** | It starts the change poller the routes surface also depends on. Mount it lazily like the others and live updates elsewhere stop until somebody visits the graph. `pages/registry.ts` carries the warning next to the flag |
 | **Routes local-only by default** | It exposes the full schema and writes a file. The gate is `APP_ENV`, not install-time: the provider is auto-discovered and boots wherever the package is installed, so `middleware` is the control that holds when the environment check does not |
 | **A newer state file is never overwritten** | Both authored files are rewritten in full and sanitised on read, so saving over a format this version does not understand is silent data loss. Refusing has to ship *before* the format changes to be worth anything |
@@ -535,6 +683,12 @@ are running. `tests/StateVersioningTest.php` pins all of it.
 | **Every route is exported, facets narrow it** | Hiding vendor routes on the PHP side means the one time you need to see one, there is no way to |
 | **Shapes are parsed, not executed** | Running an application's `toArray()` or an arbitrary `rules()` to document it can have side effects and can fail. The one deliberate exception is `rules()`, tried first and caught |
 | **`confidence` is on the wire, not smoothed over** | Response shapes cannot be obtained from the framework at all. An API description that is confidently wrong is worse than one that says what it could not work out |
+| **Queueables are found by interface, not by folder** | A job, a queued listener, a mailable and a notification all implement `ShouldQueue` and all reach the same worker. A mailable kept outside `app/Mail` is still a mailable, and a `kind` read from the directory would be a lie |
+| **A job's class is read from its own `namespace` line** | Model discovery infers the namespace from one configured path. Jobs scan four, in an application free to put any of them anywhere — four settings to get wrong, when the answer is written at the top of every file |
+| **The dispatch scanner matches two node shapes, not an API list** | There are a dozen ways to queue something and there will be more. Looking for a static `dispatch*()` or a `new`, and keeping it only when the class is one discovery found, is `ModelLinker`'s rule: match what exists rather than guess from the call |
+| **`queue_source` is on the wire** | A job using `Queueable` cannot declare `public $queue`, so the queue usually comes from the constructor or the dispatch site. Where the answer came from changes how much it can be trusted, and two sites disagreeing is reported as `mixed` rather than resolved |
+| **Route ids and paths have one spelling each** | The jobs↔routes join is a string comparison. `RouteExporter::id()` is public and `ProjectPath` is shared for exactly that reason — two definitions that merely agree today is a cross-link that breaks silently |
+| **The job list is grouped by queue, not by kind** | The queue is the unit a *worker* is configured in, so it is the one with an operational answer. Grouping by kind would sort the list by what the classes are rather than by where they run |
 | **Highlight is not selection** | Canvas selection is a gesture that feeds view membership; opening an endpoint must not quietly change what a new view would contain |
 
 ---
@@ -551,7 +705,7 @@ $this->app->bind(ColumnNormalizer::class, MyColumnNormalizer::class);
 
 Config (`config/dissect.php`): `enabled`, `path`, `middleware`,
 `models_path`, `models_namespace`, `layout_path`, `views_path`,
-`routes.watch_paths`.
+`routes.watch_paths`, `jobs.paths`, `jobs.watch_paths`.
 
 ---
 
@@ -578,7 +732,15 @@ Config (`config/dissect.php`): `enabled`, `path`, `middleware`,
 | Change how a name resolves to a node id | `src/Routes/ModelLinker.php` |
 | Change what counts as a route change | `src/Routes/RouteFingerprint.php`, `routes.watch_paths` |
 | Change how the endpoint list is filtered or grouped | `resources/js/lib/routeFilters.ts` |
+| Change how the job list is filtered or grouped | `resources/js/lib/jobFilters.ts` |
+| Change what a job's detail pane shows | `resources/js/components/JobDetail.vue` |
+| Change kind colours, or how a queue's origin is worded | `resources/js/lib/jobKinds.ts` |
 | Change verb colours | `resources/js/lib/httpMethods.ts` |
+| Change where queueable classes are found | `jobs.paths` in config, then `src/Jobs/JobDiscovery.php` |
+| Change what a job reports about itself | `src/Jobs/JobInspector.php` |
+| Support another way of queueing something | `src/Jobs/DispatchScanner.php` — `DISPATCH_METHODS`, or the `new` rule |
+| Change how a dispatch site links to an endpoint | `src/Jobs/RouteMap.php`, `src/Jobs/ProjectPath.php` |
+| Change what counts as a job change | `jobs.watch_paths` in config |
 | Change the theme | `resources/js/assets/main.css` (tokens), `vue-flow-theme.css` (canvas) |
 | Change the page shell | `resources/views/app.blade.php` |
 
@@ -594,8 +756,9 @@ Config (`config/dissect.php`): `enabled`, `path`, `middleware`,
 - `stores/routes.ts` mixes loading, filter state and selection, but the pure
   parts are already out in `lib/routeFilters.ts` and unit-tested — which is the
   shape `stores/schema.ts` still wants.
-- **Frontend unit tests barely exist.** `lib/routeFilters.spec.ts` is the first
-  one; the Playwright suite in `e2e/` is what covers the rest.
+- **Frontend unit tests are thin.** `lib/routeFilters.spec.ts` and
+  `lib/jobFilters.spec.ts` are the two; the Playwright suite in `e2e/` is what
+  covers the rest.
 - Only two drivers have been exercised against a real database (Postgres, via
   `echodms`); the others are covered by string-level checks only.
 - **Route parameter binding is read from type hints only.** An explicit
@@ -606,6 +769,18 @@ Config (`config/dissect.php`): `enabled`, `path`, `middleware`,
   trait, fall back to whatever the literal says — which may be nothing.
 - **`ResponseAnalyzer` does not follow a resource's `with()` or `additional()`**,
   so wrapper keys a payload actually carries are missing from the shape.
+- **A dispatch behind a variable is invisible.** `$job::dispatch()` and
+  `dispatch($job)` name a class only the running application knows, so those
+  sites are not found and the job may report as undispatched.
+- **A queue chosen by a condition is not reported.** `JobInspector` reads only
+  the constructor's own statements, so an `onQueue()` inside an `if` leaves the
+  queue as `default` rather than claiming one branch of it.
+- **Constructing a queueable counts as dispatching it.** The scanner's rule is
+  deliberate — see "Jobs" — but a `new SendInvoice(...)` that is genuinely never
+  dispatched still reports a site.
+- **`DispatchScanner` parses every PHP file under `jobs.watch_paths`**, where
+  the route fingerprint only stats them. It is the widest walk the package does,
+  which is why the payload is fetched on open and cached against the signal.
 - The route fingerprint stats every PHP file under `routes.watch_paths`. On a
   large `app/` that is thousands of stats per check — cheap, but not free, and
   the config exists because narrowing it is sometimes the right answer.

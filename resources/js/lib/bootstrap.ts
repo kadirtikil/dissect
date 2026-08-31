@@ -25,6 +25,12 @@ export interface Bootstrap {
    * model, and the page opens on the graph.
    */
   routesUrl?: string
+  /**
+   * Endpoint returning the job list. Inlined as a URL for the same reason as
+   * the one above, and a sharper version of it: building this payload parses
+   * every file under the watched paths rather than only stat'ing them.
+   */
+  jobsUrl?: string
   /** Endpoint returning the current change signal — see stores/schema.ts. */
   fingerprintUrl?: string
   /** The signal as of page render; polling compares against this. */

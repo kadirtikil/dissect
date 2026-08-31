@@ -5,6 +5,7 @@ import type { ModelNodeData, SchemaColumn } from '@/types/schema'
 import { LAYOUT_DIRECTION, MAX_VISIBLE_COLUMNS } from '@/lib/layout'
 import { useSchemaStore } from '@/stores/schema'
 import { useRoutesStore } from '@/stores/routes'
+import { useJobsStore } from '@/stores/jobs'
 import { useNavigationStore } from '@/stores/navigation'
 
 // Handles must face the way the ranks flow, or edges loop back on themselves.
@@ -45,6 +46,18 @@ function openEndpoints(event: MouseEvent) {
   event.stopPropagation()
   routes.filterByModel(props.id)
   nav.go('routes')
+}
+
+const jobs = useJobsStore()
+
+/** Jobs carrying this model, on the same terms as the endpoint count above. */
+const jobCount = computed(() => (jobs.loaded ? (jobs.countByModel[props.id] ?? 0) : null))
+
+/** The reverse of the "carries" chip on a job. */
+function openJobs(event: MouseEvent) {
+  event.stopPropagation()
+  jobs.filterByModel(props.id)
+  nav.go('jobs')
 }
 
 // MAX_VISIBLE_COLUMNS is shared with the layout, which reserves vertical space
@@ -214,17 +227,31 @@ function onKeydown(event: KeyboardEvent) {
     <!-- The way out to the other surface. Only on an expanded card: a collapsed
          one is a shape on a board, and adding a control to two hundred of them
          would cost more than it gives. -->
-    <button
-      v-if="expanded && !data.external"
-      class="mt-1 flex items-center gap-1 border-t pt-1 font-mono text-[10px] text-muted-foreground hover:text-foreground"
-      :aria-label="`Show endpoints touching ${data.label}`"
-      @pointerdown.stop
-      @click="openEndpoints"
-    >
-      Endpoints
-      <span v-if="endpointCount !== null" class="tabular-nums">· {{ endpointCount }}</span>
-      <span aria-hidden="true">↗</span>
-    </button>
+    <div v-if="expanded && !data.external" class="mt-1 flex items-center gap-3 border-t pt-1">
+      <button
+        class="flex items-center gap-1 font-mono text-[10px] text-muted-foreground hover:text-foreground"
+        :aria-label="`Show endpoints touching ${data.label}`"
+        @pointerdown.stop
+        @click="openEndpoints"
+      >
+        Endpoints
+        <span v-if="endpointCount !== null" class="tabular-nums">· {{ endpointCount }}</span>
+        <span aria-hidden="true">↗</span>
+      </button>
+
+      <!-- What reaches this model over HTTP, and what reaches it from a worker.
+           Two different questions with the same shape of answer. -->
+      <button
+        class="flex items-center gap-1 font-mono text-[10px] text-muted-foreground hover:text-foreground"
+        :aria-label="`Show jobs carrying ${data.label}`"
+        @pointerdown.stop
+        @click="openJobs"
+      >
+        Jobs
+        <span v-if="jobCount !== null" class="tabular-nums">· {{ jobCount }}</span>
+        <span aria-hidden="true">↗</span>
+      </button>
+    </div>
 
     <Handle type="target" :position="targetPosition" />
     <Handle type="source" :position="sourcePosition" />
