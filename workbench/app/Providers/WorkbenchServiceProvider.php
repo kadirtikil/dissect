@@ -2,7 +2,10 @@
 
 namespace Workbench\App\Providers;
 
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
+use Workbench\App\Events\PostPublished;
+use Workbench\App\Listeners\NotifyFollowers;
 
 /**
  * Points the package at the fixture models when running under Workbench.
@@ -55,6 +58,19 @@ class WorkbenchServiceProvider extends ServiceProvider
                 $root.'/workbench/app',
                 $root.'/workbench/routes',
             ],
+
+            // Same again for the job list. The fixture keeps its queueables in
+            // the conventional three directories, under the workbench app
+            // rather than the skeleton's.
+            'dissect.jobs.paths' => [
+                $root.'/workbench/app/Jobs',
+                $root.'/workbench/app/Listeners',
+                $root.'/workbench/app/Mail',
+            ],
+            'dissect.jobs.watch_paths' => [
+                $root.'/workbench/app',
+                $root.'/workbench/routes',
+            ],
             // Workbench does not report the 'local' environment, and the viewer
             // is local-only by default.
             'dissect.enabled' => true,
@@ -74,5 +90,13 @@ class WorkbenchServiceProvider extends ServiceProvider
             // no reason to carry.
             'cache.default' => 'array',
         ]);
+    }
+
+    public function boot(): void
+    {
+        // What makes NotifyFollowers a *listener* rather than a job is this
+        // line: nothing about the class itself says so, and the dispatcher is
+        // the only place it is written down.
+        Event::listen(PostPublished::class, NotifyFollowers::class);
     }
 }

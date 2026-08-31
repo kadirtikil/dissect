@@ -78,7 +78,7 @@ class RouteExporter
             $response = $this->responses->analyse($reflection);
 
             return [
-                'id' => $this->id($described['methods'], $described['uri']),
+                'id' => self::id($described['methods'], $described['uri']),
                 ...$described,
                 'group' => $this->actions->group($route),
                 'action' => $action,
@@ -100,9 +100,14 @@ class RouteExporter
      * none, and two different verbs on one path are two different endpoints —
      * so the pair that actually identifies it is what is used.
      *
+     * Public and static because the jobs surface links dispatch sites back to
+     * endpoints by this id. Two places that both spell a route's key and only
+     * happen to agree is a cross-link that breaks the first time one of them is
+     * changed.
+     *
      * @param  array<int, string>  $methods
      */
-    protected function id(array $methods, string $uri): string
+    public static function id(array $methods, string $uri): string
     {
         return implode('|', $methods).':'.$uri;
     }

@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Cache;
 use KdrDev\Dissect\Exceptions\StateFileException;
+use KdrDev\Dissect\Jobs\JobExporter;
 use KdrDev\Dissect\LayoutRepository;
 use KdrDev\Dissect\Routes\RouteExporter;
 use KdrDev\Dissect\SchemaExporter;
@@ -20,9 +21,12 @@ class DissectController
 
     protected ?string $routeFingerprint = null;
 
+    protected ?string $jobFingerprint = null;
+
     public function __construct(
         protected SchemaExporter $exporter,
         protected RouteExporter $routes,
+        protected JobExporter $jobs,
         protected LayoutRepository $layout,
         protected ViewRepository $views,
     ) {}
@@ -65,6 +69,13 @@ class DissectController
             $payload['routes'] = $this->routeFingerprint();
         }
 
+        // Same bargain for the job list, and worth making separately: the two
+        // walk overlapping directories but a session sitting on one of them
+        // should not pay for the other.
+        if ($request->boolean('jobs')) {
+            $payload['jobs'] = $this->jobFingerprint();
+        }
+
         // The whole point is to see the current value; a cached 200 would make
         // the page believe nothing had changed for as long as the browser
         // decided to hold on to it.
@@ -95,6 +106,21 @@ class DissectController
         // this the client would have no baseline to poll against.
         return response()
             ->json($this->routes() + ['fingerprint' => $this->routeFingerprint()])
+            ->header('Cache-Control', 'no-store');
+    }
+
+    /**
+     * The job list.
+     *
+     * Fetched on first open like the endpoint list, and for a sharper version
+     * of the same reason: describing jobs means parsing every file under the
+     * watched paths looking for dispatch sites, which is the widest walk this
+     * package does.
+     */
+    public function jobsJson(): JsonResponse
+    {
+        return response()
+            ->json($this->jobs() + ['fingerprint' => $this->jobFingerprint()])
             ->header('Cache-Control', 'no-store');
     }
 
@@ -225,6 +251,26 @@ class DissectController
             'dissect.routes.'.$this->routeFingerprint(),
             now()->addHour(),
             fn () => $this->routes->export(),
+        );
+    }
+
+    protected function jobFingerprint(): string
+    {
+        return $this->jobFingerprint ??= $this->jobs->fingerprint();
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function jobs(): array
+    {
+        // The dearest of the three. Every file under the watched paths is
+        // parsed, not just stat'd, so this wants the cache more than either of
+        // the others — and gets exactly the same one.
+        return Cache::remember(
+            'dissect.jobs.'.$this->jobFingerprint(),
+            now()->addHour(),
+            fn () => $this->jobs->export(),
         );
     }
 

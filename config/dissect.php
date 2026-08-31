@@ -76,6 +76,34 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Jobs
+    |--------------------------------------------------------------------------
+    |
+    | Queueable classes are found by interface, not by folder: a job, a queued
+    | listener, a mailable and a notification all implement ShouldQueue and all
+    | end up on the same worker. These are the directories scanned for them.
+    |
+    | The class behind each file is read from the file's own namespace
+    | declaration, so unlike the model path there is nothing to configure when
+    | they live somewhere unconventional — add the directory and it works.
+    |
+    | `watch_paths` is the wider set searched for dispatch sites, and doubles as
+    | the change signal for this surface. It is the same trade-off the route
+    | list makes: a job can change because the job changed or because something
+    | started dispatching it, and both are source files.
+    |
+    */
+
+    'jobs' => [
+
+        'paths' => ['app/Jobs', 'app/Listeners', 'app/Mail', 'app/Notifications'],
+
+        'watch_paths' => ['app', 'routes'],
+
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Vite dev server
     |--------------------------------------------------------------------------
     |

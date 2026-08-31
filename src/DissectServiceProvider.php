@@ -2,10 +2,16 @@
 
 namespace KdrDev\Dissect;
 
+use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Database\DatabaseManager;
 use Illuminate\Database\Eloquent\ModelInspector;
 use Illuminate\Routing\Router;
+use KdrDev\Dissect\Jobs\DispatchScanner;
+use KdrDev\Dissect\Jobs\JobDiscovery;
+use KdrDev\Dissect\Jobs\JobExporter;
+use KdrDev\Dissect\Jobs\JobInspector;
+use KdrDev\Dissect\Jobs\RouteMap;
 use KdrDev\Dissect\Routes\ActionResolver;
 use KdrDev\Dissect\Routes\Ast\ClassSource;
 use KdrDev\Dissect\Routes\ModelLinker;
@@ -80,6 +86,38 @@ class DissectServiceProvider extends ServiceProvider
             $app->make(RequestAnalyzer::class),
             $app->make(ResponseAnalyzer::class),
             $app->make(RouteFingerprint::class),
+        ));
+
+        $this->app->singleton(JobDiscovery::class, fn () => new JobDiscovery(
+            (array) config('dissect.jobs.paths', ['app/Jobs']),
+        ));
+
+        $this->app->singleton(JobInspector::class, fn (Application $app) => new JobInspector(
+            $app->make(ClassSource::class),
+            $app->make(ModelLinker::class),
+            $app->make(Dispatcher::class),
+        ));
+
+        $this->app->singleton(DispatchScanner::class, fn (Application $app) => new DispatchScanner(
+            $app->make(ClassSource::class),
+            (array) config('dissect.jobs.watch_paths', ['app', 'routes']),
+        ));
+
+        $this->app->singleton(RouteMap::class, fn (Application $app) => new RouteMap(
+            $app->make(RouteCollector::class),
+            $app->make(ActionResolver::class),
+        ));
+
+        $this->app->singleton(JobExporter::class, fn (Application $app) => new JobExporter(
+            $app->make(JobDiscovery::class),
+            $app->make(JobInspector::class),
+            $app->make(DispatchScanner::class),
+            $app->make(RouteMap::class),
+            // Constructed rather than resolved: the container's RouteFingerprint
+            // watches the route paths, and this half watches its own. Same
+            // mechanism, different question, so it must not be the same
+            // instance.
+            new RouteFingerprint((array) config('dissect.jobs.watch_paths', ['app', 'routes'])),
         ));
 
         $this->app->singleton(LayoutRepository::class, fn () => new LayoutRepository(
