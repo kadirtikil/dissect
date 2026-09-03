@@ -28,6 +28,7 @@ use KdrDev\Dissect\Routes\RouteCollector;
 use KdrDev\Dissect\Routes\RouteExporter;
 use KdrDev\Dissect\Routes\RouteFingerprint;
 use KdrDev\Dissect\Routes\RuleNormalizer;
+use KdrDev\Dissect\Routes\RuleSource;
 use KdrDev\Dissect\Types\TypeNormalizerManager;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
@@ -72,9 +73,14 @@ class DissectServiceProvider extends ServiceProvider
             $app->make(SchemaExporter::class),
         ));
 
+        $this->app->singleton(RuleSource::class, fn (Application $app) => new RuleSource(
+            $app->make(ClassSource::class),
+        ));
+
         $this->app->singleton(RequestAnalyzer::class, fn (Application $app) => new RequestAnalyzer(
             $app->make(ClassSource::class),
             $app->make(RuleNormalizer::class),
+            $app->make(RuleSource::class),
         ));
 
         $this->app->singleton(RouteFingerprint::class, fn () => new RouteFingerprint(
