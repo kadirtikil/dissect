@@ -1,4 +1,4 @@
-# 🔪 dissect
+# 🩺 dissect
 
 Visualise your Eloquent models and their relationships as an interactive graph.
 
@@ -38,12 +38,15 @@ provider is auto-discovered, and there is nothing to publish or build. 🎉
 
 ## ✅ Requirements
 
-- PHP 8.2+
-- Laravel 11.33+, 12.x, or 13.x
+- PHP 8.3+
+- Laravel 13.x
 
-Laravel 11.33 is a hard floor: column and relation discovery is delegated to
-the framework's own `ModelInspector` (the class behind `artisan model:show`),
-which does not exist in earlier releases.
+Laravel 13 is a hard floor, and deliberately so. Column and relation discovery
+is delegated to the framework's own `ModelInspector` (the class behind
+`artisan model:show`), and the endpoint surface reads
+[laravel-json-api/laravel](https://laraveljsonapi.io) schemas, whose current
+release does not support anything earlier. Supporting one framework version
+well is worth more here than supporting three thinly.
 
 ## 📦 Installation
 
@@ -182,6 +185,7 @@ Response  resource · 201                 lines[].sku  string   req
   lines[]     array
 ```
 
+- 🔀 **Web / API.** The list splits into the routes your own frontend calls and the surface you have promised to the outside world, read from the middleware group each route file applies — so an API served from somewhere other than `/api` still lands in the right half.
 - 🧭 Endpoints stand on their own. They are not tied to the model graph, nothing on the graph narrows this list, and a rule that names a table is shown as written — `exists:customers,id` says what it says.
 - 🔎 Filter by path, route name, controller or verb; facet by method and by whose code it is (`app` / `vendor` / `framework`). Nothing is hidden from the export — the facets narrow it.
 - 👀 Every route always shows. Whatever you have selected or scoped elsewhere, the endpoint list is the whole table until *you* filter it here.

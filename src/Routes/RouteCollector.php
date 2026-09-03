@@ -23,10 +23,12 @@ class RouteCollector
     }
 
     /**
-     * @return array{methods: array<int, string>, uri: string, name: string|null, domain: string|null, middleware: array<int, string>}
+     * @return array{methods: array<int, string>, uri: string, name: string|null, domain: string|null, middleware: array<int, string>, stack: string}
      */
     public function describe(Route $route): array
     {
+        $middleware = $this->middleware($route);
+
         return [
             'methods' => $this->methods($route),
             // Laravel stores the root as "/", which reads oddly in a list of
@@ -34,8 +36,45 @@ class RouteCollector
             'uri' => $route->uri(),
             'name' => $route->getName(),
             'domain' => $route->getDomain(),
-            'middleware' => $this->middleware($route),
+            'middleware' => $middleware,
+            'stack' => self::stack($middleware),
         ];
+    }
+
+    /**
+     * Which middleware stack the route was registered into: `web`, `api`, or
+     * neither.
+     *
+     * This is the closest thing the router keeps to "which file was it written
+     * in". Laravel loads `web.php` and `api.php` into one flat table and
+     * retains nothing about where each entry came from — but it does apply a
+     * group per file, and that group is the difference that actually matters:
+     * `web` is session- and cookie-backed, which is what a first-party frontend
+     * talks to; `api` is stateless, which is what everybody else talks to.
+     *
+     * Read from the group rather than from the URI because a prefix is a
+     * convention and the group is a behaviour. An application that serves its
+     * API from `/v2` or its frontend from `/app` is still correctly split here.
+     *
+     * `api` is checked first: a route somehow in both groups is making the
+     * stateless claim, and that is the one consumers have to honour.
+     *
+     * @param  array<int, string>  $middleware
+     */
+    public static function stack(array $middleware): string
+    {
+        if (in_array('api', $middleware, true)) {
+            return 'api';
+        }
+
+        if (in_array('web', $middleware, true)) {
+            return 'web';
+        }
+
+        // Neither group. Reported rather than guessed at: a console route, or
+        // one registered outside both files, is a real thing to see in the list
+        // and inventing a half for it would be a lie.
+        return 'other';
     }
 
     /**

@@ -11,6 +11,17 @@
 /** Whose code the endpoint runs. Every route is exported; this is the facet. */
 export type RouteGroup = 'app' | 'vendor' | 'framework'
 
+/**
+ * Which middleware stack the route was registered into.
+ *
+ * The closest thing the router keeps to which file a route was written in, and
+ * the split that matters to somebody reading the list: `web` is session-backed
+ * — a first-party frontend talks to it — and `api` is stateless, which is what
+ * everything else talks to. `other` is a route in neither group, reported
+ * rather than forced into a half it does not belong to.
+ */
+export type RouteStack = 'web' | 'api' | 'other'
+
 export type ActionType = 'controller' | 'closure' | 'view' | 'redirect'
 
 /**
@@ -81,6 +92,7 @@ export interface ApiRoute {
   name: string | null
   domain: string | null
   middleware: string[]
+  stack: RouteStack | string
   group: RouteGroup | string
   action: RouteAction
   parameters: RouteParameter[]

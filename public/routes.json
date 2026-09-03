@@ -13,6 +13,7 @@
         "api",
         "auth:sanctum"
       ],
+      "stack": "api",
       "group": "app",
       "action": {
         "type": "controller",
@@ -93,6 +94,7 @@
         "api",
         "auth:sanctum"
       ],
+      "stack": "api",
       "group": "app",
       "action": {
         "type": "controller",
@@ -169,6 +171,7 @@
         "api",
         "auth:sanctum"
       ],
+      "stack": "api",
       "group": "app",
       "action": {
         "type": "controller",
@@ -231,6 +234,7 @@
         "api",
         "auth:sanctum"
       ],
+      "stack": "api",
       "group": "app",
       "action": {
         "type": "controller",
@@ -278,6 +282,7 @@
         "api",
         "auth:sanctum"
       ],
+      "stack": "api",
       "group": "app",
       "action": {
         "type": "controller",
@@ -335,6 +340,7 @@
         "web",
         "throttle:10,1"
       ],
+      "stack": "web",
       "group": "app",
       "action": {
         "type": "controller",
@@ -389,6 +395,7 @@
       "middleware": [
         "web"
       ],
+      "stack": "web",
       "group": "app",
       "action": {
         "type": "controller",
@@ -422,6 +429,7 @@
       "middleware": [
         "web"
       ],
+      "stack": "web",
       "group": "vendor",
       "action": {
         "type": "controller",
@@ -455,6 +463,7 @@
       "middleware": [
         "web"
       ],
+      "stack": "web",
       "group": "framework",
       "action": {
         "type": "closure",

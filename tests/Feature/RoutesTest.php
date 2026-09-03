@@ -79,6 +79,37 @@ class RoutesTest extends TestCase
     }
 
     #[Test]
+    public function it_splits_the_table_by_the_stack_a_route_was_registered_into(): void
+    {
+        $routes = $this->routes();
+
+        // The two halves of the fixture, and the difference that matters: one
+        // is session-backed, the other stateless.
+        $this->assertSame('api', $routes['GET:api/posts']['stack']);
+        $this->assertSame('web', $routes['GET:authors']['stack']);
+    }
+
+    #[Test]
+    public function it_reads_the_stack_from_the_group_rather_than_the_uri(): void
+    {
+        // A prefix is a convention; the middleware group is a behaviour. An API
+        // served from somewhere other than /api is still an API.
+        Route::middleware('api')->get('v2/widgets', fn () => []);
+
+        $this->assertSame('api', $this->routes()['GET:v2/widgets']['stack']);
+    }
+
+    #[Test]
+    public function it_refuses_to_place_a_route_in_neither_group(): void
+    {
+        // A console route, or one registered outside both files. Inventing a
+        // half for it would put it under a heading that is not true.
+        Route::get('unstacked', fn () => []);
+
+        $this->assertSame('other', $this->routes()['GET:unstacked']['stack']);
+    }
+
+    #[Test]
     public function it_marks_an_optional_parameter_as_optional(): void
     {
         $parameter = $this->routes()['GET:api/feed/{category?}']['parameters'][0];

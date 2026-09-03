@@ -146,7 +146,7 @@ falls back to fetching. Nothing else in the app knows which host it is in.
 ```
 DissectServiceProvider    wiring; registers routes only when enabled
   ├── SchemaExporter          orchestrates: discover → inspect → normalise
-  │     ├── ModelInspector    (Laravel's own, needs ^11.33)
+  │     ├── ModelInspector    (Laravel's own)
   │     ├── ColumnNormalizer  attribute rows → the viewer's column shape
   │     │     └── TypeNormalizerManager
   │     │           └── {Postgres,MySql,Sqlite,SqlServer,Generic}TypeNormalizer
@@ -267,6 +267,15 @@ The endpoint list exists to answer the question the graph cannot: how do you
 reach this data over HTTP. What makes it part of dissect rather than a second
 `route:list` is the payload shapes — what a request must carry and what the
 response hands back, read off the form request and the resource.
+
+**The table has two halves.** `stack` says which middleware group a route was
+registered into — `web`, `api`, or neither. Laravel loads `web.php` and
+`api.php` into one flat table and keeps nothing about where an entry came from,
+so the group is the closest surviving signal, and it is the one that matters:
+`web` is session- and cookie-backed, which is what a first-party frontend talks
+to, and `api` is stateless, which is what everybody else talks to. Read from the
+group rather than the URI on purpose — a prefix is a convention, a group is a
+behaviour, so an API served from `/v2` still lands in the right half.
 
 **Endpoints carry no model ids.** The graph is a different context, and an
 endpoint is described entirely by its own contract. A rule naming a table
@@ -597,6 +606,7 @@ selection as a new view or add it to the open one.
     "uri": "api/invoices",
     "name": "invoices.store",
     "domain": null,
+    "stack": "api",                     // web | api | other — which half of the surface
     "group": "app",                     // app | vendor | framework — the facet
     "action": {
       "type": "controller",             // controller | closure | view | redirect

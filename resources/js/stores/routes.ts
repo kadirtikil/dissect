@@ -30,6 +30,15 @@ export const useRoutesStore = defineStore('routes', () => {
   const methods = ref<string[]>([])
   const groups = ref<string[]>([])
 
+  /**
+   * Which half of the table is on screen: `['web']`, `['api']`, or empty for
+   * both.
+   *
+   * Held as a list rather than a nullable single value so it filters like every
+   * other facet, even though the switcher only ever sets one at a time.
+   */
+  const stacks = ref<string[]>([])
+
   const selectedId = ref<string | null>(null)
 
   const loaded = computed(() => status.value === 'ready')
@@ -47,6 +56,7 @@ export const useRoutesStore = defineStore('routes', () => {
     search: search.value,
     methods: methods.value,
     groups: groups.value,
+    stacks: stacks.value,
   }))
 
   const visible = computed(() => filterRoutes(routes.value, filters.value))
@@ -74,6 +84,15 @@ export const useRoutesStore = defineStore('routes', () => {
       : [...methods.value, method]
   }
 
+  /**
+   * The web/api switcher, which is a pick rather than a toggle: clicking the
+   * half already showing goes back to both, and picking one never leaves the
+   * other selected too.
+   */
+  function showStack(stack: string | null) {
+    stacks.value = stack === null || stacks.value.includes(stack) ? [] : [stack]
+  }
+
   function toggleGroup(group: string) {
     groups.value = groups.value.includes(group)
       ? groups.value.filter((g) => g !== group)
@@ -96,6 +115,7 @@ export const useRoutesStore = defineStore('routes', () => {
     search.value = ''
     methods.value = []
     groups.value = []
+    stacks.value = []
   }
 
   function endpoint(): string {
@@ -165,6 +185,7 @@ export const useRoutesStore = defineStore('routes', () => {
     search,
     methods,
     groups,
+    stacks,
     selectedId,
     filters,
     visible,
@@ -175,6 +196,7 @@ export const useRoutesStore = defineStore('routes', () => {
     select,
     toggleMethod,
     toggleGroup,
+    showStack,
     focusEndpoint,
     clearFilters,
     load,

@@ -41,6 +41,39 @@ test('narrows the list by search and by facet, and clears again', async ({ page 
   await expect(rows).toHaveCount(total)
 })
 
+test('splits the table into the frontend half and the external one', async ({ page }) => {
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Routes', exact: true }).click()
+
+  const rows = page.locator('li button')
+  await expect(rows.first()).toBeVisible()
+
+  // Both halves are offered with their true size before either is picked.
+  await expect(page.getByRole('button', { name: /^Web 4/ })).toBeVisible()
+  await expect(page.getByRole('button', { name: /^API 5/ })).toBeVisible()
+
+  await page.getByRole('button', { name: /^API/ }).click()
+  await expect(page.getByText('5 of 9 endpoints')).toBeVisible()
+  // Stateless routes only. Asserted on the controller groupings rather than on
+  // a path fragment: `api/workspaces/{workspace}/members` is an API route that
+  // still contains the word the web half is named for.
+  await expect(page.getByRole('button', { name: /WorkspaceController/ })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: /DocumentController/ })).toBeVisible()
+
+  // The other tab still reports its real size while this one is showing, or it
+  // would read as "nothing to switch to".
+  await expect(page.getByRole('button', { name: /^Web 4/ })).toBeVisible()
+
+  await page.getByRole('button', { name: /^Web/ }).click()
+  await expect(page.getByText('4 of 9 endpoints')).toBeVisible()
+  await expect(page.getByRole('button', { name: /DocumentController/ })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: /WorkspaceController/ })).toBeVisible()
+
+  // Picking the half already showing goes back to the whole table.
+  await page.getByRole('button', { name: /^Web/ }).click()
+  await expect(page.getByText('9 of 9 endpoints')).toBeVisible()
+})
+
 test('describes an endpoint down to the shape of its payloads', async ({ page }) => {
   await page.goto('/')
   await page.getByRole('button', { name: 'Routes', exact: true }).click()
