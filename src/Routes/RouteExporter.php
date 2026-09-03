@@ -3,6 +3,7 @@
 namespace KdrDev\Dissect\Routes;
 
 use Illuminate\Routing\Route;
+use KdrDev\Dissect\JsonApi\DocumentAnalyzer;
 use Throwable;
 
 /**
@@ -24,6 +25,7 @@ class RouteExporter
         protected RequestAnalyzer $requests,
         protected ResponseAnalyzer $responses,
         protected RouteFingerprint $fingerprint,
+        protected DocumentAnalyzer $documents,
     ) {}
 
     /**
@@ -74,8 +76,16 @@ class RouteExporter
             $described = $this->collector->describe($route);
             $action = $this->actions->describe($route);
             $parameters = $this->collector->parameters($route);
-            $request = $this->requests->analyse($reflection);
-            $response = $this->responses->analyse($reflection);
+
+            // JSON:API first. Every route the package registers runs the same
+            // generic controller, so reflecting the action answers
+            // `JsonApiController` for all of them — the schema behind the route
+            // is the only thing that describes the payload, and where there is
+            // one it is a better answer than anything the reflection can give.
+            $document = $this->documents->response($route);
+
+            $request = $this->documents->request($route) ?? $this->requests->analyse($reflection);
+            $response = $document ?? $this->responses->analyse($reflection);
 
             return [
                 'id' => self::id($described['methods'], $described['uri']),

@@ -152,6 +152,8 @@ DissectServiceProvider    wiring; registers routes only when enabled
   │     │           └── {Postgres,MySql,Sqlite,SqlServer,Generic}TypeNormalizer
   │     └── MigrationState    "has a migration actually run?" — half the fingerprint
   ├── RouteExporter           orchestrates: collect → resolve → analyse
+  │     ├── ServerRegistry      route name → jsonapi server + resource → schema
+  │     ├── DocumentAnalyzer    a schema → the JSON:API envelope it sends
   │     ├── RouteCollector      the router's table: verbs, uri, middleware, params
   │     ├── ActionResolver      what runs, and whose code it is (app/vendor/framework)
   │     ├── RequestAnalyzer     FormRequest::rules(), else inline validate()
@@ -267,6 +269,36 @@ The endpoint list exists to answer the question the graph cannot: how do you
 reach this data over HTTP. What makes it part of dissect rather than a second
 `route:list` is the payload shapes — what a request must carry and what the
 response hands back, read off the form request and the resource.
+
+**JSON:API is read from schemas, not from controllers.** Every route
+[laravel-json-api](https://laraveljsonapi.io) registers runs the same generic
+`JsonApiController`, so reflecting the action answers the same thing for all of
+them and says nothing. The join runs through the route's *name*, which the
+package builds as `{server}.{resource}.{action}`:
+
+| The route says | Resolves to |
+|---|---|
+| `v1.posts.index` | server `v1`, resource `posts`, a collection |
+| `v1.posts.author` | the *inverse* schema — an author, not a post |
+| `v1.posts.author.show` | resource identifiers only |
+
+The third segment is a relation on some routes and an action on others, and the
+name alone cannot tell them apart — `v1.posts.index` and `v1.posts.author` have
+the same shape. The controller method the package routed to is what decides.
+
+What is reported is the **envelope**, because that is what a consumer writes
+code against: `data.attributes.title`, not `title`. The containers are emitted
+as fields of their own so the payload renders as the tree it is, and a
+relationship's `data` is marked conditional while the relationship object around
+it is not — a link is always there, linkage is not.
+
+This is the one place the exporter asks the framework to resolve something
+rather than reading it as syntax. A schema's `fields()` is a list of objects
+built by method chains; reading it as source would mean reimplementing the
+package's own resolution and getting a worse answer. It is the same bargain
+`RequestAnalyzer` already makes with `FormRequest::rules()`, and it is wrapped
+as carefully — a server that cannot be built costs its own routes their shape
+and nothing else.
 
 **The table has two halves.** `stack` says which middleware group a route was
 registered into — `web`, `api`, or neither. Laravel loads `web.php` and
@@ -628,7 +660,9 @@ selection as a new view or add it to the open one.
       ]
     },
     "response": {
-      "source": "resource",             // resource | resource-collection | json | view | redirect | unknown
+      // resource | resource-collection | json | view | redirect | unknown
+      // json-api | json-api-identifier | json-api-none
+      "source": "resource",
       "class": "App\\Http\\Resources\\InvoiceResource",
       "status": 201,
       "confidence": "certain",

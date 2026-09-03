@@ -33,9 +33,10 @@ test('narrows the list by search and by facet, and clears again', async ({ page 
   await expect(rows).toHaveCount(3)
 
   await page.getByLabel('Filter endpoints').fill('')
-  // A bare verb filters by verb rather than by text.
+  // A bare verb filters by verb rather than by text. Two now: the plain
+  // resource route and the JSON:API one.
   await page.getByRole('button', { name: /^DELETE/ }).first().click()
-  await expect(rows).toHaveCount(1)
+  await expect(rows).toHaveCount(2)
 
   await page.getByLabel('Clear all filters').click()
   await expect(rows).toHaveCount(total)
@@ -50,10 +51,10 @@ test('splits the table into the frontend half and the external one', async ({ pa
 
   // Both halves are offered with their true size before either is picked.
   await expect(page.getByRole('button', { name: /^Web 4/ })).toBeVisible()
-  await expect(page.getByRole('button', { name: /^API 5/ })).toBeVisible()
+  await expect(page.getByRole('button', { name: /^API 10/ })).toBeVisible()
 
   await page.getByRole('button', { name: /^API/ }).click()
-  await expect(page.getByText('5 of 9 endpoints')).toBeVisible()
+  await expect(page.getByText('10 of 14 endpoints')).toBeVisible()
   // Stateless routes only. Asserted on the controller groupings rather than on
   // a path fragment: `api/workspaces/{workspace}/members` is an API route that
   // still contains the word the web half is named for.
@@ -65,13 +66,13 @@ test('splits the table into the frontend half and the external one', async ({ pa
   await expect(page.getByRole('button', { name: /^Web 4/ })).toBeVisible()
 
   await page.getByRole('button', { name: /^Web/ }).click()
-  await expect(page.getByText('4 of 9 endpoints')).toBeVisible()
+  await expect(page.getByText('4 of 14 endpoints')).toBeVisible()
   await expect(page.getByRole('button', { name: /DocumentController/ })).toHaveCount(0)
   await expect(page.getByRole('button', { name: /WorkspaceController/ })).toBeVisible()
 
   // Picking the half already showing goes back to the whole table.
   await page.getByRole('button', { name: /^Web/ }).click()
-  await expect(page.getByText('9 of 9 endpoints')).toBeVisible()
+  await expect(page.getByText('14 of 14 endpoints')).toBeVisible()
 })
 
 test('describes an endpoint down to the shape of its payloads', async ({ page }) => {
@@ -87,6 +88,43 @@ test('describes an endpoint down to the shape of its payloads', async ({ page })
   await expect(page.getByText('tags[].name')).toBeVisible()
   // A rule naming a table is shown as written, not resolved to a model.
   await expect(page.getByText('exists:document_types,id')).toBeVisible()
+})
+
+test('describes a JSON:API endpoint as the envelope it actually sends', async ({ page }) => {
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Routes', exact: true }).click()
+
+  await page.locator('li button', { hasText: 'v1/documents' }).filter({ hasText: 'POST' }).click()
+
+  // Read from the schema, not from a return type — every route the package
+  // registers runs the same generic controller.
+  await expect(page.getByText('App\\JsonApi\\V1\\Documents\\DocumentSchema').first()).toBeVisible()
+  await expect(page.getByText('JSON:API document').first()).toBeVisible()
+
+  // The envelope is the point: a consumer writes `data.attributes.title`, so
+  // the containers are rendered as the tree they are rather than as a column
+  // of identical dotted prefixes.
+  //
+  // Scoped to the section: the graph stays mounted behind this surface, and a
+  // bare text match resolves to one of its hidden column names.
+  const request = page.locator('section').filter({ hasText: 'REQUEST' }).last()
+
+  await expect(request.getByText('attributes', { exact: true })).toBeVisible()
+  await expect(request.getByText('relationships', { exact: true })).toBeVisible()
+  await expect(request.getByText('title', { exact: true })).toBeVisible()
+
+  // A 204 is an answer, not a failure to find a body.
+  await page.locator('li button', { hasText: 'v1/documents/{document}' }).filter({ hasText: 'DELETE' }).click()
+  await expect(page.getByText(/Answers 204 No Content/)).toBeVisible()
+
+  // A relationship endpoint promises identifiers and nothing more.
+  await page.locator('li button', { hasText: 'relationships/owner' }).click()
+  await expect(page.getByText('JSON:API identifiers')).toBeVisible()
+
+  const response = page.locator('section').filter({ hasText: 'RESPONSE' }).last()
+
+  await expect(response.getByText('type', { exact: true })).toBeVisible()
+  await expect(response.getByText('attributes', { exact: true })).toHaveCount(0)
 })
 
 test('admits when a shape was inferred rather than read from the framework', async ({ page }) => {
@@ -115,7 +153,7 @@ test('shows every endpoint, and offers no way back into the graph', async ({ pag
   // That a saved view no longer scopes this list is covered in the filter unit
   // tests rather than here — building a view writes public/views.json, which
   // the graph specs also write, and they run in a separate worker.
-  await expect(page.getByText('9 of 9 endpoints')).toBeVisible()
+  await expect(page.getByText('14 of 14 endpoints')).toBeVisible()
   await expect(page.getByRole('button', { name: /^in “/ })).toHaveCount(0)
 
   // No row advertises models, and no endpoint links back to one.

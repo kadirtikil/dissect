@@ -12,6 +12,11 @@ abstract class TestCase extends BaseTestCase
 
     protected function defineEnvironment($app): void
     {
+        // The fixture server, registered the way an application registers one.
+        $app['config']->set('jsonapi.servers', [
+            'v1' => \Workbench\App\JsonApi\V1\Server::class,
+        ]);
+
         // Tests run under the `testing` environment, where routes are off by
         // default — switch them on deliberately, and point the exporter at the
         // Workbench fixture models rather than a non-existent app/Models.

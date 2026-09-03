@@ -5,14 +5,19 @@ import MethodBadge from '@/components/routes/MethodBadge.vue'
 import FieldTree from '@/components/routes/FieldTree.vue'
 import { useRoutesStore } from '@/stores/routes'
 import { sectionColor, sectionSurface } from '@/lib/routeSections'
+import { bodylessNote, sourceLabel } from '@/lib/payloadSources'
 
 const store = useRoutesStore()
 const { selected } = storeToRefs(store)
 
-const bodyless = computed(
-  () =>
-    selected.value?.response?.source === 'view' || selected.value?.response?.source === 'redirect',
-)
+/**
+ * The sentence for an endpoint with no JSON body, or null when it has one.
+ *
+ * A view, a redirect and a JSON:API `204` all arrive with an empty field list,
+ * and "No fields found" would read as a failure to look rather than as the
+ * answer it is.
+ */
+const bodyless = computed(() => bodylessNote(selected.value?.response?.source))
 
 const requestSummary = computed(() => {
   const request = selected.value?.request
@@ -128,6 +133,9 @@ const requestSummary = computed(() => {
         >
           Request
         </h3>
+        <span v-if="selected.request" class="font-mono text-[10px] text-muted-foreground/70">
+          {{ sourceLabel(selected.request.source) }}
+        </span>
         <span v-if="requestSummary" class="font-mono text-[10px] text-muted-foreground/70">
           {{ requestSummary }}
         </span>
@@ -162,7 +170,7 @@ const requestSummary = computed(() => {
         <!-- Whether one comes back or many is the first thing worth knowing,
              and a class name alone does not say it. -->
         <span v-if="selected.response" class="font-mono text-[10px] text-muted-foreground/70">
-          {{ selected.response.source }}
+          {{ sourceLabel(selected.response.source) }}
         </span>
         <span
           v-if="selected.response?.status"
@@ -179,10 +187,9 @@ const requestSummary = computed(() => {
         Not analysed.
       </p>
 
-      <!-- A view or a redirect has no payload to describe. "No fields found"
-           would read as a failure to look, rather than as the answer. -->
+      <!-- No payload to describe, which is a finding rather than a gap. -->
       <p v-else-if="bodyless" class="mt-1 font-mono text-[11px] text-muted-foreground/70 italic">
-        {{ selected.response.source === 'view' ? 'Renders a view' : 'Redirects' }} — no JSON body.
+        {{ bodyless }} — no JSON body.
       </p>
 
       <template v-else>

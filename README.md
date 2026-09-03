@@ -191,6 +191,28 @@ Response  resource · 201                 lines[].sku  string   req
 - 👀 Every route always shows. Whatever you have selected or scoped elsewhere, the endpoint list is the whole table until *you* filter it here.
 - 🐢 `routes.json` is fetched when you first open the tab, not inlined — so the graph still boots with no round trips.
 
+### 🧩 JSON:API
+
+Applications built on [laravel-json-api](https://laraveljsonapi.io) get their
+shapes from their **schemas**, since every route the package registers runs the
+same generic controller and a return type would say nothing.
+
+```
+POST v1/documents                      Request   JSON:API document
+                                         data          object  req
+Response  JSON:API document  201           type        string  req
+  data        object                       attributes  object
+    type                                     title
+    id                                       slug
+    attributes  object                    relationships object
+      title       sometimes                  owner       object
+    relationships object                       data      object
+```
+
+- 📦 The **envelope**, not the bare fields — you write `data.attributes.title`, so that is what the pane says.
+- 🔗 `posts/{post}/author` is described with the *author's* schema, and a `relationships/…` endpoint promises type and id and nothing else, because that is all a resource identifier object is.
+- 🚫 A `DELETE` says it answers `204` rather than reporting an empty body as a failure to find one.
+
 ### 🎯 Where the shapes come from
 
 Requests are read from a `FormRequest`'s `rules()` where one is type-hinted, and

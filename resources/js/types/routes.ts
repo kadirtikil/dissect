@@ -61,7 +61,8 @@ export interface RequestField {
 }
 
 export interface RequestShape {
-  source: 'form-request' | 'inline-validate' | 'none' | string
+  /** `json-api` when the fields were read from a schema rather than rules. */
+  source: 'form-request' | 'inline-validate' | 'none' | 'json-api' | string
   class: string | null
   confidence: Confidence
   fields: RequestField[]
@@ -77,7 +78,22 @@ export interface ResponseField {
 }
 
 export interface ResponseShape {
-  source: 'resource' | 'resource-collection' | 'json' | 'view' | 'redirect' | 'unknown' | string
+  /**
+   * The `json-api-*` sources come from a schema rather than a return type:
+   * `json-api` is a document, `json-api-identifier` a relationship endpoint's
+   * type/id pair, and `json-api-none` a 204 that must not carry a body.
+   */
+  source:
+    | 'resource'
+    | 'resource-collection'
+    | 'json'
+    | 'view'
+    | 'redirect'
+    | 'unknown'
+    | 'json-api'
+    | 'json-api-identifier'
+    | 'json-api-none'
+    | string
   class: string | null
   status?: number | null
   confidence: Confidence

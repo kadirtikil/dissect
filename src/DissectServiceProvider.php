@@ -19,6 +19,8 @@ use KdrDev\Dissect\Queue\QueueReaderFactory;
 use KdrDev\Dissect\Queue\QueueSnapshot;
 use KdrDev\Dissect\Routes\ActionResolver;
 use KdrDev\Dissect\Routes\Ast\ClassSource;
+use KdrDev\Dissect\JsonApi\DocumentAnalyzer;
+use KdrDev\Dissect\JsonApi\ServerRegistry;
 use KdrDev\Dissect\Routes\ModelLinker;
 use KdrDev\Dissect\Routes\RequestAnalyzer;
 use KdrDev\Dissect\Routes\ResponseAnalyzer;
@@ -83,12 +85,25 @@ class DissectServiceProvider extends ServiceProvider
             $app->make(ClassSource::class),
         ));
 
+        // Resolved lazily and defensively: an application without the JSON:API
+        // package installed has no server repository to bind, and must still
+        // get its endpoint list.
+        $this->app->singleton(ServerRegistry::class, fn (Application $app) => new ServerRegistry(
+            $app->make(\LaravelJsonApi\Contracts\Server\Repository::class),
+            (array) config('jsonapi.servers', []),
+        ));
+
+        $this->app->singleton(DocumentAnalyzer::class, fn (Application $app) => new DocumentAnalyzer(
+            $app->make(ServerRegistry::class),
+        ));
+
         $this->app->singleton(RouteExporter::class, fn (Application $app) => new RouteExporter(
             $app->make(RouteCollector::class),
             $app->make(ActionResolver::class),
             $app->make(RequestAnalyzer::class),
             $app->make(ResponseAnalyzer::class),
             $app->make(RouteFingerprint::class),
+            $app->make(DocumentAnalyzer::class),
         ));
 
         $this->app->singleton(JobDiscovery::class, fn () => new JobDiscovery(
