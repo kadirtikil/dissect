@@ -151,19 +151,19 @@ DissectServiceProvider    wiring; registers routes only when enabled
   │     │     └── TypeNormalizerManager
   │     │           └── {Postgres,MySql,Sqlite,SqlServer,Generic}TypeNormalizer
   │     └── MigrationState    "has a migration actually run?" — half the fingerprint
-  ├── RouteExporter           orchestrates: collect → resolve → analyse → link
+  ├── RouteExporter           orchestrates: collect → resolve → analyse
   │     ├── RouteCollector      the router's table: verbs, uri, middleware, params
   │     ├── ActionResolver      what runs, and whose code it is (app/vendor/framework)
   │     ├── RequestAnalyzer     FormRequest::rules(), else inline validate()
   │     │     └── RuleNormalizer   rule strings/objects → type, required, table
   │     ├── ResponseAnalyzer    return type → JsonResource::toArray() / response()->json()
-  │     ├── ModelLinker         table, class or convention → a schema.json node id
   │     ├── Ast\ClassSource     php-parser: a method's body, without running it
   │     └── RouteFingerprint    "has anything behind the route table been edited?"
   ├── JobExporter             orchestrates: discover → inspect → scan → link
   │     ├── JobDiscovery        queueable classes, found by interface not by folder
   │     ├── JobInspector        queue, retries, payload, middleware — read, never run
   │     │     └── Confidence      the weakest grade of everything it had to read
+  │     ├── ModelLinker         class name → a schema.json node id (jobs only)
   │     ├── DispatchScanner     php-parser: every place a job is put on the queue
   │     ├── RouteMap            a dispatch site's surroundings → a route id
   │     └── ProjectPath         the one spelling of a path both sides join on
@@ -265,18 +265,21 @@ framework or touching a database. `RuleNormalizer` follows the same rule.
 
 The endpoint list exists to answer the question the graph cannot: how do you
 reach this data over HTTP. What makes it part of dissect rather than a second
-`route:list` is one field — `models` — carrying the same class-basename ids
-`schema.json` uses as node keys. Three different things resolve to it, and
-`ModelLinker` is where they meet:
+`route:list` is the payload shapes — what a request must carry and what the
+response hands back, read off the form request and the resource.
 
-| The endpoint says | Resolved by |
-|---|---|
-| `Post $post` on the action | the type hint, via implicit route binding |
-| `exists:authors,id` in a rule | the table name |
-| `PostResource` as the return type | `@mixin`, then the `XResource → X` convention |
+**Endpoints carry no model ids.** The graph is a different context, and an
+endpoint is described entirely by its own contract. A rule naming a table
+travels verbatim (`exists:authors,id`), a placeholder is reported as a
+placeholder, and nothing resolves a name to a `schema.json` node. `ModelLinker`
+still exists, but only the jobs surface uses it.
 
-The convention is only ever *accepted* when the graph actually holds a node by
-that name, which keeps it a check rather than a guess.
+That is a deliberate reversal. Joining the two meant an endpoint could be
+narrowed, highlighted or hidden by a choice made on the graph — a saved view
+scoping the list, a model card filtering it — and an endpoint list that
+quietly omits routes is worse than one that says nothing about models. A
+resource's `@mixin` is still read, but only to grade confidence in the shape
+below it: whether the class stated what it wraps, not which model that is.
 
 **Shapes are read, not run.** Rules and resource bodies are array literals, and
 `Ast\ClassSource` reads them with `nikic/php-parser` — no container, no
@@ -439,7 +442,7 @@ main.ts                 mounts App; no router (see "Decisions")
     ├── RoutesPanel     list ▏ detail
     │   ├── RouteFilters   search + facet chips with counts
     │   ├── RouteList      grouped by controller, collapsible
-    │   └── RouteDetail    verbs, middleware, params, request, response, touches
+    │   └── RouteDetail    verbs, middleware, params, request, response
     │       └── FieldTree  a flat path list rendered as a tree
     ├── JobsPanel       list ▏ detail
     │   ├── JobFilters     search + kind/queue chips, and the undispatched count
@@ -489,23 +492,24 @@ nothing about what lands in them.
 The cross-link runs in both directions and is what stops this being two screens
 that happen to share a header:
 
-- Selecting an endpoint puts its models in `schema.highlighted`. Clicking one
-  centres it and switches surface. Highlight is kept **apart from Vue Flow's
+- Selecting a job puts its models in `schema.highlighted`. Clicking one centres
+  it and switches surface. Highlight is kept **apart from Vue Flow's
   selection**, which is a gesture somebody made on the canvas and feeds view
-  membership — conflating them would let opening an endpoint quietly rewrite
-  what a new view would contain.
-- An expanded `ModelNode` offers `Endpoints · N` and `Jobs · N`, which switch
-  the other way with the list filtered to that model — what reaches this data
-  over HTTP, and what reaches it from a worker.
-- A job's dispatch site offers the endpoint it sits in, and a model card's job
-  count is the same link read backwards. `focusEndpoint` and `focusJob` clear
-  the filters *and* the view scope before selecting: landing on a surface with
-  the thing you asked for filtered out of it is the one thing such a link must
-  not do.
+  membership — conflating them would let opening a job quietly rewrite what a
+  new view would contain.
+- An expanded `ModelNode` offers `Jobs · N`, which switches the other way with
+  the list filtered to that model — what reaches this data from a worker.
+- A job's dispatch site offers the endpoint it sits in. `focusEndpoint` and
+  `focusJob` clear the filters before selecting: landing on a surface with the
+  thing you asked for filtered out of it is the one thing such a link must not
+  do.
 
-The watcher that mirrors the selection lives in `RoutesPanel`, not in the store:
+**The routes surface takes no part in this.** It is not linked from a model
+card, it does not highlight the canvas, and nothing on the graph narrows it —
+so `RoutesPanel` holds no watcher and the routes store does not import the
+views store. The jobs watcher still lives in `JobsPanel` rather than the store:
 `stores/schema.ts` already reaches for the routes store to poll the route
-signal, and having them import each other would put a cycle between two
+signal, and having stores import each other would put a cycle between two
 module-level `defineStore` calls.
 
 Paths are rendered as a tree by splitting on `.`, but a row is only shortened to
@@ -602,8 +606,7 @@ selection as a new view or add it to the open one.
     },
     "middleware": ["api", "auth:sanctum"],
     "parameters": [
-      { "name": "invoice", "optional": false, "field": null,
-        "pattern": null, "model": "Invoice" }
+      { "name": "invoice", "optional": false, "field": null, "pattern": null }
     ],
     "request": {
       "source": "form-request",         // form-request | inline-validate | none
@@ -611,8 +614,7 @@ selection as a new view or add it to the open one.
       "confidence": "certain",          // certain | inferred | unknown
       "fields": [
         { "path": "customer_id", "type": "integer", "required": true,
-          "rules": ["required", "integer", "exists:customers,id"],
-          "model": "Customer", "column": "id" }
+          "rules": ["required", "integer", "exists:customers,id"] }
       ]
     },
     "response": {
@@ -621,13 +623,10 @@ selection as a new view or add it to the open one.
       "status": 201,
       "confidence": "certain",
       "fields": [
-        { "path": "id", "kind": "scalar", "model": "Invoice",
-          "column": "id", "conditional": false },
-        { "path": "lines[]", "kind": "array", "model": "InvoiceLine",
-          "column": null, "conditional": true }
+        { "path": "id", "kind": "scalar", "conditional": false },
+        { "path": "lines[]", "kind": "array", "conditional": true }
       ]
-    },
-    "models": ["Customer", "Invoice", "InvoiceLine"]   // the join to the graph
+    }
   }],
   "generated_at": "…",
   "fingerprint": "…"                    // travels with the payload; nothing inlines it
@@ -635,9 +634,12 @@ selection as a new view or add it to the open one.
 ```
 
 Request and response field paths share one grammar — `tags[].name` on both
-sides — so one component renders both. A `column` is only ever reported
-alongside the `model` it belongs to; on its own it names nothing anybody can
-follow.
+sides — so one component renders both.
+
+There is no `models` field and no per-field `model`/`column`: an endpoint is
+described by its own contract, and a rule naming a table says as much read
+verbatim as it would resolved. `confidence` is the one thing `@mixin` still
+feeds — whether the resource stated what it wraps, not which model that is.
 
 There is no authored counterpart file. Routes are entirely derived, so nothing
 is committed and nothing has to be sanitised on write.
@@ -857,17 +859,17 @@ Config (`config/dissect.php`): `enabled`, `path`, `middleware`,
 | Change the poll interval | `POLL_INTERVAL_MS` in `resources/js/stores/schema.ts` |
 | Change the grid | `resources/js/lib/layout.ts` |
 | Change what a view stores | `src/ViewRepository.php`, `sanitiseViews()` in `vite-plugin-persistence.ts`, `resources/js/stores/views.ts` |
-| Change how a view is chosen or created | `resources/js/components/ViewMenu.vue` |
-| Change what an expanded card shows | `resources/js/components/ModelNode.vue` |
+| Change how a view is chosen or created | `resources/js/components/graph/ViewMenu.vue` |
+| Change what an expanded card shows | `resources/js/components/graph/ModelNode.vue` |
 | Change relation colours/families | `resources/js/lib/relations.ts` |
 | Support another way of declaring request rules | `src/Routes/RequestAnalyzer.php` |
 | Support another response type | `src/Routes/ResponseAnalyzer.php` |
 | Change how a rule string is read | `src/Routes/RuleNormalizer.php` (no Illuminate imports) |
-| Change how a name resolves to a node id | `src/Routes/ModelLinker.php` |
+| Change how a name resolves to a node id (jobs only) | `src/Routes/ModelLinker.php` |
 | Change what counts as a route change | `src/Routes/RouteFingerprint.php`, `routes.watch_paths` |
 | Change how the endpoint list is filtered or grouped | `resources/js/lib/routeFilters.ts` |
 | Change how the job list is filtered or grouped | `resources/js/lib/jobFilters.ts` |
-| Change what a job's detail pane shows | `resources/js/components/JobDetail.vue` |
+| Change what a job's detail pane shows | `resources/js/components/jobs/JobDetail.vue` |
 | Change kind colours, or how a queue's origin is worded | `resources/js/lib/jobKinds.ts` |
 | Support another queue driver | `src/Queue/` — a `Contracts\QueueReader`, registered in `QueueReaderFactory::make()` |
 | Change what a live queue row reports | `src/Queue/PayloadDecoder.php` |

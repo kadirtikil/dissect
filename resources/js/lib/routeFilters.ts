@@ -15,15 +15,12 @@ export interface RouteFilterState {
   methods: string[]
   /** Empty means every group (app / vendor / framework). */
   groups: string[]
-  /** Node ids. Null means no model filter at all — not "an empty set of models". */
-  models: string[] | null
 }
 
 export const EMPTY_FILTERS: RouteFilterState = {
   search: '',
   methods: [],
   groups: [],
-  models: null,
 }
 
 export function matchesSearch(route: ApiRoute, search: string): boolean {
@@ -51,18 +48,11 @@ export function matchesGroups(route: ApiRoute, groups: string[]): boolean {
   return groups.length === 0 || groups.includes(route.group)
 }
 
-/** A route matches a model filter when it touches at least one of the models. */
-export function matchesModels(route: ApiRoute, models: string[] | null): boolean {
-  if (models === null) return true
-  return route.models.some((m) => models.includes(m))
-}
-
 export function matchesRoute(route: ApiRoute, state: RouteFilterState): boolean {
   return (
     matchesSearch(route, state.search) &&
     matchesMethods(route, state.methods) &&
-    matchesGroups(route, state.groups) &&
-    matchesModels(route, state.models)
+    matchesGroups(route, state.groups)
   )
 }
 
@@ -85,8 +75,7 @@ export function facetCounts(
   const groups: Record<string, number> = {}
 
   for (const route of routes) {
-    const base =
-      matchesSearch(route, state.search) && matchesModels(route, state.models)
+    const base = matchesSearch(route, state.search)
 
     if (base && matchesGroups(route, state.groups)) {
       for (const method of route.methods) {

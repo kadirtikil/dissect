@@ -1,15 +1,12 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { storeToRefs } from 'pinia'
-import { Layers, X } from '@lucide/vue'
+import { X } from '@lucide/vue'
 import { useRoutesStore } from '@/stores/routes'
-import { useViewsStore } from '@/stores/views'
 import { methodColor, methodRank } from '@/lib/httpMethods'
 
 const store = useRoutesStore()
-const views = useViewsStore()
-const { search, methods, groups, modelFilter, scopeToView, facets, stats } = storeToRefs(store)
-const { active } = storeToRefs(views)
+const { search, methods, groups, facets, stats } = storeToRefs(store)
 
 /**
  * Only the verbs and groups this application actually has.
@@ -32,10 +29,7 @@ const groupOptions = computed(() =>
 
 const filtered = computed(
   () =>
-    search.value !== '' ||
-    methods.value.length > 0 ||
-    groups.value.length > 0 ||
-    modelFilter.value !== null,
+    search.value !== '' || methods.value.length > 0 || groups.value.length > 0,
 )
 </script>
 
@@ -105,41 +99,6 @@ const filtered = computed(
       >
         {{ group }}
         <span class="ml-1 opacity-60 tabular-nums">{{ facets.groups[group] }}</span>
-      </button>
-    </div>
-
-    <!-- A view means "the billing models"; the endpoints touching them are part
-         of that same bounded context, so the scope carries across by default. -->
-    <div v-if="active || modelFilter" class="mt-2 flex flex-wrap items-center gap-2">
-      <button
-        v-if="active"
-        class="flex items-center gap-1 rounded-sm border px-1.5 py-0.5 font-mono text-[10px]"
-        :class="
-          scopeToView && !modelFilter
-            ? 'border-ring/40 text-foreground'
-            : 'border-transparent text-muted-foreground'
-        "
-        :disabled="!!modelFilter"
-        :aria-pressed="scopeToView && !modelFilter"
-        :title="
-          modelFilter
-            ? 'Superseded while a single model is pinned'
-            : `Only endpoints touching the models in “${active.name}”`
-        "
-        @click="scopeToView = !scopeToView"
-      >
-        <Layers class="size-3" />
-        in “{{ active.name }}”
-      </button>
-
-      <button
-        v-if="modelFilter"
-        class="flex items-center gap-1 rounded-sm border border-ring/40 px-1.5 py-0.5 font-mono text-[10px]"
-        :aria-label="`Stop filtering to ${modelFilter}`"
-        @click="store.filterByModel(null)"
-      >
-        touching {{ modelFilter }}
-        <X class="size-3" />
       </button>
     </div>
   </div>

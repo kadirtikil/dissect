@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { onMounted, watch } from 'vue'
 import { storeToRefs } from 'pinia'
-import JobFilters from '@/components/JobFilters.vue'
-import JobList from '@/components/JobList.vue'
-import JobDetail from '@/components/JobDetail.vue'
+import JobFilters from '@/components/jobs/JobFilters.vue'
+import JobList from '@/components/jobs/JobList.vue'
+import JobDetail from '@/components/jobs/JobDetail.vue'
 import { PAGE_CONTEXT } from '@/lib/toolbar'
 import { useJobsStore } from '@/stores/jobs'
 import { useSchemaStore } from '@/stores/schema'

@@ -6,13 +6,15 @@ use KdrDev\Dissect\SchemaExporter;
 use Throwable;
 
 /**
- * Turns the names an endpoint mentions into node ids the graph can address.
+ * Turns a class name into a node id the graph can address.
  *
- * This is the piece that makes the routes surface part of dissect rather than a
- * second `route:list`. A rule says `exists:authors,id`, a resource is called
- * `AuthorResource`, a parameter is type-hinted `Author` — three different ways
- * of naming the same node, and all three have to land on the id `schema.json`
- * uses as a key.
+ * Used by the jobs surface, for a queued class's payload type hints:
+ * `App\Models\Author` and a bare `Author` are two ways of naming one node, and
+ * both have to land on the id `schema.json` uses as a key.
+ *
+ * The routes surface deliberately does not use this. An endpoint is described
+ * by its own contract, and a rule's `exists:authors,id` travels verbatim rather
+ * than resolving to a node — see {@see RouteExporter}.
  *
  * A name that resolves to nothing is left as nothing. Inventing a node the
  * graph does not have would produce a link that goes nowhere, which is worse

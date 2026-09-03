@@ -12,7 +12,7 @@ so your team sees the same picture.
 - 🔒 Local-only by default; the viewer exposes your full schema, so it stays off in production unless you switch it on deliberately.
 - 🗂️ Save **views** — named subsets of the graph — so a schema too big to read at once can be read one bounded context at a time.
 - 🔎 Click any card to expand it: every column, with its key, unique, nullable, guarded, hidden and cast flags.
-- 🛣️ Switch to **Routes** for your HTTP surface — every endpoint, what it accepts, what it returns, and which models each one touches.
+- 🛣️ Switch to **Routes** for your HTTP surface — every endpoint, what it accepts and what it returns.
 - ⏱️ Switch to **Jobs** for everything that reaches a worker — which queue it lands on, how hard it retries, what it carries, and the endpoint that dispatches it.
 - 📡 Switch to **Queue** for what is on it *right now* — waiting, running, due next, and what failed. Live, polled, and never cached.
 
@@ -169,23 +169,22 @@ switch to whenever you like.
 ## 🛣️ Routes
 
 The **Routes** tab is the other half of the same question. The graph says what
-your data looks like; this says how you reach it — and, crucially, joins the
-two: every endpoint lists the models it touches, and every field says which
-column it came from.
+your data looks like; this says how you reach it: every endpoint, what a
+request must carry, and what comes back.
 
 ```
 POST api/invoices                      Request   StoreInvoiceRequest
-auth:sanctum · throttle:60,1             customer_id  integer  req  Customer.id
-                                         lines[].sku  string   req
-Response  resource · 201               Touches
-  id          Invoice.id                 Customer ↗  Invoice ↗  InvoiceLine ↗
-  customer    object  sometimes  Customer
-  lines[]     array   Comment
+auth:sanctum · throttle:60,1             customer_id  integer  req
+                                           exists:customers,id
+Response  resource · 201                 lines[].sku  string   req
+  id          scalar
+  customer    object  sometimes
+  lines[]     array
 ```
 
-- 🔗 Click a model in **Touches** to jump to it on the graph, ringed and centred. Expand a model card and click **Endpoints** to go back the other way.
+- 🧭 Endpoints stand on their own. They are not tied to the model graph, nothing on the graph narrows this list, and a rule that names a table is shown as written — `exists:customers,id` says what it says.
 - 🔎 Filter by path, route name, controller or verb; facet by method and by whose code it is (`app` / `vendor` / `framework`). Nothing is hidden from the export — the facets narrow it.
-- 🗂️ With a saved view open, the endpoint list narrows to the models in it.
+- 👀 Every route always shows. Whatever you have selected or scoped elsewhere, the endpoint list is the whole table until *you* filter it here.
 - 🐢 `routes.json` is fetched when you first open the tab, not inlined — so the graph still boots with no round trips.
 
 ### 🎯 Where the shapes come from
@@ -201,7 +200,7 @@ read from your source rather than run. Each shape says which:
 | Confidence | Meaning |
 | --- | --- |
 | `certain` | The framework itself produced it — `rules()` ran, or the resource declared its model with `@mixin`. |
-| `inferred` | Read from the source. Usually `rules()` could not run outside a request, or `PostResource` was assumed to describe a `Post`. |
+| `inferred` | Read from the source. Usually `rules()` could not run outside a request, or the resource never declared what it wraps. |
 | `unknown` | The class was found but its shape could not be read. Treat it as incomplete. |
 
 A confidently wrong API description is worse than none, so this is shown rather

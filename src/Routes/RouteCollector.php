@@ -2,11 +2,8 @@
 
 namespace KdrDev\Dissect\Routes;
 
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Routing\Route;
 use Illuminate\Routing\Router;
-use ReflectionFunctionAbstract;
-use ReflectionNamedType;
 
 /**
  * Reads the router's own table and reports the transport half of each route:
@@ -42,22 +39,20 @@ class RouteCollector
     }
 
     /**
-     * The URI's placeholders, in the order they appear, each with the model it
-     * resolves to when route model binding is in play.
+     * The URI's placeholders, in the order they appear.
      *
-     * The binding is read from the action's own type hints rather than from the
-     * container's bindings, because implicit binding — a `Post $post` parameter
-     * matching a `{post}` placeholder — is how almost every application does
-     * it, and it is the form that carries the model.
+     * What a placeholder binds to is deliberately not reported: the routes
+     * surface describes the endpoint's own contract — how it is addressed and
+     * what goes over the wire — and resolving `{post}` to a graph node is a
+     * different context's question.
      *
-     * @return array<int, array{name: string, optional: bool, field: string|null, pattern: string|null, model: string|null}>
+     * @return array<int, array{name: string, optional: bool, field: string|null, pattern: string|null}>
      */
-    public function parameters(Route $route, ?ReflectionFunctionAbstract $action = null): array
+    public function parameters(Route $route): array
     {
         // `{post}`, `{post:slug}` and `{category?}` in one pass, in URI order.
         preg_match_all('/\{(\w+)(?::(\w+))?(\?)?\}/', $route->uri(), $matches, PREG_SET_ORDER);
 
-        $bound = $this->boundModels($action);
         $wheres = $route->wheres;
         $parameters = [];
 
@@ -70,45 +65,10 @@ class RouteCollector
                 // `{post:slug}` — which column the model is looked up by.
                 'field' => ($match[2] ?? '') !== '' ? $match[2] : null,
                 'pattern' => $wheres[$name] ?? null,
-                'model' => $bound[$name] ?? null,
             ];
         }
 
         return $parameters;
-    }
-
-    /**
-     * Action parameters type-hinted as an Eloquent model, keyed by name.
-     *
-     * @return array<string, string>
-     */
-    protected function boundModels(?ReflectionFunctionAbstract $action): array
-    {
-        if ($action === null) {
-            return [];
-        }
-
-        $bound = [];
-
-        foreach ($action->getParameters() as $parameter) {
-            $type = $parameter->getType();
-
-            if (! $type instanceof ReflectionNamedType || $type->isBuiltin()) {
-                continue;
-            }
-
-            $class = $type->getName();
-
-            // class_exists() first: is_subclass_of() would autoload a class the
-            // application may not be able to resolve.
-            if (class_exists($class) && is_subclass_of($class, Model::class)) {
-                // Class basename, matching the node ids in schema.json — that
-                // match is the whole point of carrying it.
-                $bound[$parameter->getName()] = class_basename($class);
-            }
-        }
-
-        return $bound;
     }
 
     /**

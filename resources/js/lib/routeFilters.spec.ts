@@ -18,19 +18,17 @@ function route(overrides: Partial<ApiRoute> & Pick<ApiRoute, 'id'>): ApiRoute {
     group: 'app',
     action: { type: 'controller', class: 'App\\Http\\Controllers\\ThingController', method: 'index', label: 'ThingController@index' },
     parameters: [],
-    models: [],
     ...overrides,
   }
 }
 
 const ROUTES: ApiRoute[] = [
-  route({ id: 'GET:api/posts', uri: 'api/posts', name: 'posts.index', models: ['Post'] }),
-  route({ id: 'POST:api/posts', uri: 'api/posts', methods: ['POST'], name: 'posts.store', models: ['Post', 'Author'] }),
+  route({ id: 'GET:api/posts', uri: 'api/posts', name: 'posts.index' }),
+  route({ id: 'POST:api/posts', uri: 'api/posts', methods: ['POST'], name: 'posts.store' }),
   route({
     id: 'GET:api/authors',
     uri: 'api/authors',
     name: 'authors.index',
-    models: ['Author'],
     action: { type: 'controller', class: 'App\\Http\\Controllers\\AuthorController', method: 'index', label: 'AuthorController@index' },
   }),
   route({
@@ -68,17 +66,17 @@ describe('filterRoutes', () => {
     expect(filterRoutes(ROUTES, EMPTY_FILTERS)).toHaveLength(4)
   })
 
-  it('narrows by verb, group and model', () => {
+  it('narrows by verb and group', () => {
     expect(filterRoutes(ROUTES, { ...EMPTY_FILTERS, methods: ['POST'] })).toHaveLength(1)
     expect(filterRoutes(ROUTES, { ...EMPTY_FILTERS, groups: ['vendor'] })).toHaveLength(1)
-    expect(filterRoutes(ROUTES, { ...EMPTY_FILTERS, models: ['Author'] })).toHaveLength(2)
   })
 
-  it('distinguishes no model filter from an empty one', () => {
-    // null is "do not filter"; [] is "must touch one of nothing", which nothing
-    // can satisfy. Collapsing the two would make an empty view show everything.
-    expect(filterRoutes(ROUTES, { ...EMPTY_FILTERS, models: null })).toHaveLength(4)
-    expect(filterRoutes(ROUTES, { ...EMPTY_FILTERS, models: [] })).toHaveLength(0)
+  it('narrows only by what this surface asks for', () => {
+    // The endpoint list is not scoped by anything chosen elsewhere. Every
+    // filter it has is on screen, so a route can never go missing because of a
+    // selection made on the graph.
+    expect(Object.keys(EMPTY_FILTERS).sort()).toEqual(['groups', 'methods', 'search'])
+    expect(filterRoutes(ROUTES, EMPTY_FILTERS)).toHaveLength(ROUTES.length)
   })
 
   it('applies every active filter together', () => {
@@ -86,7 +84,6 @@ describe('filterRoutes', () => {
       ...EMPTY_FILTERS,
       search: 'posts',
       methods: ['POST'],
-      models: ['Author'],
     })
 
     expect(filtered.map((r) => r.id)).toEqual(['POST:api/posts'])

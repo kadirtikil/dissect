@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted } from 'vue'
 import { storeToRefs } from 'pinia'
-import QueueSection from '@/components/QueueSection.vue'
+import QueueSection from '@/components/queue/QueueSection.vue'
 import { PAGE_ACTIONS, PAGE_CONTEXT } from '@/lib/toolbar'
 import { useQueueStore } from '@/stores/queue'
 import { absolute, relative } from '@/lib/elapsed'

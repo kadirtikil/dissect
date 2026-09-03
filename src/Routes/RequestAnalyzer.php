@@ -32,7 +32,6 @@ class RequestAnalyzer
     public function __construct(
         protected ClassSource $source,
         protected RuleNormalizer $rules,
-        protected ModelLinker $models,
     ) {}
 
     /**
@@ -168,18 +167,15 @@ class RequestAnalyzer
 
             $field = $this->rules->field($path, $rule);
 
-            // The join to the graph: `exists:authors,id` says this field holds
-            // an Author's key, which is a fact the route table alone never has.
-            $model = $this->models->forTable($field['table'])
-                ?? $this->models->forClass($field['class']);
-
+            // Rules travel verbatim. `exists:authors,id` names a table, and
+            // reading it is exactly as informative as resolving it to a node
+            // would be — without making the endpoint's contract depend on the
+            // model graph having found that model.
             $fields[] = [
                 'path' => $field['path'],
                 'type' => $field['type'],
                 'required' => $field['required'],
                 'rules' => $field['rules'],
-                'model' => $model,
-                'column' => $model === null ? null : $field['column'],
             ];
         }
 
@@ -306,8 +302,7 @@ class RequestAnalyzer
      *
      * `Rule::exists('authors', 'id')` is rewritten to `exists:authors,id` so
      * that a rule written in the fluent style and one written as a string land
-     * on the same description — and so the table stays readable to the
-     * normalizer, which is where the model link comes from.
+     * on the same description.
      */
     protected function ruleText(Expr $expr): ?string
     {
@@ -317,7 +312,7 @@ class RequestAnalyzer
 
         // `Rule::unique('posts')->ignore($post->id)` — the chained part refines
         // the rule, but the rule itself is the head of the chain, and it is the
-        // half that names a table the graph knows about.
+        // half worth reporting.
         while ($expr instanceof MethodCall) {
             $expr = $expr->var;
         }

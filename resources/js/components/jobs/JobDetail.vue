@@ -2,7 +2,7 @@
 import { computed } from 'vue'
 import { storeToRefs } from 'pinia'
 import { ArrowUpRight } from '@lucide/vue'
-import JobKindBadge from '@/components/JobKindBadge.vue'
+import JobKindBadge from '@/components/jobs/JobKindBadge.vue'
 import { useJobsStore } from '@/stores/jobs'
 import { useRoutesStore } from '@/stores/routes'
 import { useSchemaStore } from '@/stores/schema'

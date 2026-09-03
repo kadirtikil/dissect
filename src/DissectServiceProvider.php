@@ -73,7 +73,6 @@ class DissectServiceProvider extends ServiceProvider
         $this->app->singleton(RequestAnalyzer::class, fn (Application $app) => new RequestAnalyzer(
             $app->make(ClassSource::class),
             $app->make(RuleNormalizer::class),
-            $app->make(ModelLinker::class),
         ));
 
         $this->app->singleton(RouteFingerprint::class, fn () => new RouteFingerprint(
@@ -82,7 +81,6 @@ class DissectServiceProvider extends ServiceProvider
 
         $this->app->singleton(ResponseAnalyzer::class, fn (Application $app) => new ResponseAnalyzer(
             $app->make(ClassSource::class),
-            $app->make(ModelLinker::class),
         ));
 
         $this->app->singleton(RouteExporter::class, fn (Application $app) => new RouteExporter(

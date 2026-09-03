@@ -1,33 +1,12 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { storeToRefs } from 'pinia'
-import { ArrowUpRight } from '@lucide/vue'
-import MethodBadge from '@/components/MethodBadge.vue'
-import FieldTree from '@/components/FieldTree.vue'
+import MethodBadge from '@/components/routes/MethodBadge.vue'
+import FieldTree from '@/components/routes/FieldTree.vue'
 import { useRoutesStore } from '@/stores/routes'
-import { useSchemaStore } from '@/stores/schema'
-import { useNavigationStore } from '@/stores/navigation'
 
 const store = useRoutesStore()
-const schema = useSchemaStore()
-const nav = useNavigationStore()
 const { selected } = storeToRefs(store)
-
-/** Node ids the graph actually has — a chip for a model outside the scan would
- *  jump to nothing, so it is shown but not offered as a link. */
-const known = computed(() => new Set(schema.nodes.map((n) => n.id)))
-
-/**
- * Takes somebody from an endpoint to the model it touches.
- *
- * The graph is the other half of the answer to "what does this endpoint do",
- * so the jump switches surface as well as centring the node — landing on the
- * canvas with the model ringed is the point of the link.
- */
-function openModel(id: string) {
-  schema.focusModels([id])
-  nav.go('models')
-}
 
 const bodyless = computed(
   () =>
@@ -99,15 +78,6 @@ const requestSummary = computed(() => {
         >
           <span>{{ parameter.name }}</span>
           <span v-if="parameter.optional" class="text-[10px] text-muted-foreground">optional</span>
-          <!-- Route model binding: the parameter is not a string, it is a row. -->
-          <button
-            v-if="parameter.model"
-            class="text-[10px] text-muted-foreground underline decoration-dotted hover:text-foreground"
-            :disabled="!known.has(parameter.model)"
-            @click="openModel(parameter.model)"
-          >
-            bound to {{ parameter.model }}
-          </button>
           <span v-if="parameter.field" class="text-[10px] text-muted-foreground">
             by {{ parameter.field }}
           </span>
@@ -145,7 +115,6 @@ const requestSummary = computed(() => {
         <FieldTree
           :fields="selected.request.fields"
           :confidence="selected.request.confidence"
-          @open-model="openModel"
         />
       </template>
     </section>
@@ -188,32 +157,14 @@ const requestSummary = computed(() => {
         <FieldTree
           :fields="selected.response.fields"
           :confidence="selected.response.confidence"
-          @open-model="openModel"
         />
       </template>
-    </section>
-
-    <section v-if="selected.models.length" class="mt-4 border-t pt-3">
-      <h3 class="font-mono text-[10px] tracking-wide text-muted-foreground uppercase">Touches</h3>
-      <div class="mt-1 flex flex-wrap gap-1">
-        <button
-          v-for="model in selected.models"
-          :key="model"
-          class="flex items-center gap-1 rounded-sm border px-1.5 py-0.5 font-mono text-[10px] hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
-          :disabled="!known.has(model)"
-          :title="known.has(model) ? `Show ${model} on the graph` : `${model} is not in the graph`"
-          @click="openModel(model)"
-        >
-          {{ model }}
-          <ArrowUpRight v-if="known.has(model)" class="size-3" />
-        </button>
-      </div>
     </section>
   </div>
 
   <div v-else class="grid flex-1 place-items-center px-6">
     <p class="font-mono text-[11px] text-muted-foreground">
-      Pick an endpoint to see how it is addressed and what it touches.
+      Pick an endpoint to see how it is addressed and what goes over the wire.
     </p>
   </div>
 </template>

@@ -3,7 +3,6 @@ import { computed, ref, shallowRef } from 'vue'
 import type { ApiRoute, RoutesFile } from '@/types/routes'
 import type { RouteFilterState } from '@/lib/routeFilters'
 import { facetCounts, filterRoutes, groupRoutes } from '@/lib/routeFilters'
-import { useViewsStore } from '@/stores/views'
 import { bootstrap } from '@/lib/bootstrap'
 
 type Status = 'idle' | 'loading' | 'ready' | 'error'
@@ -31,41 +30,23 @@ export const useRoutesStore = defineStore('routes', () => {
   const methods = ref<string[]>([])
   const groups = ref<string[]>([])
 
-  /**
-   * "Endpoints touching this model" — set when somebody arrives here from a
-   * model card rather than by opening the list.
-   */
-  const modelFilter = ref<string | null>(null)
-
-  /**
-   * Whether the active saved view narrows the endpoint list too.
-   *
-   * A view means "the billing models", and the endpoints touching them are part
-   * of that bounded context — so on by default, and one click from off.
-   */
-  const scopeToView = ref(true)
-
   const selectedId = ref<string | null>(null)
 
   const loaded = computed(() => status.value === 'ready')
 
-  /** The active view's membership, when it is meant to apply here. */
-  const viewModels = computed<string[] | null>(() => {
-    if (!scopeToView.value) return null
-    const members = useViewsStore().activeModels
-    return members ? [...members] : null
-  })
-
   /**
-   * One filter state assembled from the several controls that feed it. An
-   * explicit "show me this model's endpoints" is a deliberate act and outranks
-   * the ambient view scope.
+   * One filter state assembled from the controls that feed it.
+   *
+   * Nothing outside this surface narrows it. The active saved view scopes the
+   * graph, not the endpoint list: which models somebody grouped together says
+   * nothing about which endpoints they want to read, and a route quietly
+   * missing because of a selection made on another surface is the one failure
+   * an endpoint list must not have.
    */
   const filters = computed<RouteFilterState>(() => ({
     search: search.value,
     methods: methods.value,
     groups: groups.value,
-    models: modelFilter.value ? [modelFilter.value] : viewModels.value,
   }))
 
   const visible = computed(() => filterRoutes(routes.value, filters.value))
@@ -78,32 +59,10 @@ export const useRoutesStore = defineStore('routes', () => {
     () => visible.value.find((r) => r.id === selectedId.value) ?? null,
   )
 
-  /** Models the selected endpoint touches — what the canvas rings. */
-  const highlightedModels = computed<string[]>(() => selected.value?.models ?? [])
-
   const stats = computed(() => ({
     total: routes.value.length,
     visible: visible.value.length,
   }))
-
-  /**
-   * How many endpoints touch each model, for the link on a model card.
-   *
-   * Computed once over the whole list rather than per card: the graph can hold
-   * a few hundred nodes, and each of them asking the same question of a few
-   * hundred routes is the same answer arrived at expensively.
-   */
-  const countByModel = computed(() => {
-    const counts: Record<string, number> = {}
-
-    for (const route of routes.value) {
-      for (const model of route.models) {
-        counts[model] = (counts[model] ?? 0) + 1
-      }
-    }
-
-    return counts
-  })
 
   function select(id: string | null) {
     selectedId.value = id
@@ -121,26 +80,15 @@ export const useRoutesStore = defineStore('routes', () => {
       : [...groups.value, group]
   }
 
-  /** Arriving from a model card: one model, and nothing else in the way. */
-  function filterByModel(model: string | null) {
-    modelFilter.value = model
-    search.value = ''
-    methods.value = []
-    groups.value = []
-    selectedId.value = null
-  }
-
   /**
    * Arriving from somewhere that named one endpoint — a job's list of what
    * dispatches it.
    *
-   * Filters are cleared first, and the view scope with them: landing on this
-   * surface with the endpoint you asked for filtered out of it is the one thing
-   * a link like this must not do.
+   * Filters are cleared first: landing on this surface with the endpoint you
+   * asked for filtered out of it is the one thing a link like this must not do.
    */
   function focusEndpoint(id: string) {
     clearFilters()
-    scopeToView.value = false
     selectedId.value = id
   }
 
@@ -148,7 +96,6 @@ export const useRoutesStore = defineStore('routes', () => {
     search.value = ''
     methods.value = []
     groups.value = []
-    modelFilter.value = null
   }
 
   function endpoint(): string {
@@ -218,21 +165,16 @@ export const useRoutesStore = defineStore('routes', () => {
     search,
     methods,
     groups,
-    modelFilter,
-    scopeToView,
     selectedId,
     filters,
     visible,
     grouped,
     facets,
     selected,
-    highlightedModels,
     stats,
-    countByModel,
     select,
     toggleMethod,
     toggleGroup,
-    filterByModel,
     focusEndpoint,
     clearFilters,
     load,

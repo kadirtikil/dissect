@@ -43,19 +43,19 @@ export const pages: readonly PageEntry[] = [
     id: 'routes',
     label: 'Routes',
     icon: Route,
-    component: () => import('@/components/RoutesPanel.vue'),
+    component: () => import('@/pages/RoutesPanel.vue'),
   },
   {
     id: 'jobs',
     label: 'Jobs',
     icon: Timer,
-    component: () => import('@/components/JobsPanel.vue'),
+    component: () => import('@/pages/JobsPanel.vue'),
   },
   {
     id: 'queue',
     label: 'Queue',
     icon: Activity,
-    component: () => import('@/components/QueuePanel.vue'),
+    component: () => import('@/pages/QueuePanel.vue'),
   },
 ]
 

@@ -17,8 +17,6 @@ const props = defineProps<{
   confidence: Confidence
 }>()
 
-defineEmits<{ (e: 'open-model', model: string): void }>()
-
 interface Row {
   field: Field
   /** How far in to indent — one step per parent segment. */
@@ -78,16 +76,6 @@ function typeOf(field: Field): string | null {
 }
 
 /**
- * The link back to the graph: `Author.email` where a column is known, the model
- * alone where the field is a whole nested object.
- */
-function modelLabel(field: Field): string | null {
-  if (!field.model) return null
-
-  return field.column ? `${field.model}.${field.column}` : field.model
-}
-
-/**
  * The constraints, for a request field only — a response field has no rules,
  * only a shape.
  *
@@ -135,15 +123,6 @@ function constraintsOf(field: Field): string | null {
         >
           sometimes
         </span>
-
-        <button
-          v-if="row.field.model"
-          class="text-[10px] text-muted-foreground underline decoration-dotted hover:text-foreground"
-          :title="`Show ${row.field.model} on the graph`"
-          @click="$emit('open-model', row.field.model)"
-        >
-          {{ modelLabel(row.field) }}
-        </button>
 
         <!-- The constraints come last: they are the longest part of a row and
              the least often looked at. -->

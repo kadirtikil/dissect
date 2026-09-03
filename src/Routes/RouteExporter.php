@@ -9,9 +9,9 @@ use Throwable;
  * Builds the endpoint list — the second half of what dissect draws.
  *
  * The schema answers "what does the data look like"; this answers "how do you
- * reach it". The field that joins the two is `models`: every model an endpoint
- * touches, expressed as the same class-basename ids `schema.json` uses as node
- * keys, so the graph and the endpoint list address the same things.
+ * reach it". The two are deliberately not joined: an endpoint is described by
+ * its own contract — how it is addressed, what goes in, what comes back — and
+ * nothing here resolves a name to a node in the model graph.
  *
  * Orchestration only. Reading the router is {@see RouteCollector}, working out
  * what runs is {@see ActionResolver}.
@@ -73,7 +73,7 @@ class RouteExporter
             $reflection = $this->actions->reflect($route);
             $described = $this->collector->describe($route);
             $action = $this->actions->describe($route);
-            $parameters = $this->collector->parameters($route, $reflection);
+            $parameters = $this->collector->parameters($route);
             $request = $this->requests->analyse($reflection);
             $response = $this->responses->analyse($reflection);
 
@@ -85,7 +85,6 @@ class RouteExporter
                 'parameters' => $parameters,
                 'request' => $request,
                 'response' => $response,
-                'models' => $this->models($parameters, $request, $response),
             ];
         } catch (Throwable) {
             return null;
@@ -110,32 +109,5 @@ class RouteExporter
     public static function id(array $methods, string $uri): string
     {
         return implode('|', $methods).':'.$uri;
-    }
-
-    /**
-     * Models this endpoint is known to touch, deduplicated and sorted.
-     *
-     * Every source of a link contributes to one list: a bound route parameter,
-     * a rule pointing at a table, and the model behind a resource. One list,
-     * because "what does this endpoint touch" is one question however the
-     * answer was arrived at.
-     *
-     * @param  array<int, array{model: string|null}>  $parameters
-     * @param  array<string, mixed>|null  $request
-     * @param  array<string, mixed>|null  $response
-     * @return array<int, string>
-     */
-    protected function models(array $parameters, ?array $request, ?array $response): array
-    {
-        $models = array_column($parameters, 'model');
-
-        foreach ([...$request['fields'] ?? [], ...$response['fields'] ?? []] as $field) {
-            $models[] = $field['model'] ?? null;
-        }
-
-        $models = array_values(array_unique(array_filter($models)));
-        sort($models);
-
-        return $models;
     }
 }

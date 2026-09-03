@@ -10,7 +10,6 @@ use PhpParser\Node\Expr;
 use PhpParser\Node\Expr\Array_;
 use PhpParser\Node\Expr\MethodCall;
 use PhpParser\Node\Expr\New_;
-use PhpParser\Node\Expr\PropertyFetch;
 use PhpParser\Node\Expr\StaticCall;
 use PhpParser\Node\Scalar\Int_;
 use ReflectionClass;
@@ -48,7 +47,6 @@ class ResponseAnalyzer
 
     public function __construct(
         protected ClassSource $source,
-        protected ModelLinker $models,
     ) {}
 
     /**
@@ -112,8 +110,6 @@ class ResponseAnalyzer
      */
     protected function fromResource(string $resource, bool $collection, ?Node $body): array
     {
-        $model = $this->modelFor($resource);
-
         $fields = $this->resourceFields($resource);
 
         return $this->shape(
@@ -121,7 +117,7 @@ class ResponseAnalyzer
             $resource,
             // The naming convention is a guess, however reliable; a `@mixin` is
             // a statement. An unreadable toArray() is neither.
-            $fields === [] ? 'unknown' : ($model['stated'] ? 'certain' : 'inferred'),
+            $fields === [] ? 'unknown' : ($this->declaresMixin($resource) ? 'certain' : 'inferred'),
             $fields,
             $body === null ? null : $this->status($body),
         );
@@ -146,7 +142,6 @@ class ResponseAnalyzer
             return [];
         }
 
-        $model = $this->modelFor($resource)['id'];
         $fields = [];
 
         foreach ($this->source->keyed($array) as $key => $value) {
@@ -155,18 +150,9 @@ class ResponseAnalyzer
             $conditional = $this->isConditional($value);
 
             if ($nested === null) {
-                // `$this->title` is a column on the mixed-in model; anything
-                // computed is a value with nothing behind it, and claiming a
-                // column for it would be a lie. A column is only reported
-                // alongside the model it belongs to — on its own it names
-                // nothing anybody can follow.
-                $attribute = $model !== null && $this->isAttribute($value);
-
                 $fields[] = [
                     'path' => $path,
                     'kind' => 'scalar',
-                    'model' => $attribute ? $model : null,
-                    'column' => $attribute ? $this->attributeName($value) : null,
                     'conditional' => $conditional,
                 ];
 
@@ -174,14 +160,11 @@ class ResponseAnalyzer
             }
 
             [$nestedClass, $isCollection] = $nested;
-            $nestedModel = $this->modelFor($nestedClass)['id'];
             $nestedPath = $isCollection ? $path.'[]' : $path;
 
             $fields[] = [
                 'path' => $nestedPath,
                 'kind' => $isCollection ? 'array' : 'object',
-                'model' => $nestedModel,
-                'column' => null,
                 'conditional' => $conditional,
             ];
 
@@ -202,41 +185,23 @@ class ResponseAnalyzer
     }
 
     /**
-     * The model a resource describes, and whether it said so itself.
+     * Whether a resource states what it wraps, via `@mixin`.
      *
-     * @return array{id: string|null, stated: bool}
+     * Used only to grade confidence in the shape below it: a resource that
+     * declares its subject is one whose `$this->title` reads resolve against
+     * something known, so the keys `toArray()` returns can be trusted. Which
+     * model it names is deliberately not reported — that is the graph's
+     * context, not this endpoint's contract.
      */
-    protected function modelFor(string $resource): array
+    protected function declaresMixin(string $resource): bool
     {
         try {
-            $reflection = new ReflectionClass($resource);
+            $doc = (new ReflectionClass($resource))->getDocComment();
         } catch (Throwable) {
-            return ['id' => null, 'stated' => false];
+            return false;
         }
 
-        // `@mixin \App\Models\Post` — how a resource tells an IDE (and now this)
-        // which model its property access resolves against.
-        $doc = $reflection->getDocComment();
-
-        if ($doc !== false && preg_match('/@mixin\s+\\\\?([\w\\\\]+)/', $doc, $matches) === 1) {
-            $id = $this->models->forClass($matches[1]);
-
-            if ($id !== null) {
-                return ['id' => $id, 'stated' => true];
-            }
-        }
-
-        // The convention: PostResource describes a Post. Only accepted when the
-        // graph actually holds a node by that name, so it stays a check rather
-        // than a guess.
-        $basename = $reflection->getShortName();
-        $candidate = preg_replace('/(Resource|Collection)$/', '', $basename);
-
-        if (is_string($candidate) && $candidate !== '' && $this->models->knows($candidate)) {
-            return ['id' => $candidate, 'stated' => false];
-        }
-
-        return ['id' => null, 'stated' => false];
+        return $doc !== false && preg_match('/@mixin\s+\\\\?[\w\\\\]+/', $doc) === 1;
     }
 
     /**
@@ -339,23 +304,6 @@ class ResponseAnalyzer
         return false;
     }
 
-    /** `$this->title` — a plain attribute read, which is a column. */
-    protected function isAttribute(Expr $value): bool
-    {
-        return $value instanceof PropertyFetch
-            && $value->var instanceof Expr\Variable
-            && $value->var->name === 'this'
-            && $value->name instanceof Node\Identifier;
-    }
-
-    protected function attributeName(Expr $value): ?string
-    {
-        return $this->isAttribute($value) && $value instanceof PropertyFetch
-            && $value->name instanceof Node\Identifier
-                ? $value->name->toString()
-                : null;
-    }
-
     /** The array literal handed to `response()->json([…])`. */
     protected function jsonLiteral(Node $body): ?Array_
     {
@@ -404,8 +352,7 @@ class ResponseAnalyzer
     }
 
     /**
-     * Keys of a plain array literal — no model behind them, since a hand-built
-     * payload is not a resource.
+     * Keys of a plain array literal.
      *
      * @return array<int, array<string, mixed>>
      */
@@ -417,8 +364,6 @@ class ResponseAnalyzer
             $fields[] = [
                 'path' => $key,
                 'kind' => $value instanceof Array_ ? 'array' : 'scalar',
-                'model' => null,
-                'column' => null,
                 'conditional' => false,
             ];
         }

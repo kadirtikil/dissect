@@ -1,9 +1,9 @@
 /**
  * Shape of routes.json, as exported from the Laravel side.
  *
- * The field that matters most here is `models` on each route: it holds node ids
- * from schema.json, which is what lets an endpoint point back at the graph and
- * a model card point forward at its endpoints.
+ * Endpoints carry no model ids. The graph is a different context, and an
+ * endpoint is described by its own contract — how it is addressed, what goes
+ * in, what comes back. A rule that names a table travels verbatim.
  *
  * Kept deliberately close to the wire format, like types/schema.ts.
  */
@@ -37,8 +37,6 @@ export interface RouteParameter {
   field: string | null
   /** The `where()` constraint, if one was declared. */
   pattern: string | null
-  /** Node id of the bound model, when route model binding applies. */
-  model: string | null
 }
 
 export interface RequestField {
@@ -47,10 +45,8 @@ export interface RequestField {
   /** The rule that carries a type — `integer`, `string`, `date`. */
   type?: string | null
   required?: boolean
+  /** Verbatim, `exists:authors,id` included — nothing is resolved. */
   rules: string[]
-  /** Set when a rule names a table the graph knows, e.g. `exists:authors,id`. */
-  model?: string | null
-  column?: string | null
 }
 
 export interface RequestShape {
@@ -65,8 +61,6 @@ export type FieldKind = 'scalar' | 'object' | 'array'
 export interface ResponseField {
   path: string
   kind: FieldKind | string
-  model?: string | null
-  column?: string | null
   /** Wrapped in `when()` / `whenLoaded()` — not always present in the payload. */
   conditional?: boolean
 }
@@ -90,8 +84,6 @@ export interface ApiRoute {
   group: RouteGroup | string
   action: RouteAction
   parameters: RouteParameter[]
-  /** Node ids this endpoint touches — the join back to the graph. */
-  models: string[]
   /**
    * Absent until the exporter analyses bodies, and absent for routes where
    * there is nothing to analyse. Optional rather than empty so "not looked at"
