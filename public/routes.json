@@ -514,8 +514,8 @@
       "parameters": [],
       "request": {
         "source": "json-api",
-        "class": "App\\JsonApi\\V1\\Documents\\DocumentSchema",
-        "confidence": "certain",
+        "class": "App\\JsonApi\\V1\\Documents\\DocumentRequest",
+        "confidence": "inferred",
         "fields": [
           {
             "path": "data",
@@ -537,27 +537,39 @@
           },
           {
             "path": "data.attributes.title",
-            "type": null,
-            "required": false,
-            "rules": []
+            "type": "string",
+            "required": true,
+            "rules": [
+              "required",
+              "string",
+              "max:255"
+            ]
           },
           {
             "path": "data.attributes.slug",
-            "type": null,
-            "required": false,
-            "rules": []
+            "type": "string",
+            "required": true,
+            "rules": [
+              "required",
+              "string"
+            ]
           },
           {
             "path": "data.attributes.archived",
-            "type": null,
+            "type": "boolean",
             "required": false,
-            "rules": []
+            "rules": [
+              "boolean"
+            ]
           },
           {
             "path": "data.attributes.publishedAt",
-            "type": null,
+            "type": "date",
             "required": false,
-            "rules": []
+            "rules": [
+              "nullable",
+              "date"
+            ]
           },
           {
             "path": "data.relationships",
@@ -569,7 +581,9 @@
             "path": "data.relationships.owner",
             "type": "object",
             "required": false,
-            "rules": []
+            "rules": [
+              "toOne"
+            ]
           },
           {
             "path": "data.relationships.owner.data",

@@ -212,6 +212,8 @@ Response  JSON:API document  201           type        string  req
 - 📦 The **envelope**, not the bare fields — you write `data.attributes.title`, so that is what the pane says.
 - 🔗 `posts/{post}/author` is described with the *author's* schema, and a `relationships/…` endpoint promises type and id and nothing else, because that is all a resource identifier object is.
 - 🚫 A `DELETE` says it answers `204` rather than reporting an empty body as a failure to find one.
+- ✅ Constraints come from the resource's `ResourceRequest` — rules written against `title` are shown where the value actually sits, at `data.attributes.title`.
+- 🩹 An update stays optional field by field, because a JSON:API update is a patch: the rules say what a value must look like *if you send it*, not that you have to.
 
 ### 🎯 Where the shapes come from
 

@@ -113,6 +113,11 @@ test('describes a JSON:API endpoint as the envelope it actually sends', async ({
   await expect(request.getByText('relationships', { exact: true })).toBeVisible()
   await expect(request.getByText('title', { exact: true })).toBeVisible()
 
+  // Constraints come from the ResourceRequest beside the schema, keyed by
+  // field name and mapped onto the path the value actually sits at.
+  await expect(request.getByText('App\\JsonApi\\V1\\Documents\\DocumentRequest')).toBeVisible()
+  await expect(request.getByText('max:255')).toBeVisible()
+
   // A 204 is an answer, not a failure to find a body.
   await page.locator('li button', { hasText: 'v1/documents/{document}' }).filter({ hasText: 'DELETE' }).click()
   await expect(page.getByText(/Answers 204 No Content/)).toBeVisible()

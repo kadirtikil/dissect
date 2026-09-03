@@ -154,6 +154,7 @@ DissectServiceProvider    wiring; registers routes only when enabled
   ├── RouteExporter           orchestrates: collect → resolve → analyse
   │     ├── ServerRegistry      route name → jsonapi server + resource → schema
   │     ├── DocumentAnalyzer    a schema → the JSON:API envelope it sends
+  │     ├── RuleSource          a class's rules(): run it, else read it
   │     ├── RouteCollector      the router's table: verbs, uri, middleware, params
   │     ├── ActionResolver      what runs, and whose code it is (app/vendor/framework)
   │     ├── RequestAnalyzer     FormRequest::rules(), else inline validate()
@@ -291,6 +292,27 @@ code against: `data.attributes.title`, not `title`. The containers are emitted
 as fields of their own so the payload renders as the tree it is, and a
 relationship's `data` is marked conditional while the relationship object around
 it is not — a link is always there, linkage is not.
+
+A write endpoint's **constraints** come from the resource's `ResourceRequest`,
+which is a second source answering a second question: the schema says what
+`title` is, the request says whether it is required and what it must look like.
+Rules are keyed by field name, so `'title' => ['required']` has to be mapped
+onto `data.attributes.title` — and the schema is what says which names are
+relationships rather than attributes. A rule for something the schema does not
+declare is dropped: form requests routinely validate keys that never reach the
+wire, and inventing a document field for one would describe a payload the API
+does not accept.
+
+On an update `required` is deliberately not copied across. A JSON:API update is
+a patch — the rules say what a value must look like *if it is sent*, not that it
+must be — so only `data`, `data.type` and `data.id` stay required.
+
+The request class is found by the package's own default (`PostSchema` →
+`PostRequest`) rather than through `ResourceRequest::forResourceIfExists()`,
+which reaches into the container for a `SchemaContainer` that is only bound
+while a server is serving. One narrow consequence: a class registered through
+`RequestResolver::register()` is not seen, and such a resource is reported as
+having no rules rather than the wrong ones.
 
 This is the one place the exporter asks the framework to resolve something
 rather than reading it as syntax. A schema's `fields()` is a list of objects

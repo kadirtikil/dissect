@@ -58,4 +58,9 @@ JsonApiRoute::server('v1')
             });
 
         $server->resource('authors', JsonApiController::class)->only('index', 'show');
+
+        // Writable, and deliberately without a `CommentRequest` beside its
+        // schema: a resource whose document shape is known but whose
+        // constraints are written nowhere.
+        $server->resource('comments', JsonApiController::class);
     });

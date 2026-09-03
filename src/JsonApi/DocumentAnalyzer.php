@@ -6,6 +6,8 @@ use Illuminate\Routing\Route;
 use LaravelJsonApi\Contracts\Schema\ID;
 use LaravelJsonApi\Contracts\Schema\Relation;
 use LaravelJsonApi\Contracts\Schema\Schema;
+use KdrDev\Dissect\Routes\RuleNormalizer;
+use KdrDev\Dissect\Routes\RuleSource;
 use Throwable;
 
 /**
@@ -47,7 +49,11 @@ class DocumentAnalyzer
     /** Actions that send a document rather than only receiving one. */
     protected const WRITES = ['store', 'update'];
 
-    public function __construct(protected ServerRegistry $registry) {}
+    public function __construct(
+        protected ServerRegistry $registry,
+        protected RuleSource $reader,
+        protected RuleNormalizer $rules,
+    ) {}
 
     /**
      * The response half, or null when this is not a JSON:API route.
@@ -88,11 +94,17 @@ class DocumentAnalyzer
     /**
      * The request half, for the actions that carry a document.
      *
-     * Reported from the same schema rather than from a form request: the fields
-     * a client may send are the schema's fillable ones, and that is a fact the
-     * package already holds. Validation rules are a second, separate question —
-     * {@see \KdrDev\Dissect\Routes\RequestAnalyzer} answers that where a
-     * `ResourceRequest` exists.
+     * The document's shape comes from the schema — those are the fields a
+     * client may send — and its constraints from the resource's
+     * `ResourceRequest`, where it has one. Two sources because they answer two
+     * questions: the schema says what `title` *is*, the request says whether it
+     * is required and what it has to look like.
+     *
+     * Rules are keyed by field name, not by document path: a `ResourceRequest`
+     * writes `'title' => ['required']`, and where that value actually sits is
+     * `data.attributes.title`. Mapping the one onto the other is the whole of
+     * what this has to work out, and the schema is what says which names are
+     * relationships rather than attributes.
      *
      * @return array<string, mixed>|null
      */
@@ -164,12 +176,112 @@ class DocumentAnalyzer
             ];
         }
 
+        $validation = $this->validation($schema);
+
         return [
             'source' => 'json-api',
-            'class' => $schema::class,
-            'confidence' => 'certain',
-            'fields' => $fields,
+            // The request class where there is one: it is the file somebody
+            // opens to change what this endpoint accepts, and the schema is
+            // already named on the response half.
+            'class' => $validation['class'] ?? $schema::class,
+            'confidence' => $validation['confidence'],
+            'fields' => $this->constrain($fields, $validation['rules'], $action === 'update'),
         ];
+    }
+
+    /**
+     * A resource's validation rules, already mapped onto document paths.
+     *
+     * @return array{class: string|null, confidence: string, rules: array<string, array<string, mixed>>}
+     */
+    protected function validation(Schema $schema): array
+    {
+        $class = $this->registry->requestClass($schema);
+
+        if ($class === null) {
+            // No `ResourceRequest`, which is an answer rather than a gap. The
+            // document's shape is still exactly the schema's, and that is what
+            // this half describes — so `certain`. What is absent is the
+            // constraints, and absent constraints are honestly reported as no
+            // rules rather than as a shape nobody could read.
+            return ['class' => null, 'confidence' => 'certain', 'rules' => []];
+        }
+
+        $read = $this->reader->read($class);
+        $relations = [];
+
+        foreach ($this->relations($schema) as $relation) {
+            $relations[] = $relation->name();
+        }
+
+        $mapped = [];
+
+        foreach ($read['rules'] as $key => $rule) {
+            if (! is_string($key)) {
+                continue;
+            }
+
+            $field = $this->rules->field($key, $rule);
+            $mapped[$this->documentPath($field['path'], $relations)] = $field;
+        }
+
+        return ['class' => $class, 'confidence' => $read['confidence'], 'rules' => $mapped];
+    }
+
+    /**
+     * Where a validated field name sits in the document.
+     *
+     * Only the first segment is looked up — `author.data` validates the linkage
+     * inside a relationship, and the half that decides which container it lands
+     * in is `author`.
+     *
+     * @param  array<int, string>  $relations
+     */
+    protected function documentPath(string $path, array $relations): string
+    {
+        [$head, $rest] = array_pad(explode('.', $path, 2), 2, null);
+
+        $container = in_array($head, $relations, true) ? 'relationships' : 'attributes';
+
+        return 'data.'.$container.'.'.$head.($rest === null ? '' : '.'.$rest);
+    }
+
+    /**
+     * Folds the rules onto the fields the schema produced.
+     *
+     * The schema decides which fields exist, so a rule for something it does not
+     * declare is dropped rather than added: a `ResourceRequest` often validates
+     * keys that never reach the wire, and inventing a document field for one
+     * would describe a payload the API does not accept.
+     *
+     * On an update `required` is deliberately not taken from the rules. A
+     * JSON:API update is a patch — every field may be omitted, and the rules
+     * describe what a value has to look like *if it is sent*. Copying
+     * `required` across would tell a client it must resend the whole resource
+     * to change one attribute, which is the opposite of what the endpoint does.
+     *
+     * @param  array<int, array<string, mixed>>  $fields
+     * @param  array<string, array<string, mixed>>  $rules
+     * @return array<int, array<string, mixed>>
+     */
+    protected function constrain(array $fields, array $rules, bool $patch): array
+    {
+        foreach ($fields as $index => $field) {
+            $rule = $rules[$field['path']] ?? null;
+
+            if ($rule === null) {
+                continue;
+            }
+
+            $fields[$index]['type'] = $rule['type'] ?? $field['type'];
+            $fields[$index]['rules'] = $rule['rules'];
+
+            if (! $patch) {
+                $fields[$index]['required'] = $rule['required'];
+            }
+        }
+
+        return $fields;
     }
 
     /**

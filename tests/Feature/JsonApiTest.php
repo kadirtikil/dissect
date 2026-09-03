@@ -151,6 +151,80 @@ class JsonApiTest extends TestCase
     }
 
     #[Test]
+    public function it_maps_validation_rules_onto_the_paths_they_constrain(): void
+    {
+        // Rules are keyed by field name — `title` — and the value they govern
+        // sits at `data.attributes.title`. Mapping the one onto the other is
+        // the whole job, and the schema is what says which names are relations.
+        $fields = $this->fields($this->routes()['POST:v1/posts']['request']);
+
+        $this->assertSame(
+            'Workbench\App\JsonApi\V1\Posts\PostRequest',
+            $this->routes()['POST:v1/posts']['request']['class'],
+        );
+
+        $title = $fields['data.attributes.title'];
+        $this->assertTrue($title['required']);
+        $this->assertSame('string', $title['type']);
+        $this->assertContains('max:255', $title['rules']);
+
+        // A rule on a relation lands in `relationships`, not `attributes`.
+        $this->assertArrayHasKey('data.relationships.author', $fields);
+        $this->assertArrayNotHasKey('data.attributes.author', $fields);
+    }
+
+    #[Test]
+    public function it_keeps_an_update_optional_field_by_field(): void
+    {
+        // A JSON:API update is a patch: the rules say what `title` has to look
+        // like *if it is sent*, not that it has to be. Copying `required`
+        // across would tell a client to resend the whole resource to change one
+        // attribute.
+        $fields = $this->fields($this->routes()['PATCH:v1/posts/{post}']['request']);
+
+        $this->assertFalse($fields['data.attributes.title']['required']);
+        // The constraint still travels — it applies to whatever is sent.
+        $this->assertContains('max:255', $fields['data.attributes.title']['rules']);
+
+        // What a patch does require is the address of the thing being patched.
+        $this->assertTrue($fields['data.id']['required']);
+        $this->assertTrue($fields['data.type']['required']);
+    }
+
+    #[Test]
+    public function it_reports_a_resource_with_no_request_class_as_unconstrained(): void
+    {
+        // CommentSchema has no CommentRequest beside it. The document's shape
+        // is still exactly the schema's, so this is `certain` — what is absent
+        // is the constraints, and that is said by their absence rather than by
+        // pretending the shape could not be read.
+        $request = $this->routes()['POST:v1/comments']['request'];
+
+        // The schema is named rather than nothing: with no request class it is
+        // what defines the shape, and pointing at it beats pointing at null.
+        $this->assertSame('Workbench\App\JsonApi\V1\Comments\CommentSchema', $request['class']);
+        $this->assertSame('certain', $request['confidence']);
+
+        // The fields are all there; they simply carry no constraints.
+        $body = $this->fields($request)['data.attributes.body'];
+        $this->assertSame([], $body['rules']);
+        $this->assertFalse($body['required']);
+    }
+
+    #[Test]
+    public function it_drops_a_rule_for_something_the_schema_does_not_declare(): void
+    {
+        // A ResourceRequest often validates keys that never reach the wire.
+        // Inventing a document field for one would describe a payload the API
+        // does not actually accept.
+        $paths = $this->paths($this->routes()['POST:v1/posts']['request']);
+
+        foreach ($paths as $path) {
+            $this->assertStringStartsWith('data', $path);
+        }
+    }
+
+    #[Test]
     public function it_answers_201_for_a_create_and_200_for_a_read(): void
     {
         $routes = $this->routes();
@@ -175,6 +249,15 @@ class JsonApiTest extends TestCase
     public function it_puts_the_json_api_surface_in_the_api_half(): void
     {
         $this->assertSame('api', $this->routes()['GET:v1/posts']['stack']);
+    }
+
+    /**
+     * @param  array<string, mixed>  $shape
+     * @return array<string, array<string, mixed>>
+     */
+    protected function fields(array $shape): array
+    {
+        return array_column($shape['fields'], null, 'path');
     }
 
     /**

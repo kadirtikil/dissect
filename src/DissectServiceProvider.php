@@ -101,6 +101,8 @@ class DissectServiceProvider extends ServiceProvider
 
         $this->app->singleton(DocumentAnalyzer::class, fn (Application $app) => new DocumentAnalyzer(
             $app->make(ServerRegistry::class),
+            $app->make(RuleSource::class),
+            $app->make(RuleNormalizer::class),
         ));
 
         $this->app->singleton(RouteExporter::class, fn (Application $app) => new RouteExporter(

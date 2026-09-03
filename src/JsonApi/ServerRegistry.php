@@ -108,6 +108,34 @@ class ServerRegistry
         return $this->cache[$key] = $this->resolve($server, $resource);
     }
 
+    /**
+     * The `ResourceRequest` class validating a resource, if it has one.
+     *
+     * This applies the package's own default — `PostSchema` → `PostRequest`,
+     * from the same class name the package derives it from — rather than
+     * calling `ResourceRequest::forResourceIfExists()`. That resolver reaches
+     * into the container for a `SchemaContainer`, which is only bound while a
+     * server is actually serving a request; from the exporter it throws, and
+     * every resource would come back without validation.
+     *
+     * The consequence is narrow and worth stating: a request class registered
+     * through `RequestResolver::register()` is not seen, because that mapping
+     * is private static state on the resolver with no way to read it back. Such
+     * a resource is reported as having no rules rather than the wrong ones.
+     */
+    public function requestClass(Schema $schema): ?string
+    {
+        $class = $schema::class;
+
+        if (! str_ends_with($class, 'Schema')) {
+            return null;
+        }
+
+        $request = substr($class, 0, -strlen('Schema')).'Request';
+
+        return class_exists($request) ? $request : null;
+    }
+
     protected function resolve(string $server, string $resource): ?Schema
     {
         try {
