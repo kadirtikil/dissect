@@ -27,6 +27,9 @@
         "illuminate/support": "^13.0",
         "nikic/php-parser": "^5.0"
     },
+    "suggest": {
+        "laravel-json-api/laravel": "^5.3"
+    },
     "require-dev": {
         "laravel-json-api/laravel": "^5.3",
         "orchestra/testbench": "^11.0"
