@@ -46,14 +46,14 @@ class ServerRegistry
      * @param  array<string, class-string>  $servers  from `jsonapi.servers`
      */
     public function __construct(
-        protected Repository $servers,
+        protected ?Repository $servers,
         protected array $names,
     ) {}
 
     /** Whether the application has any JSON:API server at all. */
     public function configured(): bool
     {
-        return $this->names !== [];
+        return $this->names !== [] && $this->servers !== null;
     }
 
     /**

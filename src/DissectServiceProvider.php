@@ -94,10 +94,19 @@ class DissectServiceProvider extends ServiceProvider
         // Resolved lazily and defensively: an application without the JSON:API
         // package installed has no server repository to bind, and must still
         // get its endpoint list.
-        $this->app->singleton(ServerRegistry::class, fn (Application $app) => new ServerRegistry(
-            $app->make(\LaravelJsonApi\Contracts\Server\Repository::class),
-            (array) config('jsonapi.servers', []),
-        ));
+        $this->app->singleton(ServerRegistry::class, function (Application $app) {
+          if(interface_exists(\LaravelJsonApi\Contracts\Server\Repository::class)){
+            return new ServerRegistry(
+              $app->make(\LaravelJsonApi\Contracts\Server\Repository::class),
+              (array) config('jsonapi.servers', []),
+            );
+          } else {
+            return new ServerRegistry(
+              null,
+              (array) config('jsonapi.servers', []),
+            );
+          }
+        });
 
         $this->app->singleton(DocumentAnalyzer::class, fn (Application $app) => new DocumentAnalyzer(
             $app->make(ServerRegistry::class),
