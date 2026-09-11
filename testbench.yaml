@@ -24,6 +24,7 @@ workbench:
     web: true
     # The fixture endpoints the route exporter is developed against live in
     # workbench/routes/api.php.
+    config: true
     api: true
     commands: true
     components: false
