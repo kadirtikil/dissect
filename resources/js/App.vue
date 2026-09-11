@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import AppSidebar from '@/components/AppSidebar.vue'
-import GraphCanvas from '@/components/GraphCanvas.vue'
+import GraphCanvas from '@/components/graph/GraphCanvas.vue'
 import { storeToRefs } from 'pinia'
 import { computed, defineAsyncComponent, markRaw, ref, watch } from 'vue'
 import { pages } from '@/pages/registry'

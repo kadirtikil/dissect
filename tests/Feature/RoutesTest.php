@@ -66,15 +66,47 @@ class RoutesTest extends TestCase
     }
 
     #[Test]
-    public function it_resolves_route_model_binding_to_a_graph_node_id(): void
+    public function it_describes_a_placeholder_without_binding_it_to_a_model(): void
     {
-        // The join to schema.json: the same class-basename ids it uses as keys.
-        $route = $this->routes()['GET:api/posts/{post}'];
+        // `{post}` is type-hinted `Post` in the controller, and that is
+        // deliberately not reported: the endpoint's contract is how it is
+        // addressed, not which node the binding resolves to.
+        $parameter = $this->routes()['GET:api/posts/{post}']['parameters'][0];
 
-        $this->assertSame('Post', $route['parameters'][0]['model']);
-        // Contained rather than equal: the response contributes to this list
-        // too, and what this test is about is the binding reaching it at all.
-        $this->assertContains('Post', $route['models']);
+        $this->assertSame('post', $parameter['name']);
+        $this->assertFalse($parameter['optional']);
+        $this->assertArrayNotHasKey('model', $parameter);
+    }
+
+    #[Test]
+    public function it_splits_the_table_by_the_stack_a_route_was_registered_into(): void
+    {
+        $routes = $this->routes();
+
+        // The two halves of the fixture, and the difference that matters: one
+        // is session-backed, the other stateless.
+        $this->assertSame('api', $routes['GET:api/posts']['stack']);
+        $this->assertSame('web', $routes['GET:authors']['stack']);
+    }
+
+    #[Test]
+    public function it_reads_the_stack_from_the_group_rather_than_the_uri(): void
+    {
+        // A prefix is a convention; the middleware group is a behaviour. An API
+        // served from somewhere other than /api is still an API.
+        Route::middleware('api')->get('v2/widgets', fn () => []);
+
+        $this->assertSame('api', $this->routes()['GET:v2/widgets']['stack']);
+    }
+
+    #[Test]
+    public function it_refuses_to_place_a_route_in_neither_group(): void
+    {
+        // A console route, or one registered outside both files. Inventing a
+        // half for it would put it under a heading that is not true.
+        Route::get('unstacked', fn () => []);
+
+        $this->assertSame('other', $this->routes()['GET:unstacked']['stack']);
     }
 
     #[Test]
@@ -150,11 +182,10 @@ class RoutesTest extends TestCase
     public function it_reduces_a_fluent_rule_to_the_table_it_names(): void
     {
         // Rule::unique('posts')->ignore(…) — the chained half refines the rule,
-        // the head of the chain is what names a model.
+        // the head of the chain is the half worth reporting.
         $title = $this->field($this->routes()['PUT|PATCH:api/posts/{post}']['request'], 'title');
 
         $this->assertContains('unique:posts', $title['rules']);
-        $this->assertSame('Post', $title['model']);
     }
 
     #[Test]
@@ -168,22 +199,15 @@ class RoutesTest extends TestCase
     }
 
     #[Test]
-    public function it_links_an_exists_rule_to_the_model_behind_the_table(): void
+    public function it_reports_an_exists_rule_verbatim(): void
     {
-        // The request half of the join to the graph: this field holds an
-        // Author's key, which the route table alone could never say.
-        $field = $this->field($this->routes()['POST:api/posts']['request'], 'author_id');
+        // The rule names the table it checks, and reading it says everything
+        // resolving it to a node would have — without the endpoint's contract
+        // depending on the model graph having found that model.
+        $request = $this->routes()['POST:api/posts']['request'];
 
-        $this->assertSame('Author', $field['model']);
-        $this->assertSame('id', $field['column']);
-    }
-
-    #[Test]
-    public function it_gathers_request_links_into_the_endpoints_model_list(): void
-    {
-        // Only the request names a Category on this endpoint — the response
-        // resource never mentions one — so this is the rule link arriving.
-        $this->assertContains('Category', $this->routes()['POST:api/posts']['models']);
+        $this->assertContains('exists:authors,id', $this->field($request, 'author_id')['rules']);
+        $this->assertContains('exists:categories,id', $this->field($request, 'category_id')['rules']);
     }
 
     #[Test]
@@ -200,18 +224,18 @@ class RoutesTest extends TestCase
     }
 
     #[Test]
-    public function it_reads_a_resources_fields_and_the_columns_behind_them(): void
+    public function it_reads_a_resources_fields(): void
     {
         $response = $this->routes()['GET:api/posts/{post}']['response'];
 
         $this->assertSame('resource', $response['source']);
         $this->assertSame('Workbench\App\Http\Resources\PostResource', $response['class']);
-        // PostResource declares @mixin Post, so nothing had to be guessed.
+        // PostResource declares @mixin Post, so its keys resolve against
+        // something known and the shape can be trusted. Which model it names
+        // is not reported — only that it said.
         $this->assertSame('certain', $response['confidence']);
 
-        $title = $this->field($response, 'title');
-        $this->assertSame('Post', $title['model']);
-        $this->assertSame('title', $title['column']);
+        $this->assertSame('scalar', $this->field($response, 'title')['kind']);
     }
 
     #[Test]
@@ -220,12 +244,12 @@ class RoutesTest extends TestCase
         $response = $this->routes()['GET:api/posts/{post}']['response'];
 
         $this->assertSame('object', $this->field($response, 'author')['kind']);
-        $this->assertSame('Author', $this->field($response, 'author.name')['model']);
+        $this->assertNotNull($this->field($response, 'author.name'));
 
         // A collection is marked on the path itself, the same `[]` the request
         // side uses for a repeated rule.
         $this->assertSame('array', $this->field($response, 'comments[]')['kind']);
-        $this->assertSame('Comment', $this->field($response, 'comments[].body')['model']);
+        $this->assertNotNull($this->field($response, 'comments[].body'));
     }
 
     #[Test]
@@ -241,16 +265,6 @@ class RoutesTest extends TestCase
     }
 
     #[Test]
-    public function it_claims_no_column_for_a_computed_value(): void
-    {
-        // `excerpt` is built from the body, not read off the model.
-        $excerpt = $this->field($this->routes()['GET:api/posts/{post}']['response'], 'excerpt');
-
-        $this->assertNull($excerpt['model']);
-        $this->assertNull($excerpt['column']);
-    }
-
-    #[Test]
     public function it_finds_the_resource_behind_an_anonymous_collection(): void
     {
         // The return type says AnonymousResourceCollection, which names nothing.
@@ -262,16 +276,15 @@ class RoutesTest extends TestCase
     }
 
     #[Test]
-    public function it_describes_a_resource_with_no_model_without_inventing_one(): void
+    public function it_admits_a_shape_it_had_to_infer(): void
     {
-        // SearchHitResource has no @mixin and no matching node. Its fields are
-        // still worth reporting; a link to a `SearchHit` that does not exist
-        // would not be.
+        // SearchHitResource declares no @mixin, so its keys were read without
+        // anything to check them against. The fields are still worth
+        // reporting; claiming they are certain would not be.
         $response = $this->routes()['GET:api/search']['response'];
 
         $this->assertSame('inferred', $response['confidence']);
-        $this->assertNull($this->field($response, 'label')['model']);
-        $this->assertNull($this->field($response, 'label')['column']);
+        $this->assertNotNull($this->field($response, 'label'));
     }
 
     #[Test]
@@ -300,14 +313,23 @@ class RoutesTest extends TestCase
     }
 
     #[Test]
-    public function it_gathers_response_links_into_the_endpoints_model_list(): void
+    public function it_carries_no_model_references_at_all(): void
     {
-        // One list, three sources: the bound {post}, the resource's own model,
-        // and the models its nested resources describe.
-        $this->assertSame(
-            ['Author', 'Comment', 'Country', 'Post'],
-            $this->routes()['GET:api/posts/{post}']['models'],
-        );
+        // The decoupling, guarded end to end: routes describe endpoints, and
+        // the model graph is a different context. One endpoint that touches
+        // four models by every old measure is the sharpest place to check.
+        $route = $this->routes()['GET:api/posts/{post}'];
+
+        $this->assertArrayNotHasKey('models', $route);
+
+        foreach ($route['parameters'] as $parameter) {
+            $this->assertArrayNotHasKey('model', $parameter);
+        }
+
+        foreach ([...$route['request']['fields'], ...$route['response']['fields']] as $field) {
+            $this->assertArrayNotHasKey('model', $field);
+            $this->assertArrayNotHasKey('column', $field);
+        }
     }
 
     #[Test]

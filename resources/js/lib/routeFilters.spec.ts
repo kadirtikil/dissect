@@ -15,22 +15,27 @@ function route(overrides: Partial<ApiRoute> & Pick<ApiRoute, 'id'>): ApiRoute {
     name: null,
     domain: null,
     middleware: [],
+    stack: 'web',
     group: 'app',
     action: { type: 'controller', class: 'App\\Http\\Controllers\\ThingController', method: 'index', label: 'ThingController@index' },
     parameters: [],
-    models: [],
     ...overrides,
   }
 }
 
 const ROUTES: ApiRoute[] = [
-  route({ id: 'GET:api/posts', uri: 'api/posts', name: 'posts.index', models: ['Post'] }),
-  route({ id: 'POST:api/posts', uri: 'api/posts', methods: ['POST'], name: 'posts.store', models: ['Post', 'Author'] }),
+  route({ id: 'GET:api/posts', uri: 'api/posts', name: 'posts.index', stack: 'api' }),
+  route({
+    id: 'POST:api/posts',
+    uri: 'api/posts',
+    methods: ['POST'],
+    name: 'posts.store',
+    stack: 'api',
+  }),
   route({
     id: 'GET:api/authors',
     uri: 'api/authors',
     name: 'authors.index',
-    models: ['Author'],
     action: { type: 'controller', class: 'App\\Http\\Controllers\\AuthorController', method: 'index', label: 'AuthorController@index' },
   }),
   route({
@@ -68,17 +73,28 @@ describe('filterRoutes', () => {
     expect(filterRoutes(ROUTES, EMPTY_FILTERS)).toHaveLength(4)
   })
 
-  it('narrows by verb, group and model', () => {
+  it('narrows by verb and group', () => {
     expect(filterRoutes(ROUTES, { ...EMPTY_FILTERS, methods: ['POST'] })).toHaveLength(1)
     expect(filterRoutes(ROUTES, { ...EMPTY_FILTERS, groups: ['vendor'] })).toHaveLength(1)
-    expect(filterRoutes(ROUTES, { ...EMPTY_FILTERS, models: ['Author'] })).toHaveLength(2)
   })
 
-  it('distinguishes no model filter from an empty one', () => {
-    // null is "do not filter"; [] is "must touch one of nothing", which nothing
-    // can satisfy. Collapsing the two would make an empty view show everything.
-    expect(filterRoutes(ROUTES, { ...EMPTY_FILTERS, models: null })).toHaveLength(4)
-    expect(filterRoutes(ROUTES, { ...EMPTY_FILTERS, models: [] })).toHaveLength(0)
+  it('narrows only by what this surface asks for', () => {
+    // The endpoint list is not scoped by anything chosen elsewhere. Every
+    // filter it has is on screen, so a route can never go missing because of a
+    // selection made on the graph.
+    expect(Object.keys(EMPTY_FILTERS).sort()).toEqual(['groups', 'methods', 'search', 'stacks'])
+    expect(filterRoutes(ROUTES, EMPTY_FILTERS)).toHaveLength(ROUTES.length)
+  })
+
+  it('splits the table into the frontend half and the external one', () => {
+    // The two halves are disjoint and together they are everything, which is
+    // what makes the switcher a split rather than one more filter.
+    const web = filterRoutes(ROUTES, { ...EMPTY_FILTERS, stacks: ['web'] })
+    const api = filterRoutes(ROUTES, { ...EMPTY_FILTERS, stacks: ['api'] })
+
+    expect(api.map((r) => r.id)).toEqual(['GET:api/posts', 'POST:api/posts'])
+    expect(web).toHaveLength(2)
+    expect(web.length + api.length).toBe(ROUTES.length)
   })
 
   it('applies every active filter together', () => {
@@ -86,7 +102,6 @@ describe('filterRoutes', () => {
       ...EMPTY_FILTERS,
       search: 'posts',
       methods: ['POST'],
-      models: ['Author'],
     })
 
     expect(filtered.map((r) => r.id)).toEqual(['POST:api/posts'])
@@ -115,6 +130,22 @@ describe('facetCounts', () => {
 
     expect(counts.groups).toEqual({ app: 1 })
     expect(counts.methods).toEqual({ GET: 1 })
+  })
+
+  it('counts the other half as if the switcher were not set', () => {
+    // With Web showing, the API tab must still say how many endpoints are over
+    // there — a count of zero would read as "nothing to switch to".
+    const counts = facetCounts(ROUTES, { ...EMPTY_FILTERS, stacks: ['web'] })
+
+    expect(counts.stacks.api).toBe(2)
+    expect(counts.stacks.web).toBe(2)
+  })
+
+  it('still narrows the stack counts by the other filters', () => {
+    const counts = facetCounts(ROUTES, { ...EMPTY_FILTERS, methods: ['POST'] })
+
+    expect(counts.stacks.api).toBe(1)
+    expect(counts.stacks.web).toBeUndefined()
   })
 })
 

@@ -10,6 +10,7 @@ use PhpParser\Node\Stmt\Return_;
 use PhpParser\NodeFinder;
 use PhpParser\NodeTraverser;
 use PhpParser\NodeVisitor\NameResolver;
+use PhpParser\NodeVisitor\ParentConnectingVisitor;
 use PhpParser\Parser;
 use PhpParser\ParserFactory;
 use ReflectionClass;
@@ -148,6 +149,29 @@ class ClassSource
         return $pairs;
     }
 
+    /**
+     * A whole file's statements, parsed and cached like any other.
+     *
+     * The other entry points here start from a class and find its file. This
+     * one starts from the file, because scanning a directory for call sites is
+     * a different question from reading one class's method — and both want the
+     * same parse, resolved the same way, cached once.
+     *
+     * @return array<int, Node>|null
+     */
+    public function file(string $path): ?array
+    {
+        if (! is_file($path)) {
+            return null;
+        }
+
+        if (array_key_exists($path, $this->files)) {
+            return $this->files[$path];
+        }
+
+        return $this->files[$path] = $this->parse($path);
+    }
+
     /** The class declaration inside its own file, with names already resolved. */
     protected function declaration(string $class): ?Class_
     {
@@ -209,7 +233,12 @@ class ClassSource
             // Resolves imports and relative names, so a `new AuthorResource(…)`
             // written under a `use` statement arrives as its fully qualified
             // name — which is the only form worth comparing against.
-            $traverser = new NodeTraverser(new NameResolver);
+            // ParentConnectingVisitor rides along so a consumer that has found a
+            // node deep inside an expression can walk back up to what it belongs
+            // to. That is how a dispatch site reads the `->onQueue(...)` chained
+            // onto it. It costs one attribute per node and changes nothing for
+            // the analyzers that never look at it.
+            $traverser = new NodeTraverser(new NameResolver, new ParentConnectingVisitor);
 
             return $traverser->traverse($statements);
         } catch (Throwable) {

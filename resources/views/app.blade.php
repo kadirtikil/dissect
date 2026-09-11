@@ -32,6 +32,11 @@
             {{-- Not the payload, only where to get it: the endpoint list is
                  fetched when somebody opens it. --}}
             routesUrl: @json(route('dissect.routes')),
+            jobsUrl: @json(route('dissect.jobs')),
+            {{-- Runtime state rather than a description of code, so this one is
+                 polled rather than fetched once. --}}
+            queueUrl: @json(route('dissect.queue')),
+            queuePollInterval: @json((int) config('dissect.queue.poll_interval', 5000)),
             fingerprintUrl: @json(route('dissect.fingerprint')),
             fingerprint: @json($fingerprint),
             csrfToken: @json(csrf_token()),

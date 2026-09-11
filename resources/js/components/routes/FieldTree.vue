@@ -15,9 +15,16 @@ type Field = RequestField | ResponseField
 const props = defineProps<{
   fields: Field[]
   confidence: Confidence
+  /**
+   * The colour of the section this tree sits in, so a row reads as part of its
+   * block rather than as a third thing between two. Passed in rather than
+   * looked up here because the same component renders both halves.
+   */
+  accent?: string
 }>()
 
-defineEmits<{ (e: 'open-model', model: string): void }>()
+/** Falls back to the neutral marker when no section colour was given. */
+const accentColor = computed(() => props.accent ?? 'var(--primary)')
 
 interface Row {
   field: Field
@@ -78,16 +85,6 @@ function typeOf(field: Field): string | null {
 }
 
 /**
- * The link back to the graph: `Author.email` where a column is known, the model
- * alone where the field is a whole nested object.
- */
-function modelLabel(field: Field): string | null {
-  if (!field.model) return null
-
-  return field.column ? `${field.model}.${field.column}` : field.model
-}
-
-/**
  * The constraints, for a request field only — a response field has no rules,
  * only a shape.
  *
@@ -112,7 +109,11 @@ function constraintsOf(field: Field): string | null {
         class="flex flex-wrap items-baseline gap-x-2 py-0.5 font-mono text-[11px]"
         :style="{ paddingLeft: `${row.depth * 0.75}rem` }"
       >
-        <span :class="row.depth ? 'text-muted-foreground' : ''">{{ row.leaf }}</span>
+        <span
+          :style="row.depth ? undefined : { color: accentColor }"
+          :class="row.depth ? 'text-muted-foreground' : ''"
+          >{{ row.leaf }}</span
+        >
 
         <span v-if="typeOf(row.field)" class="text-[10px] text-muted-foreground">
           {{ typeOf(row.field) }}
@@ -120,7 +121,8 @@ function constraintsOf(field: Field): string | null {
 
         <span
           v-if="isRequestField(row.field) && row.field.required"
-          class="rounded-sm bg-primary/15 px-1 text-[9px] text-foreground/80"
+          :style="{ backgroundColor: `color-mix(in oklab, ${accentColor} 22%, transparent)` }"
+          class="rounded-sm px-1 text-[9px] text-foreground/80"
           title="Required"
         >
           req
@@ -135,15 +137,6 @@ function constraintsOf(field: Field): string | null {
         >
           sometimes
         </span>
-
-        <button
-          v-if="row.field.model"
-          class="text-[10px] text-muted-foreground underline decoration-dotted hover:text-foreground"
-          :title="`Show ${row.field.model} on the graph`"
-          @click="$emit('open-model', row.field.model)"
-        >
-          {{ modelLabel(row.field) }}
-        </button>
 
         <!-- The constraints come last: they are the longest part of a row and
              the least often looked at. -->

@@ -5,6 +5,10 @@
 laravel: '@testbench'
 
 providers:
+  # Package discovery does not run for the app Testbench builds, so the JSON:API
+  # provider is named rather than found. The fixture routes are registered
+  # through its facade, so without it half the route table does not exist.
+  - LaravelJsonApi\Laravel\ServiceProvider
   - Workbench\App\Providers\WorkbenchServiceProvider
   - KdrDev\Dissect\DissectServiceProvider
 
@@ -20,6 +24,7 @@ workbench:
     web: true
     # The fixture endpoints the route exporter is developed against live in
     # workbench/routes/api.php.
+    config: true
     api: true
     commands: true
     components: false

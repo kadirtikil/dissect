@@ -1,0 +1,297 @@
+{
+  "jobs": [
+    {
+      "id": "App\\Jobs\\ExtractDocumentText",
+      "class": "App\\Jobs\\ExtractDocumentText",
+      "name": "ExtractDocumentText",
+      "kind": "job",
+      "queue": "indexing",
+      "queue_source": "constructor",
+      "connection": null,
+      "retry": {
+        "tries": 3,
+        "timeout": 300,
+        "maxExceptions": 2,
+        "backoff": [10, 60, 300],
+        "retryUntil": false
+      },
+      "traits": { "batchable": true, "unique": false, "encrypted": false, "afterCommit": true },
+      "payload": [
+        {
+          "name": "document",
+          "type": "App\\Models\\Document",
+          "model": "Document",
+          "optional": false,
+          "variadic": false,
+          "default": null
+        },
+        {
+          "name": "variant",
+          "type": "App\\Models\\Variant",
+          "model": "Variant",
+          "optional": true,
+          "variadic": false,
+          "default": null
+        }
+      ],
+      "middleware": ["WithoutOverlapping", "RateLimited"],
+      "events": [],
+      "confidence": "inferred",
+      "dispatched_by": [
+        {
+          "file": "app/Http/Controllers/DocumentController.php",
+          "line": 74,
+          "label": "DocumentController@store",
+          "context": "App\\Http\\Controllers\\DocumentController@store",
+          "method": "dispatch",
+          "queue": null,
+          "connection": null,
+          "delayed": false,
+          "afterCommit": true,
+          "route": "POST:api/documents"
+        }
+      ],
+      "models": ["Document", "Variant"]
+    },
+    {
+      "id": "App\\Jobs\\RenderThumbnail",
+      "class": "App\\Jobs\\RenderThumbnail",
+      "name": "RenderThumbnail",
+      "kind": "job",
+      "queue": "indexing",
+      "queue_source": "dispatch",
+      "connection": null,
+      "retry": {
+        "tries": 5,
+        "timeout": null,
+        "maxExceptions": null,
+        "backoff": [30],
+        "retryUntil": true
+      },
+      "traits": { "batchable": true, "unique": false, "encrypted": false, "afterCommit": false },
+      "payload": [
+        {
+          "name": "variant",
+          "type": "App\\Models\\Variant",
+          "model": "Variant",
+          "optional": false,
+          "variadic": false,
+          "default": null
+        }
+      ],
+      "middleware": [],
+      "events": [],
+      "confidence": "certain",
+      "dispatched_by": [
+        {
+          "file": "app/Jobs/ExtractDocumentText.php",
+          "line": 58,
+          "label": "ExtractDocumentText@handle",
+          "context": "App\\Jobs\\ExtractDocumentText@handle",
+          "method": "batch",
+          "queue": "indexing",
+          "connection": null,
+          "delayed": false,
+          "afterCommit": false,
+          "route": null
+        }
+      ],
+      "models": ["Variant"]
+    },
+    {
+      "id": "App\\Jobs\\PurgeDeletedDocuments",
+      "class": "App\\Jobs\\PurgeDeletedDocuments",
+      "name": "PurgeDeletedDocuments",
+      "kind": "job",
+      "queue": "maintenance",
+      "queue_source": "property",
+      "connection": "redis",
+      "retry": {
+        "tries": 1,
+        "timeout": 900,
+        "maxExceptions": null,
+        "backoff": null,
+        "retryUntil": false
+      },
+      "traits": { "batchable": false, "unique": true, "encrypted": false, "afterCommit": false },
+      "payload": [],
+      "middleware": [],
+      "events": [],
+      "confidence": "certain",
+      "dispatched_by": [],
+      "models": []
+    },
+    {
+      "id": "App\\Jobs\\SyncWorkspaceSeats",
+      "class": "App\\Jobs\\SyncWorkspaceSeats",
+      "name": "SyncWorkspaceSeats",
+      "kind": "job",
+      "queue": null,
+      "queue_source": "mixed",
+      "connection": null,
+      "retry": {
+        "tries": null,
+        "timeout": null,
+        "maxExceptions": null,
+        "backoff": null,
+        "retryUntil": false
+      },
+      "traits": { "batchable": false, "unique": false, "encrypted": false, "afterCommit": false },
+      "payload": [
+        {
+          "name": "workspace",
+          "type": "App\\Models\\Workspace",
+          "model": "Workspace",
+          "optional": false,
+          "variadic": false,
+          "default": null
+        }
+      ],
+      "middleware": [],
+      "events": [],
+      "confidence": "certain",
+      "dispatched_by": [
+        {
+          "file": "app/Http/Controllers/WorkspaceController.php",
+          "line": 41,
+          "label": "WorkspaceController@store",
+          "context": "App\\Http\\Controllers\\WorkspaceController@store",
+          "method": "dispatch",
+          "queue": "billing",
+          "connection": null,
+          "delayed": false,
+          "afterCommit": false,
+          "route": "POST:workspaces"
+        },
+        {
+          "file": "app/Listeners/RevokeAccess.php",
+          "line": 22,
+          "label": "RevokeAccess@handle",
+          "context": "App\\Listeners\\RevokeAccess@handle",
+          "method": "dispatch",
+          "queue": "default",
+          "connection": null,
+          "delayed": true,
+          "afterCommit": false,
+          "route": null
+        }
+      ],
+      "models": ["Workspace"]
+    },
+    {
+      "id": "App\\Listeners\\RevokeAccess",
+      "class": "App\\Listeners\\RevokeAccess",
+      "name": "RevokeAccess",
+      "kind": "listener",
+      "queue": "listeners",
+      "queue_source": "property",
+      "connection": null,
+      "retry": {
+        "tries": 5,
+        "timeout": null,
+        "maxExceptions": null,
+        "backoff": [30],
+        "retryUntil": false
+      },
+      "traits": { "batchable": false, "unique": false, "encrypted": false, "afterCommit": false },
+      "payload": [],
+      "middleware": [],
+      "events": ["App\\Events\\MembershipRevoked"],
+      "confidence": "certain",
+      "dispatched_by": [],
+      "models": []
+    },
+    {
+      "id": "App\\Mail\\InvitationSent",
+      "class": "App\\Mail\\InvitationSent",
+      "name": "InvitationSent",
+      "kind": "mailable",
+      "queue": "mail",
+      "queue_source": "constructor",
+      "connection": null,
+      "retry": {
+        "tries": 3,
+        "timeout": null,
+        "maxExceptions": null,
+        "backoff": null,
+        "retryUntil": false
+      },
+      "traits": { "batchable": false, "unique": false, "encrypted": false, "afterCommit": false },
+      "payload": [
+        {
+          "name": "invitation",
+          "type": "App\\Models\\Invitation",
+          "model": "Invitation",
+          "optional": false,
+          "variadic": false,
+          "default": null
+        }
+      ],
+      "middleware": [],
+      "events": [],
+      "confidence": "certain",
+      "dispatched_by": [
+        {
+          "file": "app/Http/Controllers/WorkspaceMemberController.php",
+          "line": 63,
+          "label": "WorkspaceMemberController@index",
+          "context": "App\\Http\\Controllers\\WorkspaceMemberController@index",
+          "method": "queue",
+          "queue": null,
+          "connection": null,
+          "delayed": false,
+          "afterCommit": false,
+          "route": "GET:api/workspaces/{workspace}/members"
+        }
+      ],
+      "models": ["Invitation"]
+    },
+    {
+      "id": "App\\Notifications\\ReviewRequested",
+      "class": "App\\Notifications\\ReviewRequested",
+      "name": "ReviewRequested",
+      "kind": "notification",
+      "queue": "mail",
+      "queue_source": "property",
+      "connection": null,
+      "retry": {
+        "tries": null,
+        "timeout": null,
+        "maxExceptions": null,
+        "backoff": null,
+        "retryUntil": false
+      },
+      "traits": { "batchable": false, "unique": false, "encrypted": true, "afterCommit": false },
+      "payload": [
+        {
+          "name": "review",
+          "type": "App\\Models\\VersionReview",
+          "model": "VersionReview",
+          "optional": false,
+          "variadic": false,
+          "default": null
+        }
+      ],
+      "middleware": [],
+      "events": [],
+      "confidence": "certain",
+      "dispatched_by": [
+        {
+          "file": "app/Http/Controllers/DocumentController.php",
+          "line": 118,
+          "label": "DocumentController@show",
+          "context": "App\\Http\\Controllers\\DocumentController@show",
+          "method": "notify",
+          "queue": null,
+          "connection": null,
+          "delayed": false,
+          "afterCommit": false,
+          "route": "GET:api/documents/{document}"
+        }
+      ],
+      "models": ["VersionReview"]
+    }
+  ],
+  "generated_at": "2026-08-31T09:00:00+00:00",
+  "fingerprint": "standalone-fixture"
+}

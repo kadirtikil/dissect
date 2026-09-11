@@ -5,6 +5,9 @@ namespace Workbench\App\Http\Controllers;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Mail;
+use Workbench\App\Jobs\SyncAuthorProfile;
+use Workbench\App\Mail\WeeklyDigest;
 use Workbench\App\Models\Author;
 
 /**
@@ -28,7 +31,15 @@ class AuthorController extends Controller
             'rating' => 'integer|min:0|max:5',
         ]);
 
-        Author::create($validated);
+        $author = Author::create($validated);
+
+        // Queued through an API the scanner deliberately does not know about:
+        // what makes this a dispatch site is that WeeklyDigest is a class
+        // discovery already found.
+        Mail::to($author)->queue(new WeeklyDigest($author));
+
+        // The second of the two queues this job is dispatched onto.
+        SyncAuthorProfile::dispatch($author)->onQueue('profiles');
 
         return redirect()->route('authors.index');
     }

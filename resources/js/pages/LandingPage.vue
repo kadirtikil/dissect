@@ -1,24 +1,27 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { storeToRefs } from 'pinia'
-import { ArrowRight, Boxes, Route } from '@lucide/vue'
+import { Activity, ArrowRight, Boxes, Route, Timer } from '@lucide/vue'
 import { useSchemaStore } from '@/stores/schema'
 import { useLayoutStore } from '@/stores/layout'
 import { useViewsStore } from '@/stores/views'
 import { useRoutesStore } from '@/stores/routes'
+import { useJobsStore } from '@/stores/jobs'
 import { useNavigationStore } from '@/stores/navigation'
 
 const schema = useSchemaStore()
 const layout = useLayoutStore()
 const views = useViewsStore()
 const routes = useRoutesStore()
+const jobs = useJobsStore()
 const nav = useNavigationStore()
 
 const { status, stats, generatedAt } = storeToRefs(schema)
 const { positions } = storeToRefs(layout)
 const { views: savedViews } = storeToRefs(views)
-// Only ever read, never awaited: see the routes card below.
+// Only ever read, never awaited: see the cards below.
 const { loaded: routesLoaded, stats: routeStats } = storeToRefs(routes)
+const { loaded: jobsLoaded, stats: jobStats } = storeToRefs(jobs)
 
 /**
  * Everything here comes off the boot payload the page was rendered with.
@@ -119,6 +122,46 @@ const generated = computed(() => {
             <template v-else>
               Every endpoint, what it accepts and returns, and the models behind it.
             </template>
+          </span>
+        </button>
+
+        <button
+          class="group rounded-md border bg-card px-4 py-4 text-left transition-shadow hover:shadow-md"
+          @click="nav.go('jobs')"
+        >
+          <span class="flex items-center gap-2 font-mono text-sm font-semibold">
+            <Timer class="size-4" />
+            Jobs
+            <ArrowRight class="size-3.5 opacity-0 transition-opacity group-hover:opacity-60" />
+          </span>
+          <!-- Same bargain as the routes card: a count here would mean parsing
+               every file under the watched paths on every visit to the overview,
+               which is the one cost this page must not add. -->
+          <span class="mt-1 block font-mono text-[11px] text-muted-foreground">
+            <template v-if="jobsLoaded">
+              {{ jobStats.total }} queueables — where each runs and what puts it there.
+            </template>
+            <template v-else>
+              Everything that reaches a worker, which queue it lands on, and what dispatches it.
+            </template>
+          </span>
+        </button>
+
+        <button
+          class="group rounded-md border bg-card px-4 py-4 text-left transition-shadow hover:shadow-md"
+          @click="nav.go('queue')"
+        >
+          <span class="flex items-center gap-2 font-mono text-sm font-semibold">
+            <Activity class="size-4" />
+            Queue
+            <ArrowRight class="size-3.5 opacity-0 transition-opacity group-hover:opacity-60" />
+          </span>
+          <!-- No count, and not for the usual reason: this one is runtime state
+               rather than a description of code, and reading it on the way past
+               would make the overview do work that goes stale by the time it is
+               on screen. -->
+          <span class="mt-1 block font-mono text-[11px] text-muted-foreground">
+            What is on the queue right now, what is due next, and what failed.
           </span>
         </button>
       </div>

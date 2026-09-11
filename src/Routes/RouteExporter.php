@@ -3,15 +3,16 @@
 namespace KdrDev\Dissect\Routes;
 
 use Illuminate\Routing\Route;
+use KdrDev\Dissect\JsonApi\DocumentAnalyzer;
 use Throwable;
 
 /**
  * Builds the endpoint list — the second half of what dissect draws.
  *
  * The schema answers "what does the data look like"; this answers "how do you
- * reach it". The field that joins the two is `models`: every model an endpoint
- * touches, expressed as the same class-basename ids `schema.json` uses as node
- * keys, so the graph and the endpoint list address the same things.
+ * reach it". The two are deliberately not joined: an endpoint is described by
+ * its own contract — how it is addressed, what goes in, what comes back — and
+ * nothing here resolves a name to a node in the model graph.
  *
  * Orchestration only. Reading the router is {@see RouteCollector}, working out
  * what runs is {@see ActionResolver}.
@@ -24,6 +25,7 @@ class RouteExporter
         protected RequestAnalyzer $requests,
         protected ResponseAnalyzer $responses,
         protected RouteFingerprint $fingerprint,
+        protected DocumentAnalyzer $documents,
     ) {}
 
     /**
@@ -73,19 +75,26 @@ class RouteExporter
             $reflection = $this->actions->reflect($route);
             $described = $this->collector->describe($route);
             $action = $this->actions->describe($route);
-            $parameters = $this->collector->parameters($route, $reflection);
-            $request = $this->requests->analyse($reflection);
-            $response = $this->responses->analyse($reflection);
+            $parameters = $this->collector->parameters($route);
+
+            // JSON:API first. Every route the package registers runs the same
+            // generic controller, so reflecting the action answers
+            // `JsonApiController` for all of them — the schema behind the route
+            // is the only thing that describes the payload, and where there is
+            // one it is a better answer than anything the reflection can give.
+            $document = $this->documents->response($route);
+
+            $request = $this->documents->request($route) ?? $this->requests->analyse($reflection);
+            $response = $document ?? $this->responses->analyse($reflection);
 
             return [
-                'id' => $this->id($described['methods'], $described['uri']),
+                'id' => self::id($described['methods'], $described['uri']),
                 ...$described,
                 'group' => $this->actions->group($route),
                 'action' => $action,
                 'parameters' => $parameters,
                 'request' => $request,
                 'response' => $response,
-                'models' => $this->models($parameters, $request, $response),
             ];
         } catch (Throwable) {
             return null;
@@ -100,37 +109,15 @@ class RouteExporter
      * none, and two different verbs on one path are two different endpoints —
      * so the pair that actually identifies it is what is used.
      *
+     * Public and static because the jobs surface links dispatch sites back to
+     * endpoints by this id. Two places that both spell a route's key and only
+     * happen to agree is a cross-link that breaks the first time one of them is
+     * changed.
+     *
      * @param  array<int, string>  $methods
      */
-    protected function id(array $methods, string $uri): string
+    public static function id(array $methods, string $uri): string
     {
         return implode('|', $methods).':'.$uri;
-    }
-
-    /**
-     * Models this endpoint is known to touch, deduplicated and sorted.
-     *
-     * Every source of a link contributes to one list: a bound route parameter,
-     * a rule pointing at a table, and the model behind a resource. One list,
-     * because "what does this endpoint touch" is one question however the
-     * answer was arrived at.
-     *
-     * @param  array<int, array{model: string|null}>  $parameters
-     * @param  array<string, mixed>|null  $request
-     * @param  array<string, mixed>|null  $response
-     * @return array<int, string>
-     */
-    protected function models(array $parameters, ?array $request, ?array $response): array
-    {
-        $models = array_column($parameters, 'model');
-
-        foreach ([...$request['fields'] ?? [], ...$response['fields'] ?? []] as $field) {
-            $models[] = $field['model'] ?? null;
-        }
-
-        $models = array_values(array_unique(array_filter($models)));
-        sort($models);
-
-        return $models;
     }
 }

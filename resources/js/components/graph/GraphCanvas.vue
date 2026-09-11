@@ -13,9 +13,9 @@ import '@vue-flow/minimap/dist/style.css'
 // Must come last so it overrides Vue Flow's bundled theme.
 import '@/assets/vue-flow-theme.css'
 
-import ModelNode from '@/components/ModelNode.vue'
-import GraphLegend from '@/components/GraphLegend.vue'
-import ViewMenu from '@/components/ViewMenu.vue'
+import ModelNode from '@/components/graph/ModelNode.vue'
+import GraphLegend from '@/components/graph/GraphLegend.vue'
+import ViewMenu from '@/components/graph/ViewMenu.vue'
 import { Button } from '@/components/ui/button'
 import { ChevronsDownUp, RotateCcw } from '@lucide/vue'
 import { PAGE_ACTIONS, PAGE_CONTEXT } from '@/lib/toolbar'

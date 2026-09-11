@@ -15,15 +15,20 @@ export interface RouteFilterState {
   methods: string[]
   /** Empty means every group (app / vendor / framework). */
   groups: string[]
-  /** Node ids. Null means no model filter at all — not "an empty set of models". */
-  models: string[] | null
+  /**
+   * Empty means both halves of the table.
+   *
+   * Separate from `groups` because it answers a different question: `groups` is
+   * whose code runs, this is who the endpoint is for.
+   */
+  stacks: string[]
 }
 
 export const EMPTY_FILTERS: RouteFilterState = {
   search: '',
   methods: [],
   groups: [],
-  models: null,
+  stacks: [],
 }
 
 export function matchesSearch(route: ApiRoute, search: string): boolean {
@@ -51,10 +56,8 @@ export function matchesGroups(route: ApiRoute, groups: string[]): boolean {
   return groups.length === 0 || groups.includes(route.group)
 }
 
-/** A route matches a model filter when it touches at least one of the models. */
-export function matchesModels(route: ApiRoute, models: string[] | null): boolean {
-  if (models === null) return true
-  return route.models.some((m) => models.includes(m))
+export function matchesStacks(route: ApiRoute, stacks: string[]): boolean {
+  return stacks.length === 0 || stacks.includes(route.stack)
 }
 
 export function matchesRoute(route: ApiRoute, state: RouteFilterState): boolean {
@@ -62,7 +65,7 @@ export function matchesRoute(route: ApiRoute, state: RouteFilterState): boolean 
     matchesSearch(route, state.search) &&
     matchesMethods(route, state.methods) &&
     matchesGroups(route, state.groups) &&
-    matchesModels(route, state.models)
+    matchesStacks(route, state.stacks)
   )
 }
 
@@ -80,26 +83,36 @@ export function filterRoutes(routes: ApiRoute[], state: RouteFilterState): ApiRo
 export function facetCounts(
   routes: ApiRoute[],
   state: RouteFilterState,
-): { methods: Record<string, number>; groups: Record<string, number> } {
+): {
+  methods: Record<string, number>
+  groups: Record<string, number>
+  stacks: Record<string, number>
+} {
   const methods: Record<string, number> = {}
   const groups: Record<string, number> = {}
+  const stacks: Record<string, number> = {}
 
   for (const route of routes) {
-    const base =
-      matchesSearch(route, state.search) && matchesModels(route, state.models)
+    const base = matchesSearch(route, state.search)
 
-    if (base && matchesGroups(route, state.groups)) {
+    if (base && matchesGroups(route, state.groups) && matchesStacks(route, state.stacks)) {
       for (const method of route.methods) {
         methods[method] = (methods[method] ?? 0) + 1
       }
     }
 
-    if (base && matchesMethods(route, state.methods)) {
+    if (base && matchesMethods(route, state.methods) && matchesStacks(route, state.stacks)) {
       groups[route.group] = (groups[route.group] ?? 0) + 1
+    }
+
+    // The stack counts deliberately ignore the stack selection but honour the
+    // rest, so the switcher always reports the true size of the other half.
+    if (base && matchesMethods(route, state.methods) && matchesGroups(route, state.groups)) {
+      stacks[route.stack] = (stacks[route.stack] ?? 0) + 1
     }
   }
 
-  return { methods, groups }
+  return { methods, groups, stacks }
 }
 
 export interface RouteGrouping {

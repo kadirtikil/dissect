@@ -148,11 +148,13 @@ class RuleNormalizer
     }
 
     /**
+     * @param $rules
      * The table, model class or column an `exists`/`unique` rule points at.
      *
-     * This is the request half of the join to the graph: `exists:authors,id`
-     * says this field holds an Author's key, which is a relationship the schema
-     * knows about but the route table alone never could.
+     * Parsed but no longer reported: the routes export carries rules verbatim,
+     * so `exists:authors,id` reaches the client as written rather than split
+     * into a table and a column. Kept because reading a rule is this class's
+     * job, and the JSON:API work will want the reference a field points at.
      *
      * @return array{table: string|null, class: string|null, column: string|null}
      */

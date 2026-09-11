@@ -1,15 +1,13 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { storeToRefs } from 'pinia'
-import { Layers, X } from '@lucide/vue'
+import { X } from '@lucide/vue'
 import { useRoutesStore } from '@/stores/routes'
-import { useViewsStore } from '@/stores/views'
 import { methodColor, methodRank } from '@/lib/httpMethods'
+import { STACK_ORDER, stackSpec } from '@/lib/routeStacks'
 
 const store = useRoutesStore()
-const views = useViewsStore()
-const { search, methods, groups, modelFilter, scopeToView, facets, stats } = storeToRefs(store)
-const { active } = storeToRefs(views)
+const { search, methods, groups, stacks, facets, stats } = storeToRefs(store)
 
 /**
  * Only the verbs and groups this application actually has.
@@ -30,17 +28,70 @@ const groupOptions = computed(() =>
   ),
 )
 
+/**
+ * The switcher's options.
+ *
+ * `web` and `api` are always offered — an application with none of one is worth
+ * saying so about, and a switch that appears and disappears is worse than one
+ * reading zero. `other` is different: most applications have no such route, and
+ * an option that can only ever return nothing is a dead end.
+ */
+const stackOptions = computed(() =>
+  STACK_ORDER.filter((stack) => stack !== 'other' || (facets.value.stacks.other ?? 0) > 0),
+)
+
+const activeStack = computed(() => stacks.value[0] ?? null)
+
 const filtered = computed(
   () =>
     search.value !== '' ||
     methods.value.length > 0 ||
     groups.value.length > 0 ||
-    modelFilter.value !== null,
+    stacks.value.length > 0,
 )
 </script>
 
 <template>
   <div class="shrink-0 border-b px-3 py-2">
+    <!-- The first question anybody has about an endpoint list: is this
+         something my own frontend calls, or something I have promised to the
+         outside world. A switcher rather than another chip, because the answer
+         changes what breaking the endpoint costs. -->
+    <div class="mb-2 flex items-center gap-1 rounded-md bg-muted/60 p-0.5">
+      <button
+        class="flex-1 rounded-sm px-2 py-1 font-mono text-[10px] tracking-wide uppercase"
+        :class="
+          activeStack === null
+            ? 'bg-background text-foreground shadow-sm'
+            : 'text-muted-foreground hover:text-foreground'
+        "
+        :aria-pressed="activeStack === null"
+        title="Every route the router knows about"
+        @click="store.showStack(null)"
+      >
+        All
+        <span class="ml-1 opacity-60 tabular-nums">{{ stats.total }}</span>
+      </button>
+
+      <button
+        v-for="stack in stackOptions"
+        :key="stack"
+        class="flex-1 rounded-sm px-2 py-1 font-mono text-[10px] tracking-wide uppercase"
+        :style="activeStack === stack ? { color: stackSpec(stack).color } : undefined"
+        :class="
+          activeStack === stack
+            ? 'bg-background shadow-sm'
+            : 'text-muted-foreground hover:text-foreground'
+        "
+        :aria-pressed="activeStack === stack"
+        :title="stackSpec(stack).hint"
+        @click="store.showStack(stack)"
+      >
+        {{ stackSpec(stack).label }}
+        <span class="ml-1 opacity-60 tabular-nums">{{ facets.stacks[stack] ?? 0 }}</span>
+      </button>
+    </div>
+
     <div class="flex items-center gap-2">
       <input
         v-model="search"
@@ -105,41 +156,6 @@ const filtered = computed(
       >
         {{ group }}
         <span class="ml-1 opacity-60 tabular-nums">{{ facets.groups[group] }}</span>
-      </button>
-    </div>
-
-    <!-- A view means "the billing models"; the endpoints touching them are part
-         of that same bounded context, so the scope carries across by default. -->
-    <div v-if="active || modelFilter" class="mt-2 flex flex-wrap items-center gap-2">
-      <button
-        v-if="active"
-        class="flex items-center gap-1 rounded-sm border px-1.5 py-0.5 font-mono text-[10px]"
-        :class="
-          scopeToView && !modelFilter
-            ? 'border-ring/40 text-foreground'
-            : 'border-transparent text-muted-foreground'
-        "
-        :disabled="!!modelFilter"
-        :aria-pressed="scopeToView && !modelFilter"
-        :title="
-          modelFilter
-            ? 'Superseded while a single model is pinned'
-            : `Only endpoints touching the models in “${active.name}”`
-        "
-        @click="scopeToView = !scopeToView"
-      >
-        <Layers class="size-3" />
-        in “{{ active.name }}”
-      </button>
-
-      <button
-        v-if="modelFilter"
-        class="flex items-center gap-1 rounded-sm border border-ring/40 px-1.5 py-0.5 font-mono text-[10px]"
-        :aria-label="`Stop filtering to ${modelFilter}`"
-        @click="store.filterByModel(null)"
-      >
-        touching {{ modelFilter }}
-        <X class="size-3" />
       </button>
     </div>
   </div>

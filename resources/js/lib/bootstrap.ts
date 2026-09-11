@@ -25,6 +25,22 @@ export interface Bootstrap {
    * model, and the page opens on the graph.
    */
   routesUrl?: string
+  /**
+   * Endpoint returning the job list. Inlined as a URL for the same reason as
+   * the one above, and a sharper version of it: building this payload parses
+   * every file under the watched paths rather than only stat'ing them.
+   */
+  jobsUrl?: string
+  /**
+   * Endpoint returning what is on the queue right now.
+   *
+   * The one payload here that is not derived from source, so unlike the two
+   * above it is not fetched once — it is polled for as long as its surface is
+   * open, and never cached at either end.
+   */
+  queueUrl?: string
+  /** How often to poll that endpoint, in milliseconds. */
+  queuePollInterval?: number
   /** Endpoint returning the current change signal — see stores/schema.ts. */
   fingerprintUrl?: string
   /** The signal as of page render; polling compares against this. */

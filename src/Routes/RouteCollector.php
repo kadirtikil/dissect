@@ -2,11 +2,8 @@
 
 namespace KdrDev\Dissect\Routes;
 
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Routing\Route;
 use Illuminate\Routing\Router;
-use ReflectionFunctionAbstract;
-use ReflectionNamedType;
 
 /**
  * Reads the router's own table and reports the transport half of each route:
@@ -26,10 +23,12 @@ class RouteCollector
     }
 
     /**
-     * @return array{methods: array<int, string>, uri: string, name: string|null, domain: string|null, middleware: array<int, string>}
+     * @return array{methods: array<int, string>, uri: string, name: string|null, domain: string|null, middleware: array<int, string>, stack: string}
      */
     public function describe(Route $route): array
     {
+        $middleware = $this->middleware($route);
+
         return [
             'methods' => $this->methods($route),
             // Laravel stores the root as "/", which reads oddly in a list of
@@ -37,27 +36,62 @@ class RouteCollector
             'uri' => $route->uri(),
             'name' => $route->getName(),
             'domain' => $route->getDomain(),
-            'middleware' => $this->middleware($route),
+            'middleware' => $middleware,
+            'stack' => self::stack($middleware),
         ];
     }
 
     /**
-     * The URI's placeholders, in the order they appear, each with the model it
-     * resolves to when route model binding is in play.
+     * Which middleware stack the route was registered into: `web`, `api`, or
+     * neither.
      *
-     * The binding is read from the action's own type hints rather than from the
-     * container's bindings, because implicit binding — a `Post $post` parameter
-     * matching a `{post}` placeholder — is how almost every application does
-     * it, and it is the form that carries the model.
+     * This is the closest thing the router keeps to "which file was it written
+     * in". Laravel loads `web.php` and `api.php` into one flat table and
+     * retains nothing about where each entry came from — but it does apply a
+     * group per file, and that group is the difference that actually matters:
+     * `web` is session- and cookie-backed, which is what a first-party frontend
+     * talks to; `api` is stateless, which is what everybody else talks to.
      *
-     * @return array<int, array{name: string, optional: bool, field: string|null, pattern: string|null, model: string|null}>
+     * Read from the group rather than from the URI because a prefix is a
+     * convention and the group is a behaviour. An application that serves its
+     * API from `/v2` or its frontend from `/app` is still correctly split here.
+     *
+     * `api` is checked first: a route somehow in both groups is making the
+     * stateless claim, and that is the one consumers have to honour.
+     *
+     * @param  array<int, string>  $middleware
      */
-    public function parameters(Route $route, ?ReflectionFunctionAbstract $action = null): array
+    public static function stack(array $middleware): string
+    {
+        if (in_array('api', $middleware, true)) {
+            return 'api';
+        }
+
+        if (in_array('web', $middleware, true)) {
+            return 'web';
+        }
+
+        // Neither group. Reported rather than guessed at: a console route, or
+        // one registered outside both files, is a real thing to see in the list
+        // and inventing a half for it would be a lie.
+        return 'other';
+    }
+
+    /**
+     * The URI's placeholders, in the order they appear.
+     *
+     * What a placeholder binds to is deliberately not reported: the routes
+     * surface describes the endpoint's own contract — how it is addressed and
+     * what goes over the wire — and resolving `{post}` to a graph node is a
+     * different context's question.
+     *
+     * @return array<int, array{name: string, optional: bool, field: string|null, pattern: string|null}>
+     */
+    public function parameters(Route $route): array
     {
         // `{post}`, `{post:slug}` and `{category?}` in one pass, in URI order.
         preg_match_all('/\{(\w+)(?::(\w+))?(\?)?\}/', $route->uri(), $matches, PREG_SET_ORDER);
 
-        $bound = $this->boundModels($action);
         $wheres = $route->wheres;
         $parameters = [];
 
@@ -70,45 +104,10 @@ class RouteCollector
                 // `{post:slug}` — which column the model is looked up by.
                 'field' => ($match[2] ?? '') !== '' ? $match[2] : null,
                 'pattern' => $wheres[$name] ?? null,
-                'model' => $bound[$name] ?? null,
             ];
         }
 
         return $parameters;
-    }
-
-    /**
-     * Action parameters type-hinted as an Eloquent model, keyed by name.
-     *
-     * @return array<string, string>
-     */
-    protected function boundModels(?ReflectionFunctionAbstract $action): array
-    {
-        if ($action === null) {
-            return [];
-        }
-
-        $bound = [];
-
-        foreach ($action->getParameters() as $parameter) {
-            $type = $parameter->getType();
-
-            if (! $type instanceof ReflectionNamedType || $type->isBuiltin()) {
-                continue;
-            }
-
-            $class = $type->getName();
-
-            // class_exists() first: is_subclass_of() would autoload a class the
-            // application may not be able to resolve.
-            if (class_exists($class) && is_subclass_of($class, Model::class)) {
-                // Class basename, matching the node ids in schema.json — that
-                // match is the whole point of carrying it.
-                $bound[$parameter->getName()] = class_basename($class);
-            }
-        }
-
-        return $bound;
     }
 
     /**

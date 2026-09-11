@@ -2,7 +2,10 @@
 
 namespace Workbench\App\Providers;
 
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
+use Workbench\App\Events\PostPublished;
+use Workbench\App\Listeners\NotifyFollowers;
 
 /**
  * Points the package at the fixture models when running under Workbench.
@@ -44,6 +47,28 @@ class WorkbenchServiceProvider extends ServiceProvider
             && ! $this->app->environment('testing')
             && glob($huge.'/*.php');
 
+        // Testbench defaults to `sync`, which is the one driver that never has
+        // anything on it. The fixture app runs the database driver against its
+        // own connection so the live surface has a real queue to show —
+        // `dissect:seed-queue` puts something on it.
+        //
+        // Never under `testing`, for the same reason the generated model
+        // fixture is not: the suite asserts against a queue it seeds itself,
+        // and pointing it at the committed database file would have it read
+        // whatever somebody last ran `serve` with.
+        if (! $this->app->environment('testing')) {
+            config([
+                'queue.default' => 'database',
+                'queue.connections.database.connection' => 'workbench',
+                // The failer and the batch repository each carry their own
+                // connection, and both default to an env var this skeleton does
+                // not set — without these the history reads a database with no
+                // tables in it.
+                'queue.failed.database' => 'workbench',
+                'queue.batching.database' => 'workbench',
+            ]);
+        }
+
         config([
             'dissect.models_path' => $useHuge ? $huge : $root.'/workbench/app/Models',
             'dissect.models_namespace' => $useHuge ? 'Workbench\\App\\Huge' : 'Workbench\\App\\Models',
@@ -52,6 +77,19 @@ class WorkbenchServiceProvider extends ServiceProvider
             // skeleton, so the defaults ('app', 'routes') would watch a tree
             // holding none of the fixture controllers or route files.
             'dissect.routes.watch_paths' => [
+                $root.'/workbench/app',
+                $root.'/workbench/routes',
+            ],
+
+            // Same again for the job list. The fixture keeps its queueables in
+            // the conventional three directories, under the workbench app
+            // rather than the skeleton's.
+            'dissect.jobs.paths' => [
+                $root.'/workbench/app/Jobs',
+                $root.'/workbench/app/Listeners',
+                $root.'/workbench/app/Mail',
+            ],
+            'dissect.jobs.watch_paths' => [
                 $root.'/workbench/app',
                 $root.'/workbench/routes',
             ],
@@ -73,6 +111,15 @@ class WorkbenchServiceProvider extends ServiceProvider
             // The default database cache store wants a table this skeleton has
             // no reason to carry.
             'cache.default' => 'array',
+
         ]);
+    }
+
+    public function boot(): void
+    {
+        // What makes NotifyFollowers a *listener* rather than a job is this
+        // line: nothing about the class itself says so, and the dispatcher is
+        // the only place it is written down.
+        Event::listen(PostPublished::class, NotifyFollowers::class);
     }
 }

@@ -1,15 +1,26 @@
 /**
  * Shape of routes.json, as exported from the Laravel side.
  *
- * The field that matters most here is `models` on each route: it holds node ids
- * from schema.json, which is what lets an endpoint point back at the graph and
- * a model card point forward at its endpoints.
+ * Endpoints carry no model ids. The graph is a different context, and an
+ * endpoint is described by its own contract — how it is addressed, what goes
+ * in, what comes back. A rule that names a table travels verbatim.
  *
  * Kept deliberately close to the wire format, like types/schema.ts.
  */
 
 /** Whose code the endpoint runs. Every route is exported; this is the facet. */
 export type RouteGroup = 'app' | 'vendor' | 'framework'
+
+/**
+ * Which middleware stack the route was registered into.
+ *
+ * The closest thing the router keeps to which file a route was written in, and
+ * the split that matters to somebody reading the list: `web` is session-backed
+ * — a first-party frontend talks to it — and `api` is stateless, which is what
+ * everything else talks to. `other` is a route in neither group, reported
+ * rather than forced into a half it does not belong to.
+ */
+export type RouteStack = 'web' | 'api' | 'other'
 
 export type ActionType = 'controller' | 'closure' | 'view' | 'redirect'
 
@@ -37,8 +48,6 @@ export interface RouteParameter {
   field: string | null
   /** The `where()` constraint, if one was declared. */
   pattern: string | null
-  /** Node id of the bound model, when route model binding applies. */
-  model: string | null
 }
 
 export interface RequestField {
@@ -47,14 +56,13 @@ export interface RequestField {
   /** The rule that carries a type — `integer`, `string`, `date`. */
   type?: string | null
   required?: boolean
+  /** Verbatim, `exists:authors,id` included — nothing is resolved. */
   rules: string[]
-  /** Set when a rule names a table the graph knows, e.g. `exists:authors,id`. */
-  model?: string | null
-  column?: string | null
 }
 
 export interface RequestShape {
-  source: 'form-request' | 'inline-validate' | 'none' | string
+  /** `json-api` when the fields were read from a schema rather than rules. */
+  source: 'form-request' | 'inline-validate' | 'none' | 'json-api' | string
   class: string | null
   confidence: Confidence
   fields: RequestField[]
@@ -65,14 +73,27 @@ export type FieldKind = 'scalar' | 'object' | 'array'
 export interface ResponseField {
   path: string
   kind: FieldKind | string
-  model?: string | null
-  column?: string | null
   /** Wrapped in `when()` / `whenLoaded()` — not always present in the payload. */
   conditional?: boolean
 }
 
 export interface ResponseShape {
-  source: 'resource' | 'resource-collection' | 'json' | 'view' | 'redirect' | 'unknown' | string
+  /**
+   * The `json-api-*` sources come from a schema rather than a return type:
+   * `json-api` is a document, `json-api-identifier` a relationship endpoint's
+   * type/id pair, and `json-api-none` a 204 that must not carry a body.
+   */
+  source:
+    | 'resource'
+    | 'resource-collection'
+    | 'json'
+    | 'view'
+    | 'redirect'
+    | 'unknown'
+    | 'json-api'
+    | 'json-api-identifier'
+    | 'json-api-none'
+    | string
   class: string | null
   status?: number | null
   confidence: Confidence
@@ -87,11 +108,10 @@ export interface ApiRoute {
   name: string | null
   domain: string | null
   middleware: string[]
+  stack: RouteStack | string
   group: RouteGroup | string
   action: RouteAction
   parameters: RouteParameter[]
-  /** Node ids this endpoint touches — the join back to the graph. */
-  models: string[]
   /**
    * Absent until the exporter analyses bodies, and absent for routes where
    * there is nothing to analyse. Optional rather than empty so "not looked at"

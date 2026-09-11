@@ -1,25 +1,14 @@
 <script setup lang="ts">
-import { onMounted, watch } from 'vue'
+import { onMounted } from 'vue'
 import { storeToRefs } from 'pinia'
-import RouteFilters from '@/components/RouteFilters.vue'
-import RouteList from '@/components/RouteList.vue'
-import RouteDetail from '@/components/RouteDetail.vue'
+import RouteFilters from '@/components/routes/RouteFilters.vue'
+import RouteList from '@/components/routes/RouteList.vue'
+import RouteDetail from '@/components/routes/RouteDetail.vue'
 import { PAGE_CONTEXT } from '@/lib/toolbar'
 import { useRoutesStore } from '@/stores/routes'
-import { useSchemaStore } from '@/stores/schema'
 
 const store = useRoutesStore()
-const schema = useSchemaStore()
-const { status, error, highlightedModels, stats } = storeToRefs(store)
-
-/**
- * Keeps the canvas in step with what is selected here.
- *
- * Done from the component rather than inside the store: the schema store
- * already reaches for this one to poll the route signal, and having them import
- * each other would put a cycle between two module-level `defineStore` calls.
- */
-watch(highlightedModels, (models) => schema.highlight(models), { immediate: true })
+const { status, error, stats } = storeToRefs(store)
 
 // Fetched here rather than at boot: this is the moment somebody asked for it,
 // and load() is a no-op once the list is in hand, so switching surfaces back

@@ -4,9 +4,12 @@ namespace Workbench\App\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Workbench\App\Events\PostPublished;
 use Workbench\App\Http\Requests\StorePostRequest;
 use Workbench\App\Http\Requests\UpdatePostRequest;
 use Workbench\App\Http\Resources\PostResource;
+use Workbench\App\Jobs\PublishPost;
+use Workbench\App\Jobs\SyncAuthorProfile;
 use Workbench\App\Models\Post;
 
 /**
@@ -24,6 +27,16 @@ class PostController extends Controller
     public function store(StorePostRequest $request): JsonResponse
     {
         $post = Post::create($request->validated());
+
+        // The plain case: a static dispatch inside a controller action, which
+        // is what the route join is built to find.
+        PublishPost::dispatch($post)->afterCommit();
+
+        // The same job dispatched from two actions onto two different queues —
+        // see SyncAuthorProfile.
+        SyncAuthorProfile::dispatch($post->author)->onQueue('sync');
+
+        PostPublished::dispatch($post);
 
         return PostResource::make($post)->response()->setStatusCode(201);
     }

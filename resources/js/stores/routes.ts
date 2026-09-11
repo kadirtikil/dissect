@@ -3,7 +3,6 @@ import { computed, ref, shallowRef } from 'vue'
 import type { ApiRoute, RoutesFile } from '@/types/routes'
 import type { RouteFilterState } from '@/lib/routeFilters'
 import { facetCounts, filterRoutes, groupRoutes } from '@/lib/routeFilters'
-import { useViewsStore } from '@/stores/views'
 import { bootstrap } from '@/lib/bootstrap'
 
 type Status = 'idle' | 'loading' | 'ready' | 'error'
@@ -32,40 +31,32 @@ export const useRoutesStore = defineStore('routes', () => {
   const groups = ref<string[]>([])
 
   /**
-   * "Endpoints touching this model" — set when somebody arrives here from a
-   * model card rather than by opening the list.
-   */
-  const modelFilter = ref<string | null>(null)
-
-  /**
-   * Whether the active saved view narrows the endpoint list too.
+   * Which half of the table is on screen: `['web']`, `['api']`, or empty for
+   * both.
    *
-   * A view means "the billing models", and the endpoints touching them are part
-   * of that bounded context — so on by default, and one click from off.
+   * Held as a list rather than a nullable single value so it filters like every
+   * other facet, even though the switcher only ever sets one at a time.
    */
-  const scopeToView = ref(true)
+  const stacks = ref<string[]>([])
 
   const selectedId = ref<string | null>(null)
 
   const loaded = computed(() => status.value === 'ready')
 
-  /** The active view's membership, when it is meant to apply here. */
-  const viewModels = computed<string[] | null>(() => {
-    if (!scopeToView.value) return null
-    const members = useViewsStore().activeModels
-    return members ? [...members] : null
-  })
-
   /**
-   * One filter state assembled from the several controls that feed it. An
-   * explicit "show me this model's endpoints" is a deliberate act and outranks
-   * the ambient view scope.
+   * One filter state assembled from the controls that feed it.
+   *
+   * Nothing outside this surface narrows it. The active saved view scopes the
+   * graph, not the endpoint list: which models somebody grouped together says
+   * nothing about which endpoints they want to read, and a route quietly
+   * missing because of a selection made on another surface is the one failure
+   * an endpoint list must not have.
    */
   const filters = computed<RouteFilterState>(() => ({
     search: search.value,
     methods: methods.value,
     groups: groups.value,
-    models: modelFilter.value ? [modelFilter.value] : viewModels.value,
+    stacks: stacks.value,
   }))
 
   const visible = computed(() => filterRoutes(routes.value, filters.value))
@@ -78,32 +69,10 @@ export const useRoutesStore = defineStore('routes', () => {
     () => visible.value.find((r) => r.id === selectedId.value) ?? null,
   )
 
-  /** Models the selected endpoint touches — what the canvas rings. */
-  const highlightedModels = computed<string[]>(() => selected.value?.models ?? [])
-
   const stats = computed(() => ({
     total: routes.value.length,
     visible: visible.value.length,
   }))
-
-  /**
-   * How many endpoints touch each model, for the link on a model card.
-   *
-   * Computed once over the whole list rather than per card: the graph can hold
-   * a few hundred nodes, and each of them asking the same question of a few
-   * hundred routes is the same answer arrived at expensively.
-   */
-  const countByModel = computed(() => {
-    const counts: Record<string, number> = {}
-
-    for (const route of routes.value) {
-      for (const model of route.models) {
-        counts[model] = (counts[model] ?? 0) + 1
-      }
-    }
-
-    return counts
-  })
 
   function select(id: string | null) {
     selectedId.value = id
@@ -115,26 +84,38 @@ export const useRoutesStore = defineStore('routes', () => {
       : [...methods.value, method]
   }
 
+  /**
+   * The web/api switcher, which is a pick rather than a toggle: clicking the
+   * half already showing goes back to both, and picking one never leaves the
+   * other selected too.
+   */
+  function showStack(stack: string | null) {
+    stacks.value = stack === null || stacks.value.includes(stack) ? [] : [stack]
+  }
+
   function toggleGroup(group: string) {
     groups.value = groups.value.includes(group)
       ? groups.value.filter((g) => g !== group)
       : [...groups.value, group]
   }
 
-  /** Arriving from a model card: one model, and nothing else in the way. */
-  function filterByModel(model: string | null) {
-    modelFilter.value = model
-    search.value = ''
-    methods.value = []
-    groups.value = []
-    selectedId.value = null
+  /**
+   * Arriving from somewhere that named one endpoint — a job's list of what
+   * dispatches it.
+   *
+   * Filters are cleared first: landing on this surface with the endpoint you
+   * asked for filtered out of it is the one thing a link like this must not do.
+   */
+  function focusEndpoint(id: string) {
+    clearFilters()
+    selectedId.value = id
   }
 
   function clearFilters() {
     search.value = ''
     methods.value = []
     groups.value = []
-    modelFilter.value = null
+    stacks.value = []
   }
 
   function endpoint(): string {
@@ -204,21 +185,19 @@ export const useRoutesStore = defineStore('routes', () => {
     search,
     methods,
     groups,
-    modelFilter,
-    scopeToView,
+    stacks,
     selectedId,
     filters,
     visible,
     grouped,
     facets,
     selected,
-    highlightedModels,
     stats,
-    countByModel,
     select,
     toggleMethod,
     toggleGroup,
-    filterByModel,
+    showStack,
+    focusEndpoint,
     clearFilters,
     load,
     refresh,
