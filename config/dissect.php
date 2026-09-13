@@ -104,6 +104,28 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Providers
+    |--------------------------------------------------------------------------
+    |
+    | Directories scanned for service provider classes. `app/Providers` is the
+    | conventional home, not the only one — a package split into domains keeps
+    | a provider per domain, and a monorepo may keep them outside the
+    | application entirely.
+    |
+    | Relative paths resolve from the application base path, absolute paths are
+    | used as given, and a directory that is not there is skipped rather than
+    | reported as an error.
+    |
+    */
+
+    'providers' => [
+
+        'paths' => ['app/Providers'],
+
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Queue
     |--------------------------------------------------------------------------
     |

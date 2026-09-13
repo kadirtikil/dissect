@@ -93,6 +93,13 @@ class WorkbenchServiceProvider extends ServiceProvider
                 $root.'/workbench/app',
                 $root.'/workbench/routes',
             ],
+
+            // And again for the provider scan. The default 'app/Providers'
+            // resolves against the skeleton, whose copy holds a .gitkeep and
+            // nothing else.
+            'dissect.providers.paths' => [
+                $root.'/workbench/app/Providers',
+            ],
             // Workbench does not report the 'local' environment, and the viewer
             // is local-only by default.
             'dissect.enabled' => true,
