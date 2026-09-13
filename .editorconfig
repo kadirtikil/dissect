@@ -1,8 +1,25 @@
-[*.{js,jsx,mjs,cjs,ts,tsx,mts,cts,vue,css,scss,sass,less,styl}]
+root = true
+
+[*]
 charset = utf-8
-indent_size = 2
 indent_style = space
+indent_size = 4
 insert_final_newline = true
 trim_trailing_whitespace = true
 end_of_line = lf
+
+[*.{js,jsx,mjs,cjs,ts,tsx,mts,cts,vue,css,scss,sass,less,styl}]
+indent_size = 2
 max_line_length = 100
+
+[*.{json,json5,yml,yaml}]
+indent_size = 2
+
+[*.md]
+trim_trailing_whitespace = false
+
+[*.{php,blade.php}]
+indent_size = 4
+
+[composer.json]
+indent_size = 4
