@@ -1,5 +1,12 @@
 import type { Component } from 'vue'
-import { Activity, Boxes, House, Route, Timer } from '@lucide/vue'
+import {
+  Activity,
+  Boxes,
+  House,
+  Route,
+  Timer,
+  TreePine
+} from '@lucide/vue'
 
 /**
  * Every surface dissect has, in the order the sidebar lists them.
@@ -57,6 +64,12 @@ export const pages: readonly PageEntry[] = [
     icon: Activity,
     component: () => import('@/pages/QueuePanel.vue'),
   },
+  {
+    id: 'providertree',
+    label: 'Provider-Trees',
+    icon: TreePine,
+    component: () => import('@/pages/ProviderTrees.vue'),
+  }
 ]
 
 export function isPageId(value: unknown): value is PageId {
