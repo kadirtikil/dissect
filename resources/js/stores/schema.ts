@@ -15,6 +15,7 @@ import { useLayoutStore } from '@/stores/layout'
 import { useViewsStore } from '@/stores/views'
 import { useRoutesStore } from '@/stores/routes'
 import { useJobsStore } from '@/stores/jobs'
+import { useProviderStore } from '@/stores/provider'
 import { bootstrap } from '@/lib/bootstrap'
 
 type Status = 'idle' | 'loading' | 'ready' | 'error'
@@ -309,15 +310,18 @@ export const useSchemaStore = defineStore('schema', () => {
 
       const routes = useRoutesStore()
       const jobs = useJobsStore()
+      const providers = useProviderStore()
 
       try {
-        // Both of the derived surfaces walk a far wider tree than the model
-        // signal does, so each half is asked for only once somebody has
-        // actually opened the surface that needs it. A session on the graph
-        // asks for neither; a session on one asks for one.
-        const asked = [routes.loaded ? 'routes=1' : null, jobs.loaded ? 'jobs=1' : null].filter(
-          (part) => part !== null,
-        )
+        // The derived surfaces all walk a far wider tree than the model signal
+        // does, so each is asked for only once somebody has actually opened
+        // the surface that needs it. A session on the graph asks for none; a
+        // session on one asks for one.
+        const asked = [
+          routes.loaded ? 'routes=1' : null,
+          jobs.loaded ? 'jobs=1' : null,
+          providers.loaded ? 'providers=1' : null,
+        ].filter((part) => part !== null)
 
         const res = await fetch(asked.length ? `${url!}?${asked.join('&')}` : url!, {
           cache: 'no-store',
@@ -338,6 +342,13 @@ export const useSchemaStore = defineStore('schema', () => {
         // property to a job moves only this one.
         if (typeof payload?.jobs === 'string' && payload.jobs !== jobs.fingerprint) {
           await jobs.refresh()
+        }
+
+        // And the provider trees, which move when a provider does or when any
+        // constructor down a tree gains or loses a parameter — neither of which
+        // need touch a model, a route or a job.
+        if (typeof payload?.providers === 'string' && payload.providers !== providers.fingerprint) {
+          await providers.refresh()
         }
 
         if (typeof next !== 'string' || next === fingerprint.value) return
