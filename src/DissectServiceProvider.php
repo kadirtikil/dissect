@@ -13,6 +13,10 @@ use KdrDev\Dissect\Jobs\JobDiscovery;
 use KdrDev\Dissect\Jobs\JobExporter;
 use KdrDev\Dissect\Jobs\JobInspector;
 use KdrDev\Dissect\Jobs\RouteMap;
+use KdrDev\Dissect\ProviderTree\DependencyResolver;
+use KdrDev\Dissect\ProviderTree\ProviderExporter;
+use KdrDev\Dissect\ProviderTree\ProviderInspector;
+use KdrDev\Dissect\ProviderTree\ProviderReader;
 use KdrDev\Dissect\Queue\PayloadDecoder;
 use KdrDev\Dissect\Queue\QueueHistory;
 use KdrDev\Dissect\Queue\QueueReaderFactory;
@@ -153,6 +157,28 @@ class DissectServiceProvider extends ServiceProvider
             // mechanism, different question, so it must not be the same
             // instance.
             new RouteFingerprint((array) config('dissect.jobs.watch_paths', ['app', 'routes'])),
+        ));
+
+        $this->app->singleton(ProviderReader::class, fn () => new ProviderReader(
+            (array) config('dissect.providers.paths', ['app/Providers']),
+        ));
+
+        $this->app->singleton(ProviderInspector::class, fn (Application $app) => new ProviderInspector(
+            $app->make(ClassSource::class),
+        ));
+
+        $this->app->singleton(DependencyResolver::class, fn () => new DependencyResolver(
+            (int) config('dissect.providers.max_depth', 4),
+            (int) config('dissect.providers.max_nodes', 150),
+        ));
+
+        $this->app->singleton(ProviderExporter::class, fn (Application $app) => new ProviderExporter(
+            $app->make(ProviderReader::class),
+            $app->make(ProviderInspector::class),
+            $app->make(DependencyResolver::class),
+            // Constructed rather than resolved, for the same reason as the job
+            // half: same mechanism, its own directories.
+            new RouteFingerprint((array) config('dissect.providers.watch_paths', ['app'])),
         ));
 
         $this->app->singleton(PayloadDecoder::class, fn () => new PayloadDecoder);

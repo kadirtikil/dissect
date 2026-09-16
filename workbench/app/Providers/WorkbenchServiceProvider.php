@@ -100,6 +100,9 @@ class WorkbenchServiceProvider extends ServiceProvider
             'dissect.providers.paths' => [
                 $root.'/workbench/app/Providers',
             ],
+            'dissect.providers.watch_paths' => [
+                $root.'/workbench/app',
+            ],
             // Workbench does not report the 'local' environment, and the viewer
             // is local-only by default.
             'dissect.enabled' => true,

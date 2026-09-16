@@ -4,6 +4,7 @@ namespace KdrDev\Dissect\Tests\Feature;
 
 use Illuminate\Filesystem\Filesystem;
 use KdrDev\Dissect\ProviderTree\DependencyResolver;
+use KdrDev\Dissect\ProviderTree\ProviderExporter;
 use KdrDev\Dissect\ProviderTree\ProviderInspector;
 use KdrDev\Dissect\ProviderTree\ProviderReader;
 use KdrDev\Dissect\Tests\TestCase;
@@ -374,6 +375,84 @@ class ProvidersTest extends TestCase
     public function it_is_not_partial_when_everything_was_literal(): void
     {
         $this->assertFalse($this->describe(BindingServiceProvider::class)['partial']);
+    }
+
+    #[Test]
+    public function it_exports_every_provider_with_its_tree_inline(): void
+    {
+        $export = $this->app->make(ProviderExporter::class)->export();
+
+        $this->assertArrayHasKey('generated_at', $export);
+
+        $providers = array_column($export['providers'], null, 'id');
+        $archive = $providers[ArchiveServiceProvider::class];
+
+        $this->assertSame(ArchiveServiceProvider::class, $archive['class']);
+        $this->assertSame('ArchiveServiceProvider', $archive['name']);
+        $this->assertStringEndsWith('workbench/app/Providers/ArchiveServiceProvider.php', $archive['file']);
+
+        foreach (['provider', 'nodes', 'edges', 'side_effects', 'deferred', 'provides', 'partial', 'truncated'] as $key) {
+            $this->assertArrayHasKey($key, $archive);
+        }
+
+        // Resolved, not just inspected: the constructor hops are in the export.
+        $this->assertContains(
+            ArchiveStorage::class.'->'.ArchiveIndex::class.':injects',
+            array_column($archive['edges'], 'id'),
+        );
+
+        // Neither skipped provider sneaks in through the exporter.
+        $this->assertArrayNotHasKey('Workbench\App\Providers\AbstractDomainServiceProvider', $providers);
+    }
+
+    #[Test]
+    public function it_exports_providers_sorted_by_name(): void
+    {
+        $names = array_column($this->app->make(ProviderExporter::class)->export()['providers'], 'name');
+        $sorted = $names;
+        sort($sorted);
+
+        $this->assertSame($sorted, $names);
+    }
+
+    #[Test]
+    public function it_applies_the_configured_caps(): void
+    {
+        config(['dissect.providers.max_depth' => 2]);
+        $this->app->forgetInstance(DependencyResolver::class);
+        $this->app->forgetInstance(ProviderExporter::class);
+
+        $providers = array_column($this->app->make(ProviderExporter::class)->export()['providers'], null, 'id');
+
+        $this->assertTrue($providers[ArchiveServiceProvider::class]['truncated']);
+    }
+
+    #[Test]
+    public function its_fingerprint_is_stable_when_nothing_changes(): void
+    {
+        $exporter = $this->app->make(ProviderExporter::class);
+
+        $this->assertSame($exporter->fingerprint(), $exporter->fingerprint());
+    }
+
+    #[Test]
+    public function its_fingerprint_moves_when_a_constructor_down_the_tree_changes(): void
+    {
+        $exporter = $this->app->make(ProviderExporter::class);
+        $before = $exporter->fingerprint();
+
+        // Not a provider file: a service two hops below one. The tree changes
+        // when its signature does, so the signal has to watch it too.
+        $service = __DIR__.'/../../workbench/app/Services/ArchiveIndex.php';
+        $mtime = filemtime($service);
+        touch($service, time() + 60);
+        clearstatcache(true, $service);
+
+        try {
+            $this->assertNotSame($before, $exporter->fingerprint());
+        } finally {
+            touch($service, $mtime);
+        }
     }
 
     /** @return array<class-string, string> */
