@@ -36,6 +36,9 @@ abstract class TestCase extends BaseTestCase
             __DIR__.'/../workbench/app',
             __DIR__.'/../workbench/routes',
         ]);
+        $app['config']->set('dissect.providers.paths', [
+            __DIR__.'/../workbench/app/Providers',
+        ]);
         $app['config']->set('dissect.layout_path', $this->layoutPath($app));
         $app['config']->set('dissect.views_path', $app->basePath('.dissect-test/views.json'));
 
