@@ -35,4 +35,12 @@ enum EdgeKind: string
 
     /** A constructor parameter — the hop that turns a list of bindings into a tree. */
     case Injects = 'injects';
+
+    /**
+     * A helper method on the provider, called from `register()` or `boot()`.
+     *
+     * Not followed: whatever it binds is reported as unresolved rather than
+     * guessed at, so the arrow says where the reader stopped.
+     */
+    case Calls = 'calls';
 }

@@ -27,10 +27,18 @@ final readonly class ProviderEdge
         public ?string $consumer = null,
     ) {}
 
-    /** A stable identity for the arrow, so the frontend does not have to invent one. */
+    /**
+     * A stable identity for the arrow, so the frontend does not have to invent one.
+     *
+     * The consumer is part of it: `when(A)` and `when(B)` overriding the same
+     * contract with the same concrete are two arrows, and an id without the
+     * consumer would collapse them into one.
+     */
     public function id(): string
     {
-        return $this->source.'->'.$this->target.':'.$this->kind->value;
+        $id = $this->source.'->'.$this->target.':'.$this->kind->value;
+
+        return $this->consumer === null ? $id : $id.'@'.$this->consumer;
     }
 
     /**

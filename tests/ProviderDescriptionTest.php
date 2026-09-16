@@ -63,7 +63,7 @@ class ProviderDescriptionTest extends PhpUnitTestCase
             ],
             'edges' => [
                 [
-                    'id' => 'App\Providers\ReportServiceProvider->App\Contracts\ReportRenderer:contextual',
+                    'id' => 'App\Providers\ReportServiceProvider->App\Contracts\ReportRenderer:contextual@App\Services\ReportMailer',
                     'source' => 'App\Providers\ReportServiceProvider',
                     'target' => 'App\Contracts\ReportRenderer',
                     'kind' => 'contextual',
