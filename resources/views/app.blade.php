@@ -33,6 +33,7 @@
                  fetched when somebody opens it. --}}
             routesUrl: @json(route('dissect.routes')),
             jobsUrl: @json(route('dissect.jobs')),
+            providersUrl: @json(route('dissect.providers')),
             {{-- Runtime state rather than a description of code, so this one is
                  polled rather than fetched once. --}}
             queueUrl: @json(route('dissect.queue')),

@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Cache;
 use KdrDev\Dissect\Exceptions\StateFileException;
 use KdrDev\Dissect\Jobs\JobExporter;
 use KdrDev\Dissect\LayoutRepository;
+use KdrDev\Dissect\ProviderTree\ProviderExporter;
 use KdrDev\Dissect\Queue\QueueSnapshot;
 use KdrDev\Dissect\Routes\RouteExporter;
 use KdrDev\Dissect\SchemaExporter;
@@ -24,10 +25,13 @@ class DissectController
 
     protected ?string $jobFingerprint = null;
 
+    protected ?string $providerFingerprint = null;
+
     public function __construct(
         protected SchemaExporter $exporter,
         protected RouteExporter $routes,
         protected JobExporter $jobs,
+        protected ProviderExporter $providers,
         protected QueueSnapshot $queue,
         protected LayoutRepository $layout,
         protected ViewRepository $views,
@@ -78,6 +82,12 @@ class DissectController
             $payload['jobs'] = $this->jobFingerprint();
         }
 
+        // And again for the provider trees, whose signal watches all of `app`
+        // because a constructor anywhere down a tree can change it.
+        if ($request->boolean('providers')) {
+            $payload['providers'] = $this->providerFingerprint();
+        }
+
         // The whole point is to see the current value; a cached 200 would make
         // the page believe nothing had changed for as long as the browser
         // decided to hold on to it.
@@ -123,6 +133,20 @@ class DissectController
     {
         return response()
             ->json($this->jobs() + ['fingerprint' => $this->jobFingerprint()])
+            ->header('Cache-Control', 'no-store');
+    }
+
+    /**
+     * The provider list, every tree inline.
+     *
+     * One payload rather than a list plus one request per provider: a tree is
+     * a few dozen nodes at most, the caps keep it that way, and selecting a
+     * provider should not be a round trip.
+     */
+    public function providersJson(): JsonResponse
+    {
+        return response()
+            ->json($this->providers() + ['fingerprint' => $this->providerFingerprint()])
             ->header('Cache-Control', 'no-store');
     }
 
@@ -308,6 +332,25 @@ class DissectController
             'dissect.jobs.'.$this->jobFingerprint(),
             now()->addHour(),
             fn () => $this->jobs->export(),
+        );
+    }
+
+    protected function providerFingerprint(): string
+    {
+        return $this->providerFingerprint ??= $this->providers->fingerprint();
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function providers(): array
+    {
+        // Every provider parsed and every constructor down its tree reflected —
+        // cached on the signal like the other source-derived surfaces.
+        return Cache::remember(
+            'dissect.providers.'.$this->providerFingerprint(),
+            now()->addHour(),
+            fn () => $this->providers->export(),
         );
     }
 

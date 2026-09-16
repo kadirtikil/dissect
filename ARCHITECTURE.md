@@ -128,12 +128,13 @@ both:
                         │
   RouteExporter ────────┤ (fetched on demand)  public/routes.json
   JobExporter ──────────┤ (fetched on demand)  public/jobs.json
+  ProviderExporter ─────┤ (fetched on demand)  public/providers.json
   QueueSnapshot ────────┘ (polled, never cached) public/queue.json
 ```
 
-`routes.json` and `jobs.json` are the odd ones out: only their URLs are inlined,
-and each payload is fetched the first time somebody opens the surface that needs
-it. See "Routes" and "Jobs" below.
+`routes.json`, `jobs.json` and `providers.json` are the odd ones out: only their
+URLs are inlined, and each payload is fetched the first time somebody opens the
+surface that needs it. See "Routes", "Jobs" and "Providers" below.
 
 `resources/js/lib/bootstrap.ts` is that seam. It returns whatever the server
 inlined, or an empty object; every consumer treats the fields as optional and
@@ -170,6 +171,12 @@ DissectServiceProvider    wiring; registers routes only when enabled
   │     ├── DispatchScanner     php-parser: every place a job is put on the queue
   │     ├── RouteMap            a dispatch site's surroundings → a route id
   │     └── ProjectPath         the one spelling of a path both sides join on
+  ├── ProviderExporter        orchestrates: read → inspect → resolve
+  │     ├── ProviderReader      concrete ServiceProvider subclasses under providers.paths
+  │     ├── ProviderInspector   register()/boot() as syntax, $bindings by reflection
+  │     ├── DependencyResolver  bound concretes → their constructors, breadth-first, capped
+  │     ├── TreeBuilder         nodes and edges keyed by id while a tree is read
+  │     └── RouteFingerprint    its own instance, over providers.watch_paths
   ├── QueueSnapshot           what is on the queue *right now* — never cached
   │     ├── QueueReaderFactory  driver → a reader, or the reason there isn't one
   │     │     ├── DatabaseQueueReader  three predicates over the jobs table
@@ -226,11 +233,20 @@ directories. It may move when nothing visible changed — which costs a cache
 miss — but it must never sit still when something did, because that is a stale
 page nobody knows is stale.
 
-Both are also **only computed when asked for**. `/fingerprint` returns the route
-half only for `?routes=1` and the job half only for `?jobs=1`, which the client
-sends once the surface in question has been opened. A session that stays on the
-graph never pays for either walk, and a session on one of them never pays for
-the other.
+The provider trees have a fifth, on the same mechanism again:
+
+| Half of the graph | Comes from | Signal |
+|---|---|---|
+| Providers | provider files, and every class a tree can reach through a constructor | newest mtime + file count across `providers.watch_paths` |
+
+It defaults to all of `app` rather than `app/Providers`, because a tree changes
+when a constructor three hops below a provider gains a parameter.
+
+All three are also **only computed when asked for**. `/fingerprint` returns the
+route half only for `?routes=1`, the job half only for `?jobs=1` and the
+provider half only for `?providers=1`, which the client sends once the surface
+in question has been opened. A session that stays on the graph never pays for
+any of those walks, and a session on one of them never pays for the others.
 
 The client polls `/fingerprint` every 3s (paused while the tab is hidden,
 checked immediately when it returns) and re-fetches `schema.json` when the value
@@ -438,6 +454,64 @@ A job with an empty `dispatched_by` is reported as exactly that — no site was
 found — which is either dead code or a dynamic dispatch, and the surface must
 not claim to know which.
 
+### Providers
+
+The provider trees answer the question a provider file leaves open: what does
+this actually wire together, and what does that pull in. Same kind of surface as
+the job list — derived from source, cached against a file-stat signal, fetched
+when opened — with the tree for every provider inline in one payload, because
+the caps keep a tree to a few dozen nodes and selecting one should not be a
+round trip.
+
+**Found by type, not by folder.** `providers.paths` says where to look; being a
+concrete `ServiceProvider` subclass decides what counts, so an abstract base
+provider or a helper kept in the directory is skipped. The class is read from the
+file's own `namespace` line through `Support\ClassFile`, the tokeniser the job
+scan uses. Framework and package providers are out of scope on purpose: the
+loaded-provider list runs into the hundreds and is nearly all vendor code, which
+is a separate surface with its own switch, not a longer version of this one.
+
+**Read, never booted.** `ProviderInspector` walks `register()` and `boot()` with
+`Routes\Ast\ClassSource` and recognises the container calls by shape:
+`bind`/`singleton`/`scoped`/`instance` (and their `…If` forms),
+`when()->needs()->give()` found from its last link, `register()`, and
+`make()`/`resolve()`/`app()` with a literal. `$bindings` and `$singletons` are
+read by reflection, since a property default is a constant expression and the
+value is exactly what was written. `provides()` is read with
+`ClassSource::returnedArray()`, the same helper a job's `backoff()` goes through.
+
+**Contract and concrete are two nodes.** A binding draws as provider → contract →
+concrete; a class bound to itself is one node. A node's id is its container name,
+so a contract bound by the provider and type-hinted by one of its concretes is
+one box with two arrows into it — `TreeBuilder` dedupes by id, keeping the
+shallowest depth and the firmest confidence. An edge id includes the contextual
+consumer, so `when(A)` and `when(B)` overriding one contract stay two arrows.
+
+**What cannot be read is drawn, not dropped.** A container call whose argument is
+a variable, a loop, or a call to a helper method the application wrote becomes an
+`unresolved` node labelled with the code as written. `partial` is derived from
+those nodes rather than stored, so it cannot disagree with the tree.
+
+**Constructors are followed by reflection only.** `DependencyResolver` starts from
+every app-owned concrete in the tree and reads constructor parameters: a class
+type becomes an `injects` edge, an interface continues through what *this*
+provider bound it to (and is a leaf if it bound nothing), a union, intersection
+or required untyped parameter is an unresolved leaf, and a scalar is
+configuration and left out. It is breadth-first with one expanded set per tree
+rather than a visited set per branch: a class's constructor says the same thing
+wherever it is reached from, BFS expands it from its shallowest depth, and
+"expanded once" is also what closes a cycle — the arrow back is drawn and the
+walk does not go round again. Framework and vendor classes are drawn and not
+expanded. `max_depth` and `max_nodes` cap it and set `truncated`, which is kept
+apart from `partial`: one says something was unreadable, the other that the walk
+was cut on purpose.
+
+**A registered provider is read into the same tree.** `TreeBuilder::within()`
+makes depths relative to the registered provider's node and arrows leave from it,
+so the inspector reads a nested provider exactly as it reads the root. Each
+provider is read once per tree, which also ends a registration cycle. Side
+effects, `deferred` and `provides` stay facts about the root.
+
 ### The queue
 
 Everything above is derived from source: cached against a file-stat signal,
@@ -507,6 +581,11 @@ main.ts                 mounts App; no router (see "Decisions")
     │   ├── RouteList      grouped by controller, collapsible
     │   └── RouteDetail    verbs, middleware, params, request, response
     │       └── FieldTree  a flat path list rendered as a tree
+    ├── ProviderTreePanel  list ▏ canvas
+    │   ├── ProviderFilters   search, with a visible/total count
+    │   ├── ProviderList      name, partial and deferred markers
+    │   └── ProviderTree      its own Vue Flow instance, laid out by providerLayout
+    │       └── ProviderNode  kind, origin, confidence, badges; opens to the doc block
     ├── JobsPanel       list ▏ detail
     │   ├── JobFilters     search + kind/queue chips, and the undispatched count
     │   ├── JobList        grouped by queue, collapsible
@@ -519,6 +598,7 @@ stores/layout.ts        saved positions, debounce, prune, persist
 stores/views.ts         saved views, active view, persist
 stores/routes.ts        lazy load, filter state, selection
 stores/jobs.ts          the same, for the queue surface
+stores/provider.ts      lazy load, search, selection, which cards are open
 stores/queue.ts         the odd one: polled runtime state, nothing to cache
 stores/navigation.ts    which page is open: fragment, then storage, then default
 pages/registry.ts       every page there is — the one file a new surface is added to
@@ -529,6 +609,9 @@ lib/httpMethods.ts      verb → colour, on the same ramp
 lib/routeFilters.ts     pure predicates + facet counts (the unit-tested part)
 lib/jobFilters.ts       the same shape again: queue bucketing, facets, grouping
 lib/jobKinds.ts         kind → colour, on the same ramp; and how a queue was named
+lib/providerFilters.ts  search across a provider and every class in its tree
+lib/providerLayout.ts   tiers from the server's depth; order by parents' height
+lib/providerKinds.ts    node/edge kind → colour; confidence → dash
 lib/elapsed.ts          "2m ago" / "in 4h" — a queue is read in relative time
 lib/bootstrap.ts        the host seam
 ```
@@ -760,6 +843,50 @@ closure the way the routes surface does, and the line addresses the call.
 Like `routes.json` there is no authored counterpart: jobs are entirely derived,
 so nothing is committed and nothing has to be sanitised on write.
 
+### `providers.json` (generated — never hand-edited, never written)
+
+```jsonc
+{
+  "providers": [{
+    "id": "App\\Providers\\DocumentServiceProvider",   // the FQCN
+    "class": "App\\Providers\\DocumentServiceProvider",
+    "name": "DocumentServiceProvider",
+    "file": "app/Providers/DocumentServiceProvider.php",
+    "provider": "App\\Providers\\DocumentServiceProvider", // id of the root node
+    "nodes": [{                           // the root first, then in the order reached
+      "id": "App\\Contracts\\ImageRenderer",  // container name — a class, or a key like "search.batch"
+      "kind": "contract",                 // provider | contract | concrete | unresolved
+      "label": "ImageRenderer",           // code as written, for an unresolved node
+      "origin": "app",                    // app | framework | vendor | none (a key, or unresolved)
+      "depth": 1,                         // shallowest hop from the provider — the layout tier
+      "confidence": "certain",            // certain | inferred | unknown
+      "class": "App\\Contracts\\ImageRenderer",
+      "file": "app/Contracts/ImageRenderer.php",  // app classes only
+      "summary": null                     // first line of the doc block
+    }],
+    "edges": [{
+      "id": "App\\Contracts\\ImageRenderer->App\\Documents\\VipsImageRenderer:contextual@App\\Jobs\\RenderThumbnail",
+      "source": "App\\Contracts\\ImageRenderer",
+      "target": "App\\Documents\\VipsImageRenderer",
+      "kind": "contextual",               // bind | singleton | scoped | instance | contextual
+                                          // | registers | resolves | injects | calls
+      "confidence": "certain",
+      "consumer": "App\\Jobs\\RenderThumbnail"  // contextual only: who has to be asking
+    }],
+    "side_effects": { "events": 1, "gates": 3 },  // counts, root only
+    "deferred": false,
+    "provides": [],                       // what a deferred provider promises
+    "partial": false,                     // derived: any unresolved node
+    "truncated": false                    // a depth or node cap cut the walk
+  }],
+  "generated_at": "…",
+  "fingerprint": "…"
+}
+```
+
+Edge ids are the frontend's too: Vue Flow drops edges with duplicate ids
+silently, and the consumer is part of the id for exactly that reason.
+
 ### `queue.json` (runtime state — never cached, never written)
 
 ```jsonc
@@ -870,7 +997,7 @@ are running. `tests/StateVersioningTest.php` pins all of it.
 | **Routes local-only by default** | It exposes the full schema and writes a file. The gate is `APP_ENV`, not install-time: the provider is auto-discovered and boots wherever the package is installed, so `middleware` is the control that holds when the environment check does not |
 | **A newer state file is never overwritten** | Both authored files are rewritten in full and sanitised on read, so saving over a format this version does not understand is silent data loss. Refusing has to ship *before* the format changes to be worth anything |
 | **Relations folded into 4 families** | Eloquent has ~11 relation types; a categorical palette cannot carry that many. Polymorphic is also dashed, so family is never colour-alone |
-| **Edge labels hidden until hover** | 75 labels at fit-view zoom is noise, not information |
+| **Edge labels hidden until hover** | 75 labels at fit-view zoom is noise, not information. The provider canvas overrides it: a tree is capped small, and a label is the only thing telling a contextual override from the default beside it |
 | **Views hold membership, not positions** | One position per model means switching views never rearranges the board, and `layout.json` keeps a single writer |
 | **Expanded nodes float rather than re-flow** | The grid is a pure function of node index; growing a card in place would move every model below it out from under the cursor |
 | **Routes are a panel, not nodes on the canvas** | A real application has far more endpoints than models, and a payload shape is a tree — it reads badly as a graph node and well in a pane |
@@ -890,6 +1017,13 @@ are running. `tests/StateVersioningTest.php` pins all of it.
 | **The payload is never reported** | The envelope is safe to describe; the command is argument values and model ids that nobody decided to put on a page |
 | **An unreadable driver is reported with its reason** | Two of Laravel's drivers can be enumerated and the rest cannot. Showing an empty queue for SQS would be a lie about an empty queue — and the same rule applies to a failed job store that cannot be read |
 | **`records_completions` is on the wire** | Laravel records nothing about a job that succeeded. An empty history means nothing failed, and the client should not have to know that on its own |
+| **Provider trees are read, never booted** | Registering a provider to see what it binds connects whatever its singletons connect to and merges its config into the running app. What cannot be read statically is drawn as an unresolved node instead |
+| **Constructors are followed by reflection only, and stop at vendor code** | A signature is a declaration; resolving it from the container would construct the class. Walking into `Illuminate\*` costs a reflection per level for something nobody is debugging |
+| **Depth and node caps, with `truncated` on the wire** | The export runs for every provider on a cache miss, and a large application's constructor graph is not bounded by anything else. A tree cut by a cap says so rather than looking complete |
+| **Contract and concrete are separate nodes** | The name somebody type-hints and the class they get are the only interesting facts about a binding; drawing one box for both loses the difference |
+| **A contract the provider does not bind is a leaf** | Another provider decides it, and naming which would report the running container as a static fact |
+| **Side effects are badges, not edges** | Drawn as arrows, events, gates and config merges outnumber the dependencies and bury them; dropped entirely, a provider made only of them renders as an empty tree |
+| **Provider trees are laid out by hand, not by a layout library** | The server's `depth` already is the tier a tree layout computes; the rest is one ordering pass, and the canvas stays a pure function of the payload |
 | **Highlight is not selection** | Canvas selection is a gesture that feeds view membership; opening an endpoint must not quietly change what a new view would contain |
 
 ---
@@ -906,8 +1040,9 @@ $this->app->bind(ColumnNormalizer::class, MyColumnNormalizer::class);
 
 Config (`config/dissect.php`): `enabled`, `path`, `middleware`,
 `models_path`, `models_namespace`, `layout_path`, `views_path`,
-`routes.watch_paths`, `jobs.paths`, `jobs.watch_paths`, `queue.rows`,
-`queue.poll_interval`.
+`routes.watch_paths`, `jobs.paths`, `jobs.watch_paths`, `providers.paths`,
+`providers.max_depth`, `providers.max_nodes`, `providers.watch_paths`,
+`queue.rows`, `queue.poll_interval`.
 
 ---
 
@@ -948,6 +1083,14 @@ Config (`config/dissect.php`): `enabled`, `path`, `middleware`,
 | Support another way of queueing something | `src/Jobs/DispatchScanner.php` — `DISPATCH_METHODS`, or the `new` rule |
 | Change how a dispatch site links to an endpoint | `src/Jobs/RouteMap.php`, `src/Jobs/ProjectPath.php` |
 | Change what counts as a job change | `jobs.watch_paths` in config |
+| Change where providers are found | `providers.paths` in config, then `src/ProviderTree/ProviderReader.php` |
+| Support another way of binding something | `src/ProviderTree/ProviderInspector.php` — `BINDINGS`, `RESOLUTIONS` |
+| Recognise another provider side effect | `PROVIDER_EFFECTS` / `FACADE_EFFECTS` in `ProviderInspector.php`, `src/ProviderTree/SideEffect.php` |
+| Change how far a tree follows constructors | `providers.max_depth` / `max_nodes`, then `src/ProviderTree/DependencyResolver.php` |
+| Change what counts as a provider change | `providers.watch_paths` in config |
+| Change how a provider tree is laid out | `resources/js/lib/providerLayout.ts` |
+| Change provider node/edge colours or dashes | `resources/js/lib/providerKinds.ts` |
+| Change what a provider card shows | `resources/js/components/provider-tree/tree/ProviderNode.vue` |
 | Change the theme | `resources/js/assets/main.css` (tokens), `vue-flow-theme.css` (canvas) |
 | Change the page shell | `resources/views/app.blade.php` |
 
@@ -963,9 +1106,9 @@ Config (`config/dissect.php`): `enabled`, `path`, `middleware`,
 - `stores/routes.ts` mixes loading, filter state and selection, but the pure
   parts are already out in `lib/routeFilters.ts` and unit-tested — which is the
   shape `stores/schema.ts` still wants.
-- **Frontend unit tests are thin.** `lib/routeFilters.spec.ts` and
-  `lib/jobFilters.spec.ts` are the two; the Playwright suite in `e2e/` is what
-  covers the rest.
+- **Frontend unit tests are thin.** They cover the pure `lib/` modules — route,
+  job and provider filters, route sections, the provider layout, elapsed time;
+  the Playwright suite in `e2e/` is what covers the rest.
 - Only two drivers have been exercised against a real database (Postgres, via
   `echodms`); the others are covered by string-level checks only.
 - **Route parameter binding is read from type hints only.** An explicit
@@ -1000,6 +1143,22 @@ Config (`config/dissect.php`): `enabled`, `path`, `middleware`,
 - **`DispatchScanner` parses every PHP file under `jobs.watch_paths`**, where
   the route fingerprint only stats them. It is the widest walk the package does,
   which is why the payload is fetched on open and cached against the signal.
+- **A binding built dynamically is only half-seen.** A loop over an array, a
+  class string in a variable, or a binding in a helper method on the provider is
+  drawn as an unresolved node, not followed. Following `$this->helper()` calls
+  within the same class would recover the last of those cheaply; it is not done.
+- **A closure binding is read only when it does nothing but `new` one class.**
+  Anything more — a factory call, a `make()` inside — leaves the concrete
+  unresolved.
+- **`provides()` is not compared against what `register()` binds.** Both are on
+  the wire; a deferred provider promising something it never binds is not
+  flagged.
+- **Provider trees draw two overlapping arrows** when a provider binds a contract
+  and also overrides it contextually — both provider → contract edges share a
+  path, so only one label is readable there. Arrows between two nodes in the
+  same tier curve out past the card and back.
+- **`ClassSource` lives in `Routes\Ast`** though jobs and providers both use it.
+  Moving it is out of scope for either surface.
 - The route fingerprint stats every PHP file under `routes.watch_paths`. On a
   large `app/` that is thousands of stats per check — cheap, but not free, and
   the config exists because narrowing it is sometimes the right answer.

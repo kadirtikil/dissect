@@ -15,6 +15,7 @@ so your team sees the same picture.
 - 🛣️ Switch to **Routes** for your HTTP surface — every endpoint, what it accepts and what it returns.
 - ⏱️ Switch to **Jobs** for everything that reaches a worker — which queue it lands on, how hard it retries, what it carries, and the endpoint that dispatches it.
 - 📡 Switch to **Queue** for what is on it *right now* — waiting, running, due next, and what failed. Live, polled, and never cached.
+- 🌲 Switch to **Providers** for what each service provider binds and what that pulls in — contract, concrete, and the constructors behind it, read from source and drawn as a tree.
 
 ## 🚀 Quick start
 
@@ -94,6 +95,10 @@ The rest are config-file only:
 - **`routes.watch_paths`** — defaults to `['app', 'routes']`. Which directories are watched to notice that the endpoint list has gone stale. Narrow it to the directories that actually hold HTTP code if your `app/` is large.
 - **`jobs.paths`** — defaults to `['app/Jobs', 'app/Listeners', 'app/Mail', 'app/Notifications']`. Where queueable classes are looked for. There is no namespace setting to match: each class is read from the `namespace` line in its own file, so an unconventional layout just needs the directory adding.
 - **`jobs.watch_paths`** — defaults to `['app', 'routes']`. Where dispatch sites are looked for, and the change signal for the job list. This is the widest walk the package does — every file is *parsed*, not just stat'd — so narrowing it is worth more here than anywhere else.
+- **`providers.paths`** — defaults to `['app/Providers']`. Where service providers are looked for. Anything in there that is a concrete `ServiceProvider` subclass counts; an abstract base provider or a helper kept beside them does not.
+- **`providers.max_depth`** — defaults to `4`. How many hops from the provider a tree follows constructors before it stops and says so.
+- **`providers.max_nodes`** — defaults to `150`. A hard cap on one tree, for the export cost on a large application rather than for the drawing.
+- **`providers.watch_paths`** — defaults to `['app']`. The change signal for the provider trees. Wider than `providers.paths` on purpose: a tree changes when a constructor anywhere down it does.
 - **`queue.rows`** — defaults to `50`. How many jobs each section of the live queue lists. The counts are always exact: a queue 40,000 deep reports 40,000 and shows you the first page.
 - **`queue.poll_interval`** — defaults to `5000` (ms). How often the queue tab re-reads while it is open.
 
@@ -320,14 +325,54 @@ their `__wakeup`, and on a `SerializesModels` job go to the database for every
 model it carries; a tool that describes a queue must not be able to change one.
 Only the JSON envelope is read, and the payload itself is never put on the page.
 
+## 🌲 Providers
+
+The **Providers** tab reads each service provider in your application and draws
+what it decides: the contracts it binds, what they resolve to, and — following
+constructor type-hints — what those classes need in turn.
+
+```
+DocumentServiceProvider ── singleton ──▶ TextExtractor ── singleton ──▶ TikaTextExtractor
+        │                                                                     │ injects
+        ├── bind ────────▶ ImageRenderer ── bind ──▶ ImagickRenderer          ▼
+        │                        │                                      VersionStore
+        └── contextual ──────────┘── contextual · when RenderThumbnail ──▶ VipsImageRenderer
+```
+
+- 🧩 Contracts and the classes they resolve to are separate boxes — the difference between what somebody asks for and what they get is the whole point of a binding.
+- 🎯 `when()->needs()->give()` is drawn beside the default it overrides, labelled with who has to be asking.
+- 🔗 A provider that registers another continues into that provider's bindings rather than stopping at its name.
+- 🏷️ Side effects — events, gates, config, publishes, migrations, routes, views, commands — are counted as badges on the provider, not drawn as arrows that would bury the dependencies.
+- 〰️ The line says how sure it is: solid for what is written literally, dashed for what a constructor implied, dotted for what could not be read.
+- 🔎 Search matches a class anywhere in a tree, so "which provider wires up the transcoder?" is one word.
+
+### 🕳️ What it cannot see
+
+Nothing is booted to find this out — registering a provider to watch what it
+binds would connect whatever its singletons connect to. So only what is written
+literally can be named. A binding built in a loop, a class name in a variable,
+or a binding tucked into a helper method is still *seen*, and shows up as a
+dotted "unresolved" box with the code as written, under a banner saying the tree
+is not fully analysed. A tree cut short by `max_depth` or `max_nodes` says that
+too.
+
+The walk stops at framework and package code: `Illuminate\Filesystem\Filesystem`
+gets a box, and its own constructor is not read. A contract your provider type-
+hints but does not bind is a leaf — some other provider decides it, and guessing
+which would be reporting the running container as a fact about your source.
+
+Only your own providers are listed. `bootstrap/providers.php` and the providers
+packages register run into the hundreds and are nearly all vendor code.
+
 ## 🔍 How it works
 
 - **Schema** is built by `SchemaExporter` from Laravel's `ModelInspector` and cached against a fingerprint of your models directory, so the reflection and schema queries run once per model-file change rather than once per request.
 - **Routes** are read from the router itself; the request and response shapes behind them are read from your source with [nikic/php-parser](https://github.com/nikic/PHP-Parser), never by executing it. Cached against its own fingerprint, and only computed once you open the tab.
 - **Jobs** are found by interface across the configured directories, then every file under `jobs.watch_paths` is parsed for the places each one is dispatched — again read, never run. Its own fingerprint, its own cache, and only computed once you open the tab.
+- **Providers** are found by type across `providers.paths`; `register()` and `boot()` are parsed, `$bindings`/`$singletons` read by reflection, and constructors followed by reflection only — never resolved, never instantiated. Its own fingerprint over `providers.watch_paths`, its own cache, and only computed once you open the tab.
 - **The queue** is the one thing here that is not derived from your source, so it is the one thing that is never cached: `queue.json` is read on every request and the page polls it while it is open.
 - **The page** inlines schema, layout and views into the initial HTML, so it makes no XHR on boot.
-- **Live updates** work by polling that fingerprint — edit a model, and the graph refreshes without a file watcher. Edit a controller or a form request, and the endpoint list does the same; add a dispatch, and so does the job list.
+- **Live updates** work by polling that fingerprint — edit a model, and the graph refreshes without a file watcher. Edit a controller or a form request, and the endpoint list does the same; add a dispatch, and so does the job list; change a provider or a constructor under it, and so do the provider trees.
 - **Assets** are served straight from the package's `dist/` directory by a route with an allow-list of two filenames. Nothing to publish, nothing to re-publish after an upgrade.
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for the full design.

@@ -1,0 +1,393 @@
+{
+  "providers": [
+    {
+      "id": "App\\Providers\\AppServiceProvider",
+      "class": "App\\Providers\\AppServiceProvider",
+      "name": "AppServiceProvider",
+      "file": "app/Providers/AppServiceProvider.php",
+      "provider": "App\\Providers\\AppServiceProvider",
+      "nodes": [
+        {
+          "id": "App\\Providers\\AppServiceProvider",
+          "kind": "provider",
+          "label": "AppServiceProvider",
+          "origin": "app",
+          "depth": 0,
+          "confidence": "certain",
+          "class": "App\\Providers\\AppServiceProvider",
+          "file": "app/Providers/AppServiceProvider.php",
+          "summary": "Gates and listeners the whole application relies on."
+        }
+      ],
+      "edges": [],
+      "side_effects": {
+        "gates": 3,
+        "events": 1,
+        "config": 1
+      },
+      "deferred": false,
+      "provides": [],
+      "partial": false,
+      "truncated": false
+    },
+    {
+      "id": "App\\Providers\\DocumentServiceProvider",
+      "class": "App\\Providers\\DocumentServiceProvider",
+      "name": "DocumentServiceProvider",
+      "file": "app/Providers/DocumentServiceProvider.php",
+      "provider": "App\\Providers\\DocumentServiceProvider",
+      "nodes": [
+        {
+          "id": "App\\Providers\\DocumentServiceProvider",
+          "kind": "provider",
+          "label": "DocumentServiceProvider",
+          "origin": "app",
+          "depth": 0,
+          "confidence": "certain",
+          "class": "App\\Providers\\DocumentServiceProvider",
+          "file": "app/Providers/DocumentServiceProvider.php",
+          "summary": "Wires text extraction and thumbnail rendering for uploaded documents."
+        },
+        {
+          "id": "App\\Contracts\\TextExtractor",
+          "kind": "contract",
+          "label": "TextExtractor",
+          "origin": "app",
+          "depth": 1,
+          "confidence": "certain",
+          "class": "App\\Contracts\\TextExtractor",
+          "file": "app/Contracts/TextExtractor.php",
+          "summary": null
+        },
+        {
+          "id": "App\\Contracts\\ImageRenderer",
+          "kind": "contract",
+          "label": "ImageRenderer",
+          "origin": "app",
+          "depth": 1,
+          "confidence": "certain",
+          "class": "App\\Contracts\\ImageRenderer",
+          "file": "app/Contracts/ImageRenderer.php",
+          "summary": null
+        },
+        {
+          "id": "App\\Documents\\TikaTextExtractor",
+          "kind": "concrete",
+          "label": "TikaTextExtractor",
+          "origin": "app",
+          "depth": 2,
+          "confidence": "certain",
+          "class": "App\\Documents\\TikaTextExtractor",
+          "file": "app/Documents/TikaTextExtractor.php",
+          "summary": "Extracts searchable text with a local Apache Tika server."
+        },
+        {
+          "id": "App\\Documents\\ImagickRenderer",
+          "kind": "concrete",
+          "label": "ImagickRenderer",
+          "origin": "app",
+          "depth": 2,
+          "confidence": "certain",
+          "class": "App\\Documents\\ImagickRenderer",
+          "file": "app/Documents/ImagickRenderer.php",
+          "summary": null
+        },
+        {
+          "id": "App\\Documents\\VipsImageRenderer",
+          "kind": "concrete",
+          "label": "VipsImageRenderer",
+          "origin": "app",
+          "depth": 2,
+          "confidence": "certain",
+          "class": "App\\Documents\\VipsImageRenderer",
+          "file": "app/Documents/VipsImageRenderer.php",
+          "summary": null
+        },
+        {
+          "id": "App\\Documents\\VersionStore",
+          "kind": "concrete",
+          "label": "VersionStore",
+          "origin": "app",
+          "depth": 3,
+          "confidence": "inferred",
+          "class": "App\\Documents\\VersionStore",
+          "file": "app/Documents/VersionStore.php",
+          "summary": null
+        },
+        {
+          "id": "Illuminate\\Filesystem\\FilesystemManager",
+          "kind": "concrete",
+          "label": "FilesystemManager",
+          "origin": "framework",
+          "depth": 4,
+          "confidence": "inferred",
+          "class": "Illuminate\\Filesystem\\FilesystemManager",
+          "file": null,
+          "summary": null
+        }
+      ],
+      "edges": [
+        {
+          "id": "App\\Providers\\DocumentServiceProvider->App\\Contracts\\TextExtractor:singleton",
+          "source": "App\\Providers\\DocumentServiceProvider",
+          "target": "App\\Contracts\\TextExtractor",
+          "kind": "singleton",
+          "confidence": "certain",
+          "consumer": null
+        },
+        {
+          "id": "App\\Contracts\\TextExtractor->App\\Documents\\TikaTextExtractor:singleton",
+          "source": "App\\Contracts\\TextExtractor",
+          "target": "App\\Documents\\TikaTextExtractor",
+          "kind": "singleton",
+          "confidence": "certain",
+          "consumer": null
+        },
+        {
+          "id": "App\\Providers\\DocumentServiceProvider->App\\Contracts\\ImageRenderer:bind",
+          "source": "App\\Providers\\DocumentServiceProvider",
+          "target": "App\\Contracts\\ImageRenderer",
+          "kind": "bind",
+          "confidence": "certain",
+          "consumer": null
+        },
+        {
+          "id": "App\\Contracts\\ImageRenderer->App\\Documents\\ImagickRenderer:bind",
+          "source": "App\\Contracts\\ImageRenderer",
+          "target": "App\\Documents\\ImagickRenderer",
+          "kind": "bind",
+          "confidence": "certain",
+          "consumer": null
+        },
+        {
+          "id": "App\\Providers\\DocumentServiceProvider->App\\Contracts\\ImageRenderer:contextual@App\\Jobs\\RenderThumbnail",
+          "source": "App\\Providers\\DocumentServiceProvider",
+          "target": "App\\Contracts\\ImageRenderer",
+          "kind": "contextual",
+          "confidence": "certain",
+          "consumer": "App\\Jobs\\RenderThumbnail"
+        },
+        {
+          "id": "App\\Contracts\\ImageRenderer->App\\Documents\\VipsImageRenderer:contextual@App\\Jobs\\RenderThumbnail",
+          "source": "App\\Contracts\\ImageRenderer",
+          "target": "App\\Documents\\VipsImageRenderer",
+          "kind": "contextual",
+          "confidence": "certain",
+          "consumer": "App\\Jobs\\RenderThumbnail"
+        },
+        {
+          "id": "App\\Documents\\TikaTextExtractor->App\\Documents\\VersionStore:injects",
+          "source": "App\\Documents\\TikaTextExtractor",
+          "target": "App\\Documents\\VersionStore",
+          "kind": "injects",
+          "confidence": "inferred",
+          "consumer": null
+        },
+        {
+          "id": "App\\Documents\\VersionStore->Illuminate\\Filesystem\\FilesystemManager:injects",
+          "source": "App\\Documents\\VersionStore",
+          "target": "Illuminate\\Filesystem\\FilesystemManager",
+          "kind": "injects",
+          "confidence": "inferred",
+          "consumer": null
+        }
+      ],
+      "side_effects": {},
+      "deferred": false,
+      "provides": [],
+      "partial": false,
+      "truncated": false
+    },
+    {
+      "id": "App\\Providers\\SearchServiceProvider",
+      "class": "App\\Providers\\SearchServiceProvider",
+      "name": "SearchServiceProvider",
+      "file": "app/Providers/SearchServiceProvider.php",
+      "provider": "App\\Providers\\SearchServiceProvider",
+      "nodes": [
+        {
+          "id": "App\\Providers\\SearchServiceProvider",
+          "kind": "provider",
+          "label": "SearchServiceProvider",
+          "origin": "app",
+          "depth": 0,
+          "confidence": "certain",
+          "class": "App\\Providers\\SearchServiceProvider",
+          "file": "app/Providers/SearchServiceProvider.php",
+          "summary": "Document search, loaded only when something asks for the index."
+        },
+        {
+          "id": "App\\Contracts\\SearchIndex",
+          "kind": "contract",
+          "label": "SearchIndex",
+          "origin": "app",
+          "depth": 1,
+          "confidence": "certain",
+          "class": "App\\Contracts\\SearchIndex",
+          "file": "app/Contracts/SearchIndex.php",
+          "summary": null
+        },
+        {
+          "id": "App\\Providers\\IndexingServiceProvider",
+          "kind": "provider",
+          "label": "IndexingServiceProvider",
+          "origin": "app",
+          "depth": 1,
+          "confidence": "certain",
+          "class": "App\\Providers\\IndexingServiceProvider",
+          "file": "app/Providers/IndexingServiceProvider.php",
+          "summary": null
+        },
+        {
+          "id": "App\\Search\\MeilisearchIndex",
+          "kind": "concrete",
+          "label": "MeilisearchIndex",
+          "origin": "app",
+          "depth": 2,
+          "confidence": "certain",
+          "class": "App\\Search\\MeilisearchIndex",
+          "file": "app/Search/MeilisearchIndex.php",
+          "summary": null
+        },
+        {
+          "id": "search.batch",
+          "kind": "contract",
+          "label": "search.batch",
+          "origin": "none",
+          "depth": 2,
+          "confidence": "certain",
+          "class": null,
+          "file": null,
+          "summary": null
+        },
+        {
+          "id": "App\\Search\\BatchWriter",
+          "kind": "concrete",
+          "label": "BatchWriter",
+          "origin": "app",
+          "depth": 3,
+          "confidence": "certain",
+          "class": "App\\Search\\BatchWriter",
+          "file": "app/Search/BatchWriter.php",
+          "summary": null
+        }
+      ],
+      "edges": [
+        {
+          "id": "App\\Providers\\SearchServiceProvider->App\\Contracts\\SearchIndex:singleton",
+          "source": "App\\Providers\\SearchServiceProvider",
+          "target": "App\\Contracts\\SearchIndex",
+          "kind": "singleton",
+          "confidence": "certain",
+          "consumer": null
+        },
+        {
+          "id": "App\\Contracts\\SearchIndex->App\\Search\\MeilisearchIndex:singleton",
+          "source": "App\\Contracts\\SearchIndex",
+          "target": "App\\Search\\MeilisearchIndex",
+          "kind": "singleton",
+          "confidence": "certain",
+          "consumer": null
+        },
+        {
+          "id": "App\\Providers\\SearchServiceProvider->App\\Providers\\IndexingServiceProvider:registers",
+          "source": "App\\Providers\\SearchServiceProvider",
+          "target": "App\\Providers\\IndexingServiceProvider",
+          "kind": "registers",
+          "confidence": "certain",
+          "consumer": null
+        },
+        {
+          "id": "App\\Providers\\IndexingServiceProvider->search.batch:scoped",
+          "source": "App\\Providers\\IndexingServiceProvider",
+          "target": "search.batch",
+          "kind": "scoped",
+          "confidence": "certain",
+          "consumer": null
+        },
+        {
+          "id": "search.batch->App\\Search\\BatchWriter:scoped",
+          "source": "search.batch",
+          "target": "App\\Search\\BatchWriter",
+          "kind": "scoped",
+          "confidence": "certain",
+          "consumer": null
+        }
+      ],
+      "side_effects": {},
+      "deferred": true,
+      "provides": [
+        "App\\Contracts\\SearchIndex"
+      ],
+      "partial": false,
+      "truncated": false
+    },
+    {
+      "id": "App\\Providers\\WorkspaceServiceProvider",
+      "class": "App\\Providers\\WorkspaceServiceProvider",
+      "name": "WorkspaceServiceProvider",
+      "file": "app/Providers/WorkspaceServiceProvider.php",
+      "provider": "App\\Providers\\WorkspaceServiceProvider",
+      "nodes": [
+        {
+          "id": "App\\Providers\\WorkspaceServiceProvider",
+          "kind": "provider",
+          "label": "WorkspaceServiceProvider",
+          "origin": "app",
+          "depth": 0,
+          "confidence": "certain",
+          "class": "App\\Providers\\WorkspaceServiceProvider",
+          "file": "app/Providers/WorkspaceServiceProvider.php",
+          "summary": null
+        },
+        {
+          "id": "App\\Workspaces\\WorkspaceResolver",
+          "kind": "concrete",
+          "label": "WorkspaceResolver",
+          "origin": "app",
+          "depth": 1,
+          "confidence": "certain",
+          "class": "App\\Workspaces\\WorkspaceResolver",
+          "file": "app/Workspaces/WorkspaceResolver.php",
+          "summary": null
+        },
+        {
+          "id": "unresolved:0",
+          "kind": "unresolved",
+          "label": "$this->app->bind($contract, $implementation)",
+          "origin": "none",
+          "depth": 1,
+          "confidence": "unknown",
+          "class": null,
+          "file": null,
+          "summary": null
+        }
+      ],
+      "edges": [
+        {
+          "id": "App\\Providers\\WorkspaceServiceProvider->App\\Workspaces\\WorkspaceResolver:resolves",
+          "source": "App\\Providers\\WorkspaceServiceProvider",
+          "target": "App\\Workspaces\\WorkspaceResolver",
+          "kind": "resolves",
+          "confidence": "certain",
+          "consumer": null
+        },
+        {
+          "id": "App\\Providers\\WorkspaceServiceProvider->unresolved:0:bind",
+          "source": "App\\Providers\\WorkspaceServiceProvider",
+          "target": "unresolved:0",
+          "kind": "bind",
+          "confidence": "unknown",
+          "consumer": null
+        }
+      ],
+      "side_effects": {},
+      "deferred": false,
+      "provides": [],
+      "partial": true,
+      "truncated": true
+    }
+  ],
+  "generated_at": "2026-09-16T12:00:00+00:00",
+  "fingerprint": "e2e0fixture0prov"
+}

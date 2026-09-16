@@ -1,5 +1,12 @@
-import type { Component } from 'vue'
-import { Activity, Boxes, House, Route, Timer } from '@lucide/vue'
+import type { LucideIcon } from '@lucide/vue'
+import {
+  Activity,
+  Boxes,
+  House,
+  Route,
+  Timer,
+  TreePine
+} from '@lucide/vue'
 
 /**
  * Every surface dissect has, in the order the sidebar lists them.
@@ -8,12 +15,12 @@ import { Activity, Boxes, House, Route, Timer } from '@lucide/vue'
  * the sidebar, the navigation store and the shell all pick it up. None of them
  * knows any page by name.
  */
-export type PageId = 'landing' | 'models' | 'routes' | 'jobs' | 'queue'
+export type PageId = 'landing' | 'models' | 'routes' | 'jobs' | 'queue' | 'providertree'
 
 export interface PageEntry {
   id: PageId
   label: string
-  icon: Component
+  icon: LucideIcon
   /**
    * True for a page the shell keeps alive for the whole session rather than
    * mounting through this registry.
@@ -28,7 +35,7 @@ export interface PageEntry {
    * Lazily imported, so a page nobody opens costs nothing but an unfetched
    * chunk. Absent on a `persistent` entry, which the shell holds directly.
    */
-  component?: () => Promise<{ default: Component }>
+  component?: () => Promise<{ default: any}>
 }
 
 export const pages: readonly PageEntry[] = [
@@ -57,6 +64,12 @@ export const pages: readonly PageEntry[] = [
     icon: Activity,
     component: () => import('@/pages/QueuePanel.vue'),
   },
+  {
+    id: 'providertree',
+    label: 'Provider-Trees',
+    icon: TreePine,
+    component: () => import('@/pages/ProviderTreePanel.vue'),
+  }
 ]
 
 export function isPageId(value: unknown): value is PageId {

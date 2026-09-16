@@ -104,6 +104,44 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Providers
+    |--------------------------------------------------------------------------
+    |
+    | Directories scanned for service provider classes. `app/Providers` is the
+    | conventional home, not the only one — a package split into domains keeps
+    | a provider per domain, and a monorepo may keep them outside the
+    | application entirely.
+    |
+    | Relative paths resolve from the application base path, absolute paths are
+    | used as given, and a directory that is not there is skipped rather than
+    | reported as an error.
+    |
+    | Each provider's tree follows the classes it binds into their constructors,
+    | by reflection and never by resolving anything. `max_depth` is how many
+    | hops from the provider that walk goes, and `max_nodes` caps one tree
+    | outright; a tree cut by either says so. Both exist for the export cost on
+    | a large application, not for the drawing.
+    |
+    | `watch_paths` is the change signal. It is wider than `paths` because a
+    | tree changes when a constructor anywhere down it does, not only when a
+    | provider file is edited.
+    |
+    */
+
+    'providers' => [
+
+        'paths' => ['app/Providers'],
+
+        'max_depth' => 4,
+
+        'max_nodes' => 150,
+
+        'watch_paths' => ['app'],
+
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Queue
     |--------------------------------------------------------------------------
     |
