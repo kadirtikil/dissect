@@ -175,6 +175,17 @@
   opacity: 1;
 }
 
+/*
+ * Except on a provider tree. It is capped small, and there the label is the only
+ * thing telling a contextual override from the default binding beside it.
+ *
+ * Kept here rather than in ProviderTree.vue: a <style> block in a lazily loaded
+ * page is split into a second stylesheet, which the asset route does not serve.
+ */
+.provider-tree .vue-flow__edge-textwrapper {
+  opacity: 1;
+}
+
 .vue-flow__edge:hover .vue-flow__edge-path {
   /* Same inline-style override as the selected rule below. */
   stroke-width: 2.5 !important;

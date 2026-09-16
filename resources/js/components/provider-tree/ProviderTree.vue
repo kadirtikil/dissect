@@ -122,14 +122,3 @@ onNodesInitialized(() => {
     </VueFlow>
   </div>
 </template>
-
-<style>
-/*
- * The theme hides edge labels until hover, because the model graph carries
- * dozens of them. A provider tree is capped small, and here the label is the
- * only thing telling a contextual override from the default binding beside it.
- */
-.provider-tree .vue-flow__edge-textwrapper {
-  opacity: 1;
-}
-</style>
