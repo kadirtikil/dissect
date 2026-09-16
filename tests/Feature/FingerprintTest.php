@@ -4,6 +4,7 @@ namespace KdrDev\Dissect\Tests\Feature;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use KdrDev\Dissect\ProviderTree\ProviderExporter;
 use KdrDev\Dissect\SchemaExporter;
 use KdrDev\Dissect\Tests\TestCase;
 use PHPUnit\Framework\Attributes\Test;
@@ -93,5 +94,17 @@ class FingerprintTest extends TestCase
             ->assertOk()
             ->assertJson(['fingerprint' => $expected])
             ->assertHeader('Cache-Control', 'no-store, private');
+    }
+
+    #[Test]
+    public function it_reports_the_provider_signal_only_when_asked_for_it(): void
+    {
+        // It stats every file under `app`; a session on the graph should not
+        // pay for that.
+        $this->get('/dissect/fingerprint')->assertJsonMissingPath('providers');
+
+        $this->get('/dissect/fingerprint?providers=1')
+            ->assertOk()
+            ->assertJson(['providers' => $this->app->make(ProviderExporter::class)->fingerprint()]);
     }
 }

@@ -455,6 +455,28 @@ class ProvidersTest extends TestCase
         }
     }
 
+    #[Test]
+    public function it_serves_the_provider_list_with_the_signal_that_describes_it(): void
+    {
+        $response = $this->get('dissect/providers.json');
+
+        $response->assertOk();
+        $response->assertHeader('Cache-Control', 'no-store, private');
+
+        $payload = $response->json();
+
+        $this->assertArrayHasKey('generated_at', $payload);
+        $this->assertSame($this->app->make(ProviderExporter::class)->fingerprint(), $payload['fingerprint']);
+        $this->assertContains(ArchiveServiceProvider::class, array_column($payload['providers'], 'id'));
+    }
+
+    #[Test]
+    public function it_tells_the_page_where_the_provider_list_is(): void
+    {
+        // Only the URL is inlined; the list itself is fetched when opened.
+        $this->get('dissect')->assertSee('providersUrl', false);
+    }
+
     /** @return array<class-string, string> */
     protected function providers(): array
     {
