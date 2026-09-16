@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { computed, ref, shallowRef } from 'vue'
 import type { Provider, ProvidersFile } from '@/types/providers'
 import { bootstrap } from '@/lib/bootstrap'
+import { filterProviders, type ProviderFilterState } from '@/lib/providerFilters'
 
 type Status = 'idle' | 'loading' | 'ready' | 'error'
 
@@ -22,14 +23,34 @@ export const useProviderStore = defineStore('provider-store', () => {
   /** Server change signal this list was built from. */
   const fingerprint = ref<string | null>(null)
 
+  const search = ref('')
+
   const selectedId = ref<string | null>(null)
 
   const loaded = computed(() => status.value === 'ready')
 
-  const selected = computed(() => providers.value.find((p) => p.id === selectedId.value) ?? null)
+  const filters = computed<ProviderFilterState>(() => ({ search: search.value }))
+
+  const visible = computed(() => filterProviders(providers.value, filters.value))
+
+  /**
+   * Looked up among the visible providers, as the job list does: a tree on the
+   * canvas for a provider the list has filtered out would be a selection
+   * nobody can see the source of.
+   */
+  const selected = computed(() => visible.value.find((p) => p.id === selectedId.value) ?? null)
+
+  const stats = computed(() => ({
+    total: providers.value.length,
+    visible: visible.value.length,
+  }))
 
   function select(id: string | null) {
     selectedId.value = id
+  }
+
+  function clearFilters() {
+    search.value = ''
   }
 
   function endpoint(): string {
@@ -98,9 +119,14 @@ export const useProviderStore = defineStore('provider-store', () => {
     providers,
     loaded,
     fingerprint,
+    search,
     selectedId,
+    filters,
+    visible,
     selected,
+    stats,
     select,
+    clearFilters,
     load,
     refresh,
   }
