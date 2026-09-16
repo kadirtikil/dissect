@@ -92,3 +92,17 @@ export interface ProvidersFile {
   providers: Provider[]
   generated_at?: string
 }
+
+/**
+ * What a card on the canvas is handed.
+ *
+ * The provider-level facts ride only on the root, which is the one box they
+ * describe — badges on every node would say the same thing eleven times.
+ */
+export interface ProviderNodeData {
+  node: ProviderNode
+  root: boolean
+  sideEffects: Provider['side_effects']
+  deferred: boolean
+  provides: string[]
+}

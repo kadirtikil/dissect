@@ -27,6 +27,15 @@ export const useProviderStore = defineStore('provider-store', () => {
 
   const selectedId = ref<string | null>(null)
 
+  /**
+   * Node ids whose doc block is open.
+   *
+   * Held here rather than in the card: Vue Flow replaces the node array when a
+   * refresh lands, and a component ref would snap every card shut each time
+   * somebody saved a file.
+   */
+  const expanded = ref<Set<string>>(new Set())
+
   const loaded = computed(() => status.value === 'ready')
 
   const filters = computed<ProviderFilterState>(() => ({ search: search.value }))
@@ -47,6 +56,13 @@ export const useProviderStore = defineStore('provider-store', () => {
 
   function select(id: string | null) {
     selectedId.value = id
+  }
+
+  function toggleExpanded(id: string) {
+    const next = new Set(expanded.value)
+    if (next.has(id)) next.delete(id)
+    else next.add(id)
+    expanded.value = next
   }
 
   function clearFilters() {
@@ -121,11 +137,13 @@ export const useProviderStore = defineStore('provider-store', () => {
     fingerprint,
     search,
     selectedId,
+    expanded,
     filters,
     visible,
     selected,
     stats,
     select,
+    toggleExpanded,
     clearFilters,
     load,
     refresh,

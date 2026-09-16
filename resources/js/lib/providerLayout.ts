@@ -17,8 +17,12 @@ import type { ProviderEdge, ProviderNode } from '@/types/providers'
 export const PROVIDER_NODE_WIDTH = 220
 export const PROVIDER_NODE_HEIGHT = 64
 
-/** Horizontal space between tiers, where the edges run. */
-const COLUMN_GAP = 120
+/**
+ * Horizontal space between tiers, where the edges run — wide enough for the
+ * longest label an edge carries, `contextual · when ReportMailer`, to sit
+ * between two cards rather than under one.
+ */
+const COLUMN_GAP = 200
 /** Vertical space between boxes in one tier. */
 const ROW_GAP = 24
 
