@@ -32,6 +32,12 @@ export interface Bootstrap {
    */
   jobsUrl?: string
   /**
+   * Endpoint returning every service provider with its tree inline. A URL for
+   * the same reason again: building it parses each provider and reflects every
+   * constructor down its tree.
+   */
+  providersUrl?: string
+  /**
    * Endpoint returning what is on the queue right now.
    *
    * The one payload here that is not derived from source, so unlike the two
