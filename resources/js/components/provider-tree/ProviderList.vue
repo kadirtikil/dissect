@@ -10,13 +10,12 @@ const {fetchProviders, setSelectedProvider} = useProviderStore()
 onMounted(async () => {
   await fetchProviders()
 })
-
 </script>
 
 
 
 <template>
-  <div class="min-h-0 flex-1 overflow-y-auto">
+  <div class="min-h-0 flex-1 overflow-y-auto border-t border-r p-1">
       <ul>
         <li v-for="(provider, index) in providers" :key="index">
           <button

@@ -11,7 +11,7 @@ const searchWord = ref('');
 
 
 <template>
-<div class="flex flex-row p-2">
+<div class="flex flex-row p-2 border-r">
   <Input
     v-model="searchWord"
     class="min-w-0 flex-1 rounded-sm border bg-background px-2 py-1 font-mono text-xs outline-none focus:border-ring"
