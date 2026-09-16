@@ -16,6 +16,11 @@ namespace KdrDev\Dissect\ProviderTree;
  * `partial` is not stored, it is read off the nodes: a tree is partial exactly
  * when something in it could not be named, and a flag kept separately is one
  * that can disagree with the tree it describes.
+ *
+ * `truncated` is the other way a tree can be incomplete, and a different
+ * sentence: nothing was unreadable, the depth or node cap stopped the walk on
+ * purpose. There is no node to derive that from — the point is that the nodes
+ * past the cap were never added.
  */
 final readonly class ProviderDescription
 {
@@ -33,6 +38,7 @@ final readonly class ProviderDescription
         public array $sideEffects = [],
         public bool $deferred = false,
         public array $provides = [],
+        public bool $truncated = false,
     ) {}
 
     /** Whether any branch of the tree stopped at something it could not name. */
@@ -68,6 +74,7 @@ final readonly class ProviderDescription
             'deferred' => $this->deferred,
             'provides' => $this->provides,
             'partial' => $this->partial(),
+            'truncated' => $this->truncated,
         ];
     }
 }

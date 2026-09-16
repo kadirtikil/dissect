@@ -2,6 +2,7 @@
 
 namespace KdrDev\Dissect\ProviderTree;
 
+use Closure;
 use Illuminate\Support\ServiceProvider;
 use KdrDev\Dissect\Jobs\ProjectPath;
 use ReflectionClass;
@@ -17,11 +18,25 @@ use Throwable;
  *
  * The inspector and the dependency resolver both add to it, which is why it is
  * its own object rather than arrays threaded through both.
+ *
+ * A provider registered by the one being described is read into the same tree
+ * via {@see within()}: while it is read, depths are relative to *its* node and
+ * arrows leave from it, so the inspector reads a nested provider exactly the
+ * way it reads the root.
  */
 final class TreeBuilder
 {
     /** Firmest first — the index is the ordering, as in {@see \KdrDev\Dissect\Jobs\Confidence}. */
     protected const LADDER = ['certain', 'inferred', 'unknown'];
+
+    /** Set by the inspector once the root provider has been read. */
+    public bool $deferred = false;
+
+    /** @var array<int, string> */
+    public array $provides = [];
+
+    /** Whether a depth or node cap cut something off. */
+    public bool $truncated = false;
 
     /** @var array<string, ProviderNode> */
     protected array $nodes = [];
@@ -32,12 +47,61 @@ final class TreeBuilder
     /** @var array<string, int> */
     protected array $sideEffects = [];
 
+    /** @var array<string, true> Providers already read into this tree. */
+    protected array $read = [];
+
     protected int $unresolved = 0;
+
+    protected string $current;
+
+    protected int $offset = 0;
 
     /** @param  class-string  $provider */
     public function __construct(public readonly string $provider)
     {
         $this->named($provider, NodeKind::Provider, 0, 'certain');
+        $this->current = $provider;
+        $this->read[$provider] = true;
+    }
+
+    /** The provider whose calls are being read — arrows leave from it. */
+    public function current(): string
+    {
+        return $this->current;
+    }
+
+    public function isRoot(): bool
+    {
+        return $this->current === $this->provider;
+    }
+
+    /**
+     * Read a registered provider into this tree, from its own node.
+     *
+     * Each provider is read once per tree: a registration cycle, or two
+     * providers registering the same third, is an arrow to a node already
+     * drawn rather than a second copy of its bindings.
+     *
+     * @param  Closure(): void  $read
+     */
+    public function within(string $provider, Closure $read): void
+    {
+        $node = $this->nodes[$provider] ?? null;
+
+        if ($node === null || isset($this->read[$provider])) {
+            return;
+        }
+
+        $this->read[$provider] = true;
+
+        [$current, $offset] = [$this->current, $this->offset];
+        [$this->current, $this->offset] = [$provider, $node->depth];
+
+        try {
+            $read();
+        } finally {
+            [$this->current, $this->offset] = [$current, $offset];
+        }
     }
 
     /**
@@ -46,6 +110,8 @@ final class TreeBuilder
      * Everything about the node other than its position — label, origin, file,
      * summary — is read off the name itself, so every caller describes a class
      * the same way.
+     *
+     * `$depth` is relative to the provider being read.
      */
     public function named(string $name, NodeKind $kind, int $depth, string $confidence): string
     {
@@ -58,7 +124,7 @@ final class TreeBuilder
             kind: $kind,
             label: $reflection === null ? $name : $reflection->getShortName(),
             origin: $origin,
-            depth: $depth,
+            depth: $this->offset + $depth,
             confidence: $confidence,
             class: $reflection?->getName(),
             file: $origin === Origin::App && $reflection->getFileName() !== false
@@ -85,6 +151,12 @@ final class TreeBuilder
         };
     }
 
+    /** Whether a name is a class, interface or enum that can be reflected. */
+    public function exists(string $name): bool
+    {
+        return $this->reflect(ltrim($name, '\\')) !== null;
+    }
+
     /**
      * Something known to be there that could not be named, returning its id.
      *
@@ -98,7 +170,7 @@ final class TreeBuilder
             kind: NodeKind::Unresolved,
             label: $label,
             origin: Origin::None,
-            depth: $depth,
+            depth: $this->offset + $depth,
             confidence: 'unknown',
         ));
     }
@@ -114,21 +186,68 @@ final class TreeBuilder
         }
     }
 
+    /**
+     * Counted for the root only: the badges sit on the provider being
+     * described, and a registered provider's config merge is not something the
+     * root does.
+     */
     public function sideEffect(SideEffect $effect): void
     {
-        $this->sideEffects[$effect->value] = ($this->sideEffects[$effect->value] ?? 0) + 1;
+        if ($this->isRoot()) {
+            $this->sideEffects[$effect->value] = ($this->sideEffects[$effect->value] ?? 0) + 1;
+        }
     }
 
-    /** @param  array<int, string>  $provides */
-    public function build(bool $deferred, array $provides): ProviderDescription
+    public function node(string $id): ?ProviderNode
+    {
+        return $this->nodes[$id] ?? null;
+    }
+
+    /** @return array<int, ProviderNode> */
+    public function nodes(): array
+    {
+        return array_values($this->nodes);
+    }
+
+    public function has(string $id): bool
+    {
+        return isset($this->nodes[$id]);
+    }
+
+    public function count(): int
+    {
+        return count($this->nodes);
+    }
+
+    /**
+     * Where arrows of the given kinds lead from one node.
+     *
+     * @param  array<int, EdgeKind>  $kinds
+     * @return array<int, string>
+     */
+    public function targets(string $source, array $kinds): array
+    {
+        $targets = [];
+
+        foreach ($this->edges as $edge) {
+            if ($edge->source === $source && in_array($edge->kind, $kinds, true)) {
+                $targets[] = $edge->target;
+            }
+        }
+
+        return array_values(array_unique($targets));
+    }
+
+    public function build(): ProviderDescription
     {
         return new ProviderDescription(
             provider: $this->provider,
             nodes: array_values($this->nodes),
             edges: array_values($this->edges),
             sideEffects: $this->sideEffects,
-            deferred: $deferred,
-            provides: $provides,
+            deferred: $this->deferred,
+            provides: $this->provides,
+            truncated: $this->truncated,
         );
     }
 

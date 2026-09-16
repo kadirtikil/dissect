@@ -83,6 +83,7 @@ class ProviderDescriptionTest extends PhpUnitTestCase
             'deferred' => true,
             'provides' => ['App\Contracts\ReportRenderer'],
             'partial' => false,
+            'truncated' => false,
         ], $this->description()->toArray());
     }
 

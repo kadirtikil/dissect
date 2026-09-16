@@ -38,9 +38,10 @@ use Throwable;
  * unresolved node rather than dropped. A tree that stops and says so is
  * worth more than one that looks complete and is not.
  *
- * This is one level deep: the provider, the contracts it names, and what they
- * are bound to. Following a concrete into its own constructor is the
- * dependency resolver's job.
+ * What comes back is the provider, the contracts it names, what they are bound
+ * to, and the same again for every application provider it registers.
+ * Following a concrete into its own constructor is the dependency resolver's
+ * job.
  */
 class ProviderInspector
 {
@@ -92,6 +93,15 @@ class ProviderInspector
     /** One provider's direct tree, or null if it cannot be reflected at all. */
     public function describe(string $class): ?ProviderDescription
     {
+        return $this->tree($class)?->build();
+    }
+
+    /**
+     * The tree still open, for the dependency resolver to add to before it is
+     * built.
+     */
+    public function tree(string $class): ?TreeBuilder
+    {
         try {
             $reflection = new ReflectionClass($class);
         } catch (Throwable) {
@@ -100,6 +110,23 @@ class ProviderInspector
 
         $tree = new TreeBuilder($reflection->getName());
 
+        $this->read($reflection, $tree);
+
+        // Deferral is a fact about the root. A registered provider being
+        // deferred changes when it loads, not what the root binds.
+        $tree->deferred = $reflection->implementsInterface(DeferrableProvider::class);
+        $tree->provides = $this->provides($reflection);
+
+        return $tree;
+    }
+
+    /**
+     * One provider's calls into the tree, from whichever node is current.
+     *
+     * @param  ReflectionClass<object>  $reflection
+     */
+    protected function read(ReflectionClass $reflection, TreeBuilder $tree): void
+    {
         $this->properties($reflection, $tree);
 
         foreach (['register', 'boot'] as $name) {
@@ -112,10 +139,6 @@ class ProviderInspector
                 $this->call($expr, $reflection, $tree);
             }
         }
-
-        $deferred = $reflection->implementsInterface(DeferrableProvider::class);
-
-        return $tree->build($deferred, $this->provides($reflection));
     }
 
     /**
@@ -256,7 +279,7 @@ class ProviderInspector
         }
 
         $tree->edge(
-            $tree->provider,
+            $tree->current(),
             $tree->unresolved($this->print($call), 1),
             EdgeKind::Calls,
             'unknown',
@@ -323,7 +346,7 @@ class ProviderInspector
     ): void {
         if ($concrete === $abstract) {
             $id = $tree->named($abstract, $tree->kindOf($abstract), 1, $confidence);
-            $tree->edge($tree->provider, $id, $kind, $confidence, $consumer);
+            $tree->edge($tree->current(), $id, $kind, $confidence, $consumer);
 
             return;
         }
@@ -331,7 +354,7 @@ class ProviderInspector
         // The abstract was written literally, so it is certain even when what
         // it is bound to is not.
         $contract = $tree->named($abstract, NodeKind::Contract, 1, 'certain');
-        $tree->edge($tree->provider, $contract, $kind, 'certain', $consumer);
+        $tree->edge($tree->current(), $contract, $kind, 'certain', $consumer);
 
         $target = $concrete === null
             ? $tree->unresolved($unread === null ? '?' : $this->print($unread), 2)
@@ -381,7 +404,15 @@ class ProviderInspector
         }
     }
 
-    /** `$this->app->register(Other::class)` — an edge to a provider. */
+    /**
+     * `$this->app->register(Other::class)` — an edge to a provider, and that
+     * provider's own bindings beneath it.
+     *
+     * Registering a provider is binding everything it binds, so stopping at a
+     * node named after it would hide exactly what the call does. Only the
+     * application's own providers are followed; a package's provider is a
+     * leaf, for the same reason vendor code is everywhere else.
+     */
     protected function registration(MethodCall|StaticCall $call, TreeBuilder $tree): void
     {
         $provider = $this->literal($call->args[0] ?? null);
@@ -392,7 +423,14 @@ class ProviderInspector
             return;
         }
 
-        $tree->edge($tree->provider, $tree->named($provider, NodeKind::Provider, 1, 'certain'), EdgeKind::Registers, 'certain');
+        $id = $tree->named($provider, NodeKind::Provider, 1, 'certain');
+        $tree->edge($tree->current(), $id, EdgeKind::Registers, 'certain');
+
+        if ($tree->node($id)?->origin !== Origin::App || $tree->kindOf($id) !== NodeKind::Provider) {
+            return;
+        }
+
+        $tree->within($id, fn () => $this->read(new ReflectionClass($id), $tree));
     }
 
     /** `make()`, `resolve()`, `app()` with a name: needed, not decided. */
@@ -406,13 +444,13 @@ class ProviderInspector
             return;
         }
 
-        $tree->edge($tree->provider, $tree->named($name, $tree->kindOf($name), 1, 'certain'), EdgeKind::Resolves, 'certain');
+        $tree->edge($tree->current(), $tree->named($name, $tree->kindOf($name), 1, 'certain'), EdgeKind::Resolves, 'certain');
     }
 
     /** A call that was seen and could not be read: one unresolved node, labelled with what was written. */
     protected function unreadable(TreeBuilder $tree, EdgeKind $kind, Expr $call): void
     {
-        $tree->edge($tree->provider, $tree->unresolved($this->print($call), 1), $kind, 'unknown');
+        $tree->edge($tree->current(), $tree->unresolved($this->print($call), 1), $kind, 'unknown');
     }
 
     /**

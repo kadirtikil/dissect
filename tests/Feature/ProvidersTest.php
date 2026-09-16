@@ -2,6 +2,8 @@
 
 namespace KdrDev\Dissect\Tests\Feature;
 
+use Illuminate\Filesystem\Filesystem;
+use KdrDev\Dissect\ProviderTree\DependencyResolver;
 use KdrDev\Dissect\ProviderTree\ProviderInspector;
 use KdrDev\Dissect\ProviderTree\ProviderReader;
 use KdrDev\Dissect\Tests\TestCase;
@@ -9,6 +11,7 @@ use PHPUnit\Framework\Attributes\Test;
 use Workbench\App\Contracts\ReportRenderer;
 use Workbench\App\Contracts\SearchIndex;
 use Workbench\App\Contracts\Transcoder;
+use Workbench\App\Providers\ArchiveServiceProvider;
 use Workbench\App\Providers\BindingServiceProvider;
 use Workbench\App\Providers\ContextualServiceProvider;
 use Workbench\App\Providers\DeferredSearchServiceProvider;
@@ -19,10 +22,14 @@ use Workbench\App\Providers\ResolvingServiceProvider;
 use Workbench\App\Providers\SideEffectServiceProvider;
 use Workbench\App\Providers\SiblingServiceProvider;
 use Workbench\App\Providers\WorkbenchServiceProvider;
+use Workbench\App\Services\ArchiveIndex;
+use Workbench\App\Services\ArchiveStorage;
 use Workbench\App\Services\DatabaseSearchIndex;
 use Workbench\App\Services\FfmpegTranscoder;
 use Workbench\App\Services\HtmlReportRenderer;
+use Workbench\App\Services\NullSearchIndex;
 use Workbench\App\Services\PdfReportRenderer;
+use Workbench\App\Services\ReportArchive;
 use Workbench\App\Services\ReportMailer;
 
 /**
@@ -32,8 +39,9 @@ use Workbench\App\Services\ReportMailer;
  * exist one per construct rather than one per shape of application: the four
  * plain container calls, a contextual binding, a provider registering another,
  * a deferred one, bindings declared as properties, a provider that only
- * resolves, one that is all side effects, and one written so that none of it
- * can be read statically.
+ * resolves, one that is all side effects, one written so that none of it can
+ * be read statically, and one whose single binding opens onto a constructor
+ * chain that reaches the framework and loops back on itself.
  *
  * Two of the files in that directory are there to be left out.
  */
@@ -45,6 +53,7 @@ class ProvidersTest extends TestCase
         $providers = $this->providers();
 
         foreach ([
+            ArchiveServiceProvider::class,
             BindingServiceProvider::class,
             ContextualServiceProvider::class,
             DeferredSearchServiceProvider::class,
@@ -192,13 +201,122 @@ class ProvidersTest extends TestCase
     }
 
     #[Test]
-    public function it_draws_a_registered_provider_as_a_provider_node(): void
+    public function it_continues_into_the_bindings_of_a_registered_provider(): void
     {
+        // Registering a provider binds everything it binds, so the tree goes on
+        // beneath its node, with the arrows leaving from it rather than the root.
         $this->assertEdges(RegistersSiblingServiceProvider::class, [
             RegistersSiblingServiceProvider::class.'->'.SiblingServiceProvider::class.':registers' => 'certain',
+            SiblingServiceProvider::class.'->workbench.renderer:singleton' => 'certain',
+            'workbench.renderer->'.HtmlReportRenderer::class.':singleton' => 'certain',
         ]);
 
-        $this->assertSame('provider', $this->nodes(RegistersSiblingServiceProvider::class)[SiblingServiceProvider::class]['kind']);
+        $nodes = $this->nodes(RegistersSiblingServiceProvider::class);
+
+        $this->assertSame('provider', $nodes[SiblingServiceProvider::class]['kind']);
+        $this->assertSame(1, $nodes[SiblingServiceProvider::class]['depth']);
+        $this->assertSame(2, $nodes['workbench.renderer']['depth']);
+        $this->assertSame(3, $nodes[HtmlReportRenderer::class]['depth']);
+    }
+
+    #[Test]
+    public function it_follows_a_bound_class_into_its_constructor(): void
+    {
+        $edges = $this->resolvedEdges(ArchiveServiceProvider::class);
+
+        $this->assertSame('inferred', $edges[ReportArchive::class.'->'.ArchiveStorage::class.':injects']);
+        $this->assertSame('inferred', $edges[ArchiveStorage::class.'->'.ArchiveIndex::class.':injects']);
+
+        // The contract the archive type-hints is the one this provider binds,
+        // so the arrow meets the node the binding already drew.
+        $this->assertSame('inferred', $edges[ReportArchive::class.'->'.ReportRenderer::class.':injects']);
+        $this->assertSame('certain', $edges[ReportRenderer::class.'->'.HtmlReportRenderer::class.':bind']);
+
+        $nodes = $this->resolvedNodes(ArchiveServiceProvider::class);
+
+        $this->assertSame(1, $nodes[ReportArchive::class]['depth']);
+        $this->assertSame(2, $nodes[ArchiveStorage::class]['depth']);
+        $this->assertSame(3, $nodes[ArchiveIndex::class]['depth']);
+    }
+
+    #[Test]
+    public function it_follows_a_class_the_provider_binds_even_when_no_constructor_was_asked_for(): void
+    {
+        // DatabaseSearchIndex is bound by BindingServiceProvider and needs the
+        // transcoder — the hop the fixture exists for.
+        $this->assertSame(
+            'inferred',
+            $this->resolvedEdges(BindingServiceProvider::class)[DatabaseSearchIndex::class.'->'.FfmpegTranscoder::class.':injects'],
+        );
+    }
+
+    #[Test]
+    public function it_draws_a_cycle_once_and_stops(): void
+    {
+        $edges = $this->resolvedEdges(ArchiveServiceProvider::class);
+
+        $this->assertArrayHasKey(ArchiveStorage::class.'->'.ArchiveIndex::class.':injects', $edges);
+        $this->assertArrayHasKey(ArchiveIndex::class.'->'.ArchiveStorage::class.':injects', $edges);
+
+        $this->assertFalse($this->resolve(ArchiveServiceProvider::class)['truncated']);
+    }
+
+    #[Test]
+    public function it_stops_at_framework_code(): void
+    {
+        $nodes = $this->resolvedNodes(ArchiveServiceProvider::class);
+
+        $this->assertSame('framework', $nodes[Filesystem::class]['origin']);
+
+        // Filesystem's own constructor is not read, so nothing hangs off it.
+        $this->assertSame([], array_values(array_filter(
+            $this->resolve(ArchiveServiceProvider::class)['edges'],
+            fn (array $edge) => $edge['source'] === Filesystem::class,
+        )));
+    }
+
+    #[Test]
+    public function it_reports_a_parameter_it_cannot_name_as_an_unknown_leaf(): void
+    {
+        $description = $this->resolve(ArchiveServiceProvider::class);
+
+        $unresolved = array_column(array_filter(
+            $description['nodes'],
+            fn (array $node) => $node['kind'] === 'unresolved',
+        ), 'label');
+
+        sort($unresolved);
+
+        // The union names two classes and so names neither; the untyped one is
+        // still something the container has to fill. The scalar with a
+        // default is configuration and does not appear.
+        $this->assertSame([
+            '$metadata',
+            '$preview: '.FfmpegTranscoder::class.'|'.NullSearchIndex::class,
+        ], $unresolved);
+
+        $this->assertTrue($description['partial']);
+    }
+
+    #[Test]
+    public function it_cuts_the_walk_at_the_depth_cap_and_says_so(): void
+    {
+        $description = $this->resolve(ArchiveServiceProvider::class, maxDepth: 2);
+        $nodes = array_column($description['nodes'], null, 'id');
+
+        $this->assertArrayHasKey(ArchiveStorage::class, $nodes);
+        $this->assertArrayNotHasKey(ArchiveIndex::class, $nodes);
+        $this->assertArrayNotHasKey(Filesystem::class, $nodes);
+        $this->assertTrue($description['truncated']);
+    }
+
+    #[Test]
+    public function it_cuts_the_walk_at_the_node_cap_and_says_so(): void
+    {
+        $description = $this->resolve(ArchiveServiceProvider::class, maxNodes: 4);
+
+        $this->assertCount(4, $description['nodes']);
+        $this->assertTrue($description['truncated']);
     }
 
     #[Test]
@@ -268,6 +386,32 @@ class ProvidersTest extends TestCase
     protected function describe(string $provider): array
     {
         return app(ProviderInspector::class)->describe($provider)->toArray();
+    }
+
+    /**
+     * Inspected, then walked into constructors.
+     *
+     * @return array<string, mixed>
+     */
+    protected function resolve(string $provider, ?int $maxDepth = null, ?int $maxNodes = null): array
+    {
+        $tree = app(ProviderInspector::class)->tree($provider);
+
+        (new DependencyResolver($maxDepth, $maxNodes))->resolve($tree);
+
+        return $tree->build()->toArray();
+    }
+
+    /** @return array<string, string> edge id => confidence */
+    protected function resolvedEdges(string $provider): array
+    {
+        return array_column($this->resolve($provider)['edges'], 'confidence', 'id');
+    }
+
+    /** @return array<string, array<string, mixed>> */
+    protected function resolvedNodes(string $provider): array
+    {
+        return array_column($this->resolve($provider)['nodes'], null, 'id');
     }
 
     /** @return array<string, array<string, mixed>> */
