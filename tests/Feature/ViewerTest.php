@@ -70,6 +70,29 @@ class ViewerTest extends TestCase
     }
 
     #[Test]
+    public function it_revalidates_the_entry_and_stylesheet_and_caches_chunks_for_good(): void
+    {
+        // The entry and the stylesheet keep their names across releases, so a
+        // browser has to ask again; a chunk's name changes with its contents,
+        // so it never has to.
+        foreach (['dissect.js', 'dissect.css'] as $file) {
+            $first = $this->get('/dissect/assets/'.$file)->assertOk();
+
+            $this->assertStringContainsString('no-cache', (string) $first->headers->get('Cache-Control'));
+            $this->assertNotEmpty($etag = $first->headers->get('ETag'));
+
+            $this->get('/dissect/assets/'.$file, ['If-None-Match' => $etag])->assertStatus(304);
+        }
+
+        $chunk = basename((string) collect(glob(dirname(__DIR__, 2).'/dist/dissect-*.js'))->first());
+
+        $this->assertStringContainsString(
+            'immutable',
+            (string) $this->get('/dissect/assets/'.$chunk)->assertOk()->headers->get('Cache-Control'),
+        );
+    }
+
+    #[Test]
     public function it_serves_no_asset_outside_the_allow_list(): void
     {
         $this->get('/dissect/assets/index.html')->assertNotFound();
