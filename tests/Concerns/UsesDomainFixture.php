@@ -26,10 +26,11 @@ trait UsesDomainFixture
         $app['config']->set('dissect.domains.root', $root);
         $app['config']->set('dissect.domains.file', $root.'/.dissect/domains.json');
         $app['config']->set('dissect.models.paths', [$root.'/app/Models', $root.'/app/Domain/*/Models']);
-        $app['config']->set('dissect.jobs.paths', [$root.'/app/Domain/*/Jobs']);
+        // Jobs and providers take no `*` yet, unlike models.
+        $app['config']->set('dissect.jobs.paths', [$root.'/app/Domain/Billing/Jobs', $root.'/app/Domain/Sales/Jobs']);
         $app['config']->set('dissect.jobs.watch_paths', [$root.'/app']);
         $app['config']->set('dissect.routes.watch_paths', [$root.'/app', $root.'/routes.php']);
-        $app['config']->set('dissect.providers.paths', [$root.'/app/Domain/*/Providers']);
+        $app['config']->set('dissect.providers.paths', [$root.'/app/Domain/Billing/Providers']);
         $app['config']->set('dissect.providers.watch_paths', [$root.'/app']);
     }
 

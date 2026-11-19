@@ -134,10 +134,11 @@ class WorkbenchServiceProvider extends ServiceProvider
                 'dissect.domains.root' => $domains,
                 'dissect.domains.file' => $domains.'/.dissect/domains.json',
                 'dissect.models.paths' => [$domains.'/app/Models', $domains.'/app/Domain/*/Models'],
-                'dissect.jobs.paths' => [$domains.'/app/Domain/*/Jobs'],
+                // Jobs and providers take no `*` yet, unlike models.
+                'dissect.jobs.paths' => [$domains.'/app/Domain/Billing/Jobs', $domains.'/app/Domain/Sales/Jobs'],
                 'dissect.jobs.watch_paths' => [$domains.'/app'],
                 'dissect.routes.watch_paths' => [$root.'/workbench/app', $root.'/workbench/routes', $domains],
-                'dissect.providers.paths' => [$domains.'/app/Domain/*/Providers'],
+                'dissect.providers.paths' => [$domains.'/app/Domain/Billing/Providers'],
                 'dissect.providers.watch_paths' => [$domains.'/app'],
             ]);
         }
