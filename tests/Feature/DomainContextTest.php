@@ -77,6 +77,23 @@ class DomainContextTest extends TestCase
     }
 
     #[Test]
+    public function a_provider_and_every_class_in_its_tree_carry_their_domain(): void
+    {
+        $provider = collect($this->getJson('/dissect/providers.json')->assertOk()->json('providers'))
+            ->firstWhere('name', 'BillingServiceProvider');
+
+        $this->assertSame('Billing', $provider['context']);
+
+        $nodes = collect($provider['nodes'])->pluck('context', 'id')->all();
+
+        $this->assertSame('Billing', $nodes[self::NS.'Domain\\Billing\\Services\\FakeGateway']);
+        // Contracts count too: an interface is in its folder's domain.
+        $this->assertSame('Billing', $nodes[self::NS.'Domain\\Billing\\Contracts\\PaymentGateway']);
+        // Unassigned code is unassigned, and so is the framework.
+        $this->assertNull($nodes[self::NS.'Support\\Clock']);
+    }
+
+    #[Test]
     public function switched_off_every_row_says_none(): void
     {
         config()->set('dissect.domains.enabled', false);

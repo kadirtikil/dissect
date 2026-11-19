@@ -213,6 +213,7 @@ class DissectServiceProvider extends ServiceProvider
             // half: same mechanism, its own directories.
             new RouteFingerprint($this->watched('providers', ['app'], ['app/Providers'])),
             $app->make(CodeOwnership::class),
+            $app->make(ContextResolver::class),
         ));
 
         $this->app->singleton(PayloadDecoder::class, fn () => new PayloadDecoder);
