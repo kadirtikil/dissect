@@ -4,6 +4,7 @@ import { storeToRefs } from 'pinia'
 import { ChevronDown, ChevronRight } from '@lucide/vue'
 import MethodBadge from '@/components/routes/MethodBadge.vue'
 import { useRoutesStore } from '@/stores/routes'
+import type { ApiRoute } from '@/types/routes'
 
 const store = useRoutesStore()
 const { grouped, selectedId, search } = storeToRefs(store)
@@ -23,6 +24,11 @@ function toggle(key: string) {
 
 // Typing a filter is asking to see what matched, so folds get out of the way.
 watch(search, () => collapsed.value.clear())
+
+/** The path, minus the root's lone slash when a domain already ends in one. */
+function pathOf(route: ApiRoute): string {
+  return route.domain && route.uri === '/' ? '' : route.uri
+}
 </script>
 
 <template>
@@ -51,8 +57,11 @@ watch(search, () => collapsed.value.clear())
           >
             <MethodBadge :methods="route.methods" />
 
+            <!-- The domain first, muted: the same path on two domains is two
+                 endpoints, and without it they would be two identical rows. -->
             <span class="min-w-0 flex-1 truncate font-mono text-xs">
-              {{ route.uri }}
+              <span v-if="route.domain" class="text-muted-foreground">{{ route.domain }}/</span
+              >{{ pathOf(route) }}
             </span>
           </button>
         </li>

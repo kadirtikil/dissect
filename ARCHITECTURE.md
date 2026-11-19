@@ -578,7 +578,7 @@ main.ts                 mounts App; no router (see "Decisions")
     │   └── GraphLegend relation families
     ├── RoutesPanel     list ▏ detail
     │   ├── RouteFilters   search + facet chips with counts
-    │   ├── RouteList      grouped by controller, collapsible
+    │   ├── RouteList      grouped by controller (full class name), collapsible
     │   └── RouteDetail    verbs, middleware, params, request, response
     │       └── FieldTree  a flat path list rendered as a tree
     ├── ProviderTreePanel  list ▏ canvas
@@ -739,6 +739,7 @@ selection as a new view or add it to the open one.
 {
   "routes": [{
     "id": "POST:api/invoices",          // verbs + path; plenty of routes have no name
+                                        // on a domain: "GET://admin.example.com/dashboard"
     "methods": ["POST"],
     "uri": "api/invoices",
     "name": "invoices.store",

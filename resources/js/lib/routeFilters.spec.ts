@@ -72,6 +72,16 @@ describe('matchesSearch', () => {
     expect(matchesSearch(ROUTES[3]!, 'post')).toBe(false)
   })
 
+  it('matches the domain a route is bound to', () => {
+    const tenant = route({
+      id: 'GET://{account}.example.test/dashboard',
+      domain: '{account}.example.test',
+    })
+
+    expect(matchesSearch(tenant, 'example.test')).toBe(true)
+    expect(matchesSearch(ROUTES[0]!, 'example.test')).toBe(false)
+  })
+
   it('ignores case and surrounding space, and an empty term matches all', () => {
     expect(matchesSearch(ROUTES[0]!, '  POSTS  ')).toBe(true)
     expect(matchesSearch(ROUTES[3]!, '')).toBe(true)
@@ -180,5 +190,42 @@ describe('groupRoutes', () => {
     const total = groupRoutes(ROUTES).reduce((sum, g) => sum + g.routes.length, 0)
 
     expect(total).toBe(ROUTES.length)
+  })
+
+  it('keeps two controllers that share a short name apart', () => {
+    // Two API versions, one class name. They used to be one heading.
+    const versioned = (version: string) =>
+      route({
+        id: `GET:api/${version}/posts`,
+        uri: `api/${version}/posts`,
+        action: {
+          type: 'controller',
+          class: `App\\Http\\Controllers\\Api\\${version.toUpperCase()}\\PostController`,
+          method: 'index',
+          label: 'PostController@index',
+        },
+      })
+
+    const groups = groupRoutes([versioned('v1'), versioned('v2'), ROUTES[0]!])
+
+    expect(groups.map((g) => [g.label, g.routes.length])).toEqual([
+      ['ThingController', 1],
+      ['V1\\PostController', 1],
+      ['V2\\PostController', 1],
+    ])
+    expect(groups.map((g) => g.key)).toContain('App\\Http\\Controllers\\Api\\V1\\PostController')
+  })
+
+  it('treats a leading backslash as the same class', () => {
+    const groups = groupRoutes([
+      ROUTES[0]!,
+      route({
+        id: 'GET:api/other',
+        action: { ...ROUTES[0]!.action, class: '\\App\\Http\\Controllers\\ThingController' },
+      }),
+    ])
+
+    expect(groups).toHaveLength(1)
+    expect(groups[0]!.label).toBe('ThingController')
   })
 })

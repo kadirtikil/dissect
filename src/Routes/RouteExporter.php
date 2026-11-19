@@ -97,7 +97,7 @@ class RouteExporter
             ?? $this->responses->analyse($reflection));
 
         return [
-            'id' => self::id($described['methods'], $described['uri']),
+            'id' => self::id($described['methods'], $described['uri'], $described['domain']),
             ...$described,
             'group' => $this->attempt(fn () => $this->actions->group($route)) ?? 'other',
             'action' => $this->attempt(fn () => $this->actions->describe($route))
@@ -136,6 +136,13 @@ class RouteExporter
      * none, and two different verbs on one path are two different endpoints —
      * so the pair that actually identifies it is what is used.
      *
+     * A route bound to a domain carries it, written the way a URL without a
+     * scheme is: `GET://{account}.example.com/dashboard`. Without it, the same
+     * path on an admin and a tenant domain was one id for two endpoints, and
+     * the list could only ever select the first. Laravel trims the slashes off
+     * a URI, so a route with no domain can never spell an id that starts
+     * with `//`, and its id is unchanged.
+     *
      * Public and static because the jobs surface links dispatch sites back to
      * endpoints by this id. Two places that both spell a route's key and only
      * happen to agree is a cross-link that breaks the first time one of them is
@@ -143,8 +150,12 @@ class RouteExporter
      *
      * @param  array<int, string>  $methods
      */
-    public static function id(array $methods, string $uri): string
+    public static function id(array $methods, string $uri, ?string $domain = null): string
     {
-        return implode('|', $methods).':'.$uri;
+        $address = $domain === null || $domain === ''
+            ? $uri
+            : '//'.$domain.'/'.ltrim($uri, '/');
+
+        return implode('|', $methods).':'.$address;
     }
 }

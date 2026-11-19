@@ -17,7 +17,7 @@ import { useRoutesStore } from '@/stores/routes'
 import { useJobsStore } from '@/stores/jobs'
 import { useProviderStore } from '@/stores/provider'
 import { bootstrap } from '@/lib/bootstrap'
-import { baseName, shortNames } from '@/lib/modelNames'
+import { baseName, shortNames } from '@/lib/classNames'
 
 type Status = 'idle' | 'loading' | 'ready' | 'error'
 
@@ -102,7 +102,7 @@ export const useSchemaStore = defineStore('schema', () => {
   /** Models referenced by a relation but missing from `nodes`. */
   /**
    * What each node is called on screen. Ids are fully qualified class names;
-   * see lib/modelNames for how they are shortened.
+   * see lib/classNames for how they are shortened.
    */
   const labels = computed(() => new Map(nodes.value.map((n) => [n.id, n.data?.label ?? n.id])))
 
