@@ -156,7 +156,7 @@ class DissectServiceProvider extends ServiceProvider
             // watches the route paths, and this half watches its own. Same
             // mechanism, different question, so it must not be the same
             // instance.
-            new RouteFingerprint((array) config('dissect.jobs.watch_paths', ['app', 'routes'])),
+            new RouteFingerprint($this->watched('jobs', ['app', 'routes'], ['app/Jobs'])),
         ));
 
         $this->app->singleton(ProviderReader::class, fn () => new ProviderReader(
@@ -178,7 +178,7 @@ class DissectServiceProvider extends ServiceProvider
             $app->make(DependencyResolver::class),
             // Constructed rather than resolved, for the same reason as the job
             // half: same mechanism, its own directories.
-            new RouteFingerprint((array) config('dissect.providers.watch_paths', ['app'])),
+            new RouteFingerprint($this->watched('providers', ['app'], ['app/Providers'])),
         ));
 
         $this->app->singleton(PayloadDecoder::class, fn () => new PayloadDecoder);
@@ -225,6 +225,28 @@ class DissectServiceProvider extends ServiceProvider
      * The viewer exposes the full schema and writes a layout file, so it stays
      * off outside local development unless switched on deliberately.
      */
+    /**
+     * The directories a surface's change signal stats.
+     *
+     * The ones it scans are always among them. `watch_paths` exists to widen
+     * the signal past the scanned directories — a constructor anywhere down a
+     * provider tree, a dispatch site anywhere in `app` — not to narrow it. A
+     * provider directory outside `app/`, as a monorepo package would have,
+     * otherwise never moves the signal, and edits to it sit behind a cached
+     * export for up to an hour.
+     *
+     * @param  array<int, string>  $watch
+     * @param  array<int, string>  $scan
+     * @return array<int, string>
+     */
+    protected function watched(string $surface, array $watch, array $scan): array
+    {
+        return array_values(array_unique([
+            ...(array) config("dissect.{$surface}.watch_paths", $watch),
+            ...(array) config("dissect.{$surface}.paths", $scan),
+        ]));
+    }
+
     protected function shouldRegisterRoutes(): bool
     {
         $enabled = config('dissect.enabled');

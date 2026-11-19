@@ -3,6 +3,8 @@
 namespace KdrDev\Dissect\Tests\Feature;
 
 use Illuminate\Filesystem\Filesystem;
+use KdrDev\Dissect\Jobs\JobExporter;
+use KdrDev\Dissect\ProviderTree\ProviderExporter;
 use KdrDev\Dissect\Tests\TestCase;
 use PHPUnit\Framework\Attributes\Test;
 
@@ -71,5 +73,39 @@ class CacheInvalidationTest extends TestCase
         // Nothing changed, so the second request read the entry the first one
         // wrote rather than adding one beside it.
         $this->assertSame($written, count((new Filesystem)->allFiles($this->cache)));
+    }
+
+    #[Test]
+    public function a_provider_directory_outside_the_watched_paths_still_moves_the_signal(): void
+    {
+        // A monorepo package: scanned for providers, nowhere under `app`.
+        $this->rewire('providers');
+        $before = $this->app->make(ProviderExporter::class)->fingerprint();
+
+        file_put_contents($this->scanned.'/BillingServiceProvider.php', '<?php // added');
+
+        $this->rewire('providers');
+        $this->assertNotSame($before, $this->app->make(ProviderExporter::class)->fingerprint());
+    }
+
+    #[Test]
+    public function a_job_directory_outside_the_watched_paths_still_moves_the_signal(): void
+    {
+        $this->rewire('jobs');
+        $before = $this->app->make(JobExporter::class)->fingerprint();
+
+        file_put_contents($this->scanned.'/ChargeInvoice.php', '<?php // added');
+
+        $this->rewire('jobs');
+        $this->assertNotSame($before, $this->app->make(JobExporter::class)->fingerprint());
+    }
+
+    /** Scan the temporary directory, watch one that never changes, and rebuild the exporter. */
+    protected function rewire(string $surface): void
+    {
+        config()->set("dissect.{$surface}.paths", [$this->scanned]);
+        config()->set("dissect.{$surface}.watch_paths", [__DIR__.'/../../workbench/routes']);
+
+        $this->app->forgetInstance($surface === 'jobs' ? JobExporter::class : ProviderExporter::class);
     }
 }
