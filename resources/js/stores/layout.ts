@@ -74,15 +74,32 @@ export const useLayoutStore = defineStore('layout', () => {
     timer = setTimeout(() => void save(), SAVE_DEBOUNCE_MS)
   }
 
-  async function save() {
+  /**
+   * Writes the layout, one request at a time.
+   *
+   * Queued like the views store's writes, and for a sharper reason: the
+   * debounce only spaces saves out, it does not stop a slow one overlapping
+   * the next. Two POSTs in flight can land out of order, leaving the file
+   * holding the earlier of the two layouts.
+   */
+  let queue: Promise<void> = Promise.resolve()
+
+  function save(): Promise<void> {
+    queue = queue.then(write)
+    return queue
+  }
+
+  async function write() {
     saving.value = true
     saveError.value = null
 
-    const next = pendingIds
-      ? Object.fromEntries(
-          Object.entries(positions.value).filter(([id]) => pendingIds!.includes(id)),
-        )
-      : positions.value
+    // Read at send time, not when the save was scheduled: a queued write
+    // must carry every drag made while it waited.
+    const sent = positions.value
+    const keep = pendingIds
+    const body = keep
+      ? Object.fromEntries(Object.entries(sent).filter(([id]) => keep.includes(id)))
+      : sent
 
     const { saveUrl, csrfToken } = bootstrap()
 
@@ -94,10 +111,25 @@ export const useLayoutStore = defineStore('layout', () => {
           // Laravel rejects the POST without this; harmless when standalone.
           ...(csrfToken ? { 'x-csrf-token': csrfToken } : {}),
         },
-        body: JSON.stringify({ version: 1, positions: next }),
+        body: JSON.stringify({ version: 1, positions: body }),
       })
       if (!res.ok) throw new Error(`${res.status} ${res.statusText}`)
-      positions.value = next
+
+      // Forget the models that were pruned from the file — and only those.
+      // Assigning what was sent back to `positions` would also erase every
+      // drag made while the request was in flight. A position replaced since
+      // (a model that came back and was dragged again) is a new object, so
+      // the identity check leaves it alone.
+      if (keep) {
+        const pruned = Object.keys(sent).filter(
+          (id) => !(id in body) && positions.value[id] === sent[id],
+        )
+        if (pruned.length > 0) {
+          positions.value = Object.fromEntries(
+            Object.entries(positions.value).filter(([id]) => !pruned.includes(id)),
+          )
+        }
+      }
     } catch (e) {
       saveError.value = e instanceof Error ? e.message : String(e)
     } finally {
