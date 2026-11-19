@@ -40,9 +40,13 @@ jobs:
       # rebuilt) and cannot produce a false alarm.
       - name: Fail if the frontend moved after the bundle did
         run: |
-          sources=$(git log -1 --format=%ct -- \
-            resources/js vite.config.ts vite-plugin-persistence.ts \
-            package.json pnpm-lock.yaml)
+          # What the build reads. Not vite-plugin-persistence.ts: it is
+          # `apply: 'serve'`, so it never reaches the build, and rebuilding
+          # after a change to it gives byte-identical output, which leaves
+          # no dist/ commit that could satisfy this check.
+          paths="resources/js vite.config.ts package.json pnpm-lock.yaml"
+
+          sources=$(git log -1 --format=%ct -- $paths)
           bundle=$(git log -1 --format=%ct -- dist)
 
           if [ -z "$bundle" ]; then
@@ -59,7 +63,7 @@ jobs:
             echo "    pnpm build && git add dist && git commit"
             echo
             echo "Most recent frontend change:"
-            git log -1 --format='  %h %ad %s' --date=short -- resources/js vite.config.ts
+            git log -1 --format='  %h %ad %s' --date=short -- $paths
             echo "Most recent dist/ build:"
             git log -1 --format='  %h %ad %s' --date=short -- dist
             exit 1
