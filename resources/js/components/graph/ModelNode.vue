@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { computed } from 'vue'
-import { Handle, Position, type NodeProps } from '@vue-flow/core'
+import { computed, nextTick, watch } from 'vue'
+import { Handle, Position, useVueFlow, type NodeProps } from '@vue-flow/core'
 import type { ModelNodeData, SchemaColumn } from '@/types/schema'
 import { LAYOUT_DIRECTION, MAX_VISIBLE_COLUMNS } from '@/lib/layout'
+import { MORE_HANDLE, NODE_HANDLE, columnHandle } from '@/lib/relationHandles'
 import { useSchemaStore } from '@/stores/schema'
 import { useJobsStore } from '@/stores/jobs'
 import { useNavigationStore } from '@/stores/navigation'
@@ -57,6 +58,41 @@ const visibleColumns = computed(() =>
 const hiddenColumnCount = computed(() =>
   expanded.value ? 0 : Math.max(0, props.data.columns.length - MAX_VISIBLE_COLUMNS),
 )
+
+/**
+ * The columns of this model a relation leaves from or arrives at. Each gets a
+ * handle on its own row, so an edge starts at `author_id` rather than at the
+ * card as a whole; see lib/relationHandles.
+ */
+const keys = computed(() => store.keys.get(props.id))
+
+/** Whether a key column is folded into "+N more", which then stands in for it. */
+const hiddenKeys = computed(() => {
+  const hidden = props.data.columns.slice(visibleColumns.value.length).map((col) => col.name)
+  return {
+    in: hidden.some((name) => keys.value?.in.has(name)),
+    out: hidden.some((name) => keys.value?.out.has(name)),
+  }
+})
+
+/**
+ * A row's handle sits on the card's border, like the card's own handles. The
+ * row is inset by the card's padding (px-3), so the handle is pushed out by it.
+ */
+const rowHandleStyle = {
+  in: { left: 'calc(-0.75rem - 4px)' },
+  out: { right: 'calc(-0.75rem - 4px)' },
+}
+
+/**
+ * Vue Flow measures where a card's handles are when the card resizes. Opening
+ * a card does resize it, but the rows it adds can render after that
+ * measurement, and scrolling an open card moves rows without resizing
+ * anything. Both would leave edges pointing at where a row used to be.
+ */
+const { updateNodeInternals } = useVueFlow()
+const remeasure = () => nextTick(() => updateNodeInternals([props.id]))
+watch([expanded, keys], remeasure)
 
 // A model with no $fillable reports every column as non-fillable, which would
 // stamp "guarded" on every row and say nothing. The flag is only meaningful
@@ -170,13 +206,21 @@ function onKeydown(event: KeyboardEvent) {
       v-if="data.columns.length"
       class="mt-1 flex flex-col gap-px border-t pt-1"
       :class="expanded ? 'nowheel max-h-[380px] overflow-y-auto' : ''"
+      @scroll.passive="remeasure"
     >
       <li
         v-for="col in visibleColumns"
         :key="col.name"
         class="font-mono text-[10px] leading-[14px] text-muted-foreground"
       >
-        <div class="flex items-baseline justify-between gap-2">
+        <div class="relative flex items-baseline justify-between gap-2">
+          <Handle
+            v-if="keys?.in.has(col.name)"
+            :id="columnHandle(col.name, 'in')"
+            type="target"
+            :position="Position.Left"
+            :style="rowHandleStyle.in"
+          />
           <span class="truncate" :class="{ 'italic opacity-70': col.virtual }">{{ col.name }}</span>
           <!-- Short label is shown; the verbatim database type is on the tooltip,
                since that is what you want when chasing a migration issue. -->
@@ -187,6 +231,13 @@ function onKeydown(event: KeyboardEvent) {
           >
             {{ col.label }}
           </span>
+          <Handle
+            v-if="keys?.out.has(col.name)"
+            :id="columnHandle(col.name, 'out')"
+            type="source"
+            :position="Position.Right"
+            :style="rowHandleStyle.out"
+          />
         </div>
 
         <div v-if="expanded" class="flex flex-wrap gap-1 pb-0.5">
@@ -205,9 +256,23 @@ function onKeydown(event: KeyboardEvent) {
       </li>
       <li
         v-if="hiddenColumnCount"
-        class="font-mono text-[10px] leading-[14px] text-muted-foreground/70 italic"
+        class="relative font-mono text-[10px] leading-[14px] text-muted-foreground/70 italic"
       >
+        <Handle
+          v-if="hiddenKeys.in"
+          :id="MORE_HANDLE.in"
+          type="target"
+          :position="Position.Left"
+          :style="rowHandleStyle.in"
+        />
         +{{ hiddenColumnCount }} more
+        <Handle
+          v-if="hiddenKeys.out"
+          :id="MORE_HANDLE.out"
+          type="source"
+          :position="Position.Right"
+          :style="rowHandleStyle.out"
+        />
       </li>
     </ul>
 
@@ -231,8 +296,21 @@ function onKeydown(event: KeyboardEvent) {
       </button>
     </div>
 
-    <Handle type="target" :position="targetPosition" />
-    <Handle type="source" :position="sourcePosition" />
+    <!-- The card as a whole: for a relation whose columns are not known.
+         Always present, so an edge can attach the moment it needs to, but
+         only drawn while one does. -->
+    <Handle
+      :id="NODE_HANDLE.in"
+      type="target"
+      :position="targetPosition"
+      :class="{ 'opacity-0': !store.cardHandlesInUse.in.has(id) }"
+    />
+    <Handle
+      :id="NODE_HANDLE.out"
+      type="source"
+      :position="sourcePosition"
+      :class="{ 'opacity-0': !store.cardHandlesInUse.out.has(id) }"
+    />
   </div>
 </template>
 

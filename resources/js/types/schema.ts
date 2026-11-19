@@ -101,6 +101,25 @@ export interface SchemaEdge {
   /** The relation method name on the source model, e.g. `documents`. */
   name: string
   type: RelationType | string
+  /**
+   * The columns that tie the two models together. Optional because a host may
+   * be running a version of the package from before it was emitted.
+   */
+  keys?: RelationKeys
+}
+
+/**
+ * Which column on each end of a relation does the linking: `posts.author_id`
+ * → `authors.id` for a belongs-to. Null where it cannot be named, such as the
+ * far end of a MorphTo, whose owner is a different model on every row.
+ */
+export interface RelationKeys {
+  /** A column of the model declaring the relation. */
+  source: string | null
+  /** A column of the related model. */
+  target: string | null
+  /** The table in between: a many-to-many's pivot, a has-through's middle. */
+  via: string | null
 }
 
 export interface Schema {

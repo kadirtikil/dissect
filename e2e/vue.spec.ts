@@ -222,3 +222,95 @@ test('a dragged node stays where it was put when the view changes', async ({ pag
 
   expect(await flowPosition(page, 'User')).toEqual(dragged)
 })
+
+/**
+ * How far an edge's two ends are, on screen, from the handles they should
+ * leave and arrive at. Both are measured in page pixels, so the canvas's pan
+ * and zoom do not matter.
+ */
+async function edgeOffsets(
+  page: Page,
+  edge: { source: string; name: string; target: string },
+  handles: { source: string; target: string },
+) {
+  return page.evaluate(
+    ({ edge, handles }) => {
+      const id = `App\\Models\\${edge.source}--${edge.name}--App\\Models\\${edge.target}`
+      const path = [...document.querySelectorAll<SVGGElement>('.vue-flow__edge')]
+        .find((g) => g.dataset.id === id)
+        ?.querySelector<SVGPathElement>('.vue-flow__edge-path')
+      if (!path) return null
+
+      const onScreen = (at: number) => {
+        const point = path.getPointAtLength(at)
+        const matrix = path.getScreenCTM()!
+        return new DOMPoint(point.x, point.y).matrixTransform(matrix)
+      }
+
+      const handle = (model: string, handleId: string) => {
+        const node = [...document.querySelectorAll<HTMLElement>('.vue-flow__node')].find(
+          (n) => n.dataset.id === `App\\Models\\${model}`,
+        )
+        const box = node
+          ?.querySelector(`.vue-flow__handle[data-handleid="${handleId}"]`)
+          ?.getBoundingClientRect()
+        return box ? { x: box.x + box.width / 2, y: box.y + box.height / 2 } : null
+      }
+
+      const from = handle(edge.source, handles.source)
+      const to = handle(edge.target, handles.target)
+      if (!from || !to) return null
+
+      const start = onScreen(0)
+      const end = onScreen(path.getTotalLength())
+      return {
+        source: Math.hypot(start.x - from.x, start.y - from.y),
+        target: Math.hypot(end.x - to.x, end.y - to.y),
+      }
+    },
+    { edge, handles },
+  )
+}
+
+test('a relation runs from its foreign key to the key it points at', async ({ page }) => {
+  await openGraph(page)
+  await expect(page.locator('.vue-flow__node')).toHaveCount(22)
+
+  // Document belongs to Folder: from documents.folder_id to folders.id.
+  const offsets = await edgeOffsets(
+    page,
+    { source: 'Document', name: 'folder', target: 'Folder' },
+    { source: 'col-out:folder_id', target: 'col-in:id' },
+  )
+
+  expect(offsets).not.toBeNull()
+  expect(offsets!.source).toBeLessThan(3)
+  expect(offsets!.target).toBeLessThan(3)
+})
+
+test('a key folded into "+N more" is stood in for until the card opens', async ({ page }) => {
+  await openGraph(page)
+  await expect(page.locator('.vue-flow__node')).toHaveCount(22)
+
+  // documents.workspace_id is past what a collapsed card lists.
+  const edge = { source: 'Document', name: 'workspace', target: 'Workspace' }
+
+  const folded = await edgeOffsets(page, edge, { source: 'more-out', target: 'col-in:id' })
+  expect(folded).not.toBeNull()
+  expect(folded!.source).toBeLessThan(3)
+
+  await node(page, 'Document').locator('.model-node').click()
+  await expect(node(page, 'Document').locator('.model-node')).toHaveAttribute(
+    'aria-expanded',
+    'true',
+  )
+
+  // Once listed, the column carries its own handle and the edge moves to it.
+  await expect
+    .poll(
+      async () =>
+        (await edgeOffsets(page, edge, { source: 'col-out:workspace_id', target: 'col-in:id' }))
+          ?.source,
+    )
+    .toBeLessThan(3)
+})
