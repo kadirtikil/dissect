@@ -38,6 +38,11 @@ export interface Bootstrap {
    */
   providersUrl?: string
   /**
+   * Endpoint returning every domain and the classes in it. A URL rather than
+   * the payload: building it reads every PHP file under the source folders.
+   */
+  domainsUrl?: string
+  /**
    * Endpoint returning what is on the queue right now.
    *
    * The one payload here that is not derived from source, so unlike the two

@@ -1,6 +1,6 @@
 import type { LucideIcon } from '@lucide/vue'
 import type { Component } from 'vue'
-import { Activity, Boxes, House, Route, Timer, TreePine } from '@lucide/vue'
+import { Activity, Boxes, House, Network, Route, Timer, TreePine } from '@lucide/vue'
 
 /**
  * Every surface dissect has, in the order the sidebar lists them.
@@ -9,7 +9,7 @@ import { Activity, Boxes, House, Route, Timer, TreePine } from '@lucide/vue'
  * the sidebar, the navigation store and the shell all pick it up. None of them
  * knows any page by name.
  */
-export type PageId = 'landing' | 'models' | 'routes' | 'jobs' | 'queue' | 'providertree'
+export type PageId = 'landing' | 'models' | 'routes' | 'jobs' | 'queue' | 'providertree' | 'domains'
 
 export interface PageEntry {
   id: PageId
@@ -63,6 +63,12 @@ export const pages: readonly PageEntry[] = [
     label: 'Provider-Trees',
     icon: TreePine,
     component: () => import('@/pages/ProviderTreePanel.vue'),
+  },
+  {
+    id: 'domains',
+    label: 'Domains',
+    icon: Network,
+    component: () => import('@/pages/DomainsPanel.vue'),
   },
 ]
 
