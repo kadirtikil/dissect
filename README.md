@@ -275,6 +275,10 @@ should be noticed rather than believed.
 `/dissect/domains.json` lists every domain, how it was found, the classes in
 it, the unassigned classes and the findings.
 
+Every model, route, job and provider is also tagged with its domain, so the
+other pages can show it. A route belongs to its controller's domain, and a
+closure route to the domain of the file it is written in.
+
 ## 🛣️ Routes
 
 The **Routes** tab is the other half of the same question. The graph says what

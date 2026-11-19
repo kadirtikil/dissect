@@ -749,7 +749,8 @@ selection as a new view or add it to the open one.
       "kind": "string",                  // portable
       "nullable": false, "unique": true, "increments": false,
       "fillable": true, "hidden": false, "cast": null, "virtual": false
-    }]
+    }],
+    "context": "Identity"             // its domain, or null; see below
   }],
   "edges": [{
     "source": "App\\Models\\User", "target": "App\\Models\\Team",
@@ -962,6 +963,19 @@ A row carries the envelope and nothing else:
 There is deliberately no `payload` and no `batch` id: the first is somebody's
 data, and the second only exists inside the serialised command, which is never
 opened.
+
+### `context`: the domain on every row
+
+Model nodes, routes, jobs, providers and every node in a provider's tree carry
+`context`: the name of the domain the class belongs to, or `null`. It is
+resolved on the PHP side by `ContextResolver`, so the page can label and filter
+by domain without fetching `domains.json`. It is called `context` rather than
+`domain` because a route's `domain` is already its host.
+
+A route takes its controller's domain, or for a closure, the domain of the file
+the closure is written in. A plain app's rows are all `null`. Each payload is
+cached against its own signal, none of which watches `.dissect/domains.json`,
+so that file's modification time is part of the cache stamp.
 
 ### `domains.json` (generated — never hand-edited, never written)
 
