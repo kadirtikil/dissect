@@ -21,9 +21,13 @@ const { status, error, snapshot, reading, loaded, readable, depths, totals } = s
  */
 let stop: (() => void) | undefined
 
-onMounted(async () => {
-  await store.read()
+// The poller starts synchronously, before the first read is awaited. Started
+// after it, a page left while that read was still in flight unmounted with
+// nothing to stop — and the timer it then started polled for the rest of the
+// session.
+onMounted(() => {
   stop = store.watchQueue()
+  void store.read()
 })
 
 onUnmounted(() => stop?.())

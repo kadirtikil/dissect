@@ -58,3 +58,29 @@ test('follows a queued job to the class behind it', async ({ page }) => {
   )
   await expect(page.getByText('App\\Jobs\\RenderThumbnail')).toBeVisible()
 })
+
+test('stops polling when the page is left before its first reading arrives', async ({ page }) => {
+  await page.clock.install()
+
+  // Hold the first reading until the page has already been left.
+  let release!: () => void
+  const held = new Promise<void>((resolve) => (release = resolve))
+  let reads = 0
+
+  await page.route('**/queue.json*', async (route) => {
+    reads++
+    if (reads === 1) await held
+    await route.continue()
+  })
+
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Queue', exact: true }).click()
+  await expect.poll(() => reads).toBe(1)
+
+  await page.getByRole('button', { name: 'Jobs', exact: true }).click()
+  release()
+
+  // Several poll intervals later, nothing else has been asked for.
+  await page.clock.runFor(30_000)
+  expect(reads).toBe(1)
+})
