@@ -133,4 +133,29 @@ class BrokenFilesTest extends TestCase
         $this->assertNotContains('DissectBroken\\Providers\\HalfSaved', $ids);
     }
 
+    #[Test]
+    public function a_provider_whose_tree_throws_keeps_its_row_and_says_why(): void
+    {
+        $this->partialMock(ProviderInspector::class, function ($mock) {
+            $mock->shouldReceive('tree')
+                ->with(SiblingServiceProvider::class)
+                ->andThrow(new RuntimeException("Container exploded\nwith a trace"));
+            $mock->shouldReceive('tree')->passthru();
+        });
+
+        $providers = collect($this->getJson('/dissect/providers.json')->assertOk()->json('providers'))
+            ->keyBy('id');
+
+        $this->assertTrue($providers->has(BindingServiceProvider::class), 'the others are still read');
+
+        $sibling = $providers->get(SiblingServiceProvider::class);
+
+        $this->assertNotNull($sibling, 'a provider that throws is still listed');
+        $this->assertTrue($sibling['partial']);
+        $this->assertSame(
+            ['could not be read: RuntimeException: Container exploded'],
+            array_column(array_filter($sibling['nodes'], fn ($node) => $node['kind'] === 'unresolved'), 'label'),
+        );
+    }
+
 }

@@ -2,6 +2,7 @@
 
 namespace KdrDev\Dissect\ProviderTree;
 
+use Illuminate\Support\Str;
 use KdrDev\Dissect\Routes\RouteFingerprint;
 use Throwable;
 
@@ -79,8 +80,12 @@ class ProviderExporter
             $this->resolver->resolve($tree);
 
             $description = $tree->build()->toArray();
-        } catch (Throwable) {
-            return null;
+        } catch (Throwable $e) {
+            $description = $this->unreadable($class, $e);
+
+            if ($description === null) {
+                return null;
+            }
         }
 
         // The list needs a name and a file without digging the root out of
@@ -92,5 +97,42 @@ class ProviderExporter
             'file' => $file,
             ...$description,
         ];
+    }
+
+    /**
+     * The row for a provider whose tree threw half way.
+     *
+     * Dropping it would make the provider look like it does not exist, which
+     * is the one wrong answer: it is registered and it does run. So it keeps
+     * its row, with a single dotted box under the root saying why the rest is
+     * missing — the same shape as any other branch the reader could not name,
+     * so the list marks it partial and the canvas says "not fully analysed".
+     *
+     * @return array<string, mixed>|null
+     */
+    protected function unreadable(string $class, Throwable $e): ?array
+    {
+        try {
+            $tree = new TreeBuilder($class);
+
+            $tree->edge(
+                $class,
+                $tree->unresolved('could not be read: '.$this->reason($e), 1),
+                EdgeKind::Calls,
+                'unknown',
+            );
+
+            return $tree->build()->toArray();
+        } catch (Throwable) {
+            return null;
+        }
+    }
+
+    /** The exception, short enough to fit a node: its class and first line. */
+    protected function reason(Throwable $e): string
+    {
+        $message = strtok($e->getMessage(), "\n") ?: '';
+
+        return class_basename($e).($message === '' ? '' : ': '.Str::limit($message, 120));
     }
 }
