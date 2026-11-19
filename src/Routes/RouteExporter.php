@@ -67,35 +67,62 @@ class RouteExporter
      * reason a model whose table is missing still gets a node: the other forty
      * are still worth looking at.
      *
+     * Only the address is load-bearing. Everything read from the action — the
+     * controller, its parameters, what goes in and what comes back — is read
+     * on its own, so a FormRequest that will not autoload or a controller that
+     * throws on construction costs that one field, not the endpoint. A list
+     * that quietly omits routes is worse than one that says it could not read
+     * them.
+     *
      * @return array<string, mixed>|null
      */
     protected function describe(Route $route): ?array
     {
         try {
-            $reflection = $this->actions->reflect($route);
             $described = $this->collector->describe($route);
-            $action = $this->actions->describe($route);
-            $parameters = $this->collector->parameters($route);
+        } catch (Throwable) {
+            return null;
+        }
 
-            // JSON:API first. Every route the package registers runs the same
-            // generic controller, so reflecting the action answers
-            // `JsonApiController` for all of them — the schema behind the route
-            // is the only thing that describes the payload, and where there is
-            // one it is a better answer than anything the reflection can give.
-            $document = $this->documents->response($route);
+        $reflection = $this->attempt(fn () => $this->actions->reflect($route));
 
-            $request = $this->documents->request($route) ?? $this->requests->analyse($reflection);
-            $response = $document ?? $this->responses->analyse($reflection);
+        // JSON:API first. Every route the package registers runs the same
+        // generic controller, so reflecting the action answers
+        // `JsonApiController` for all of them — the schema behind the route is
+        // the only thing that describes the payload, and where there is one it
+        // is a better answer than anything the reflection can give.
+        $request = $this->attempt(fn () => $this->documents->request($route)
+            ?? $this->requests->analyse($reflection));
+        $response = $this->attempt(fn () => $this->documents->response($route)
+            ?? $this->responses->analyse($reflection));
 
-            return [
-                'id' => self::id($described['methods'], $described['uri']),
-                ...$described,
-                'group' => $this->actions->group($route),
-                'action' => $action,
-                'parameters' => $parameters,
-                'request' => $request,
-                'response' => $response,
-            ];
+        return [
+            'id' => self::id($described['methods'], $described['uri']),
+            ...$described,
+            'group' => $this->attempt(fn () => $this->actions->group($route)) ?? 'other',
+            'action' => $this->attempt(fn () => $this->actions->describe($route))
+                ?? ['type' => 'unknown', 'class' => null, 'method' => null, 'label' => $route->getActionName()],
+            'parameters' => $this->attempt(fn () => $this->collector->parameters($route)) ?? [],
+            'request' => $request,
+            'response' => $response,
+        ];
+    }
+
+    /**
+     * Runs one part of a route's description, and swallows what it throws.
+     *
+     * `null` is what the client already renders as "not analysed", so a part
+     * that could not be read looks exactly like one that was never attempted.
+     *
+     * @template T
+     *
+     * @param  callable(): T  $read
+     * @return T|null
+     */
+    protected function attempt(callable $read): mixed
+    {
+        try {
+            return $read();
         } catch (Throwable) {
             return null;
         }

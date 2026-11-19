@@ -158,4 +158,33 @@ class BrokenFilesTest extends TestCase
         );
     }
 
+    #[Test]
+    public function a_form_request_that_does_not_load_costs_the_request_not_the_route(): void
+    {
+        $route = $this->route('POST:broken-request');
+
+        $this->assertNotNull($route, 'the endpoint is still listed');
+        $this->assertSame('BrokenController@store', $route['action']['label']);
+    }
+
+    #[Test]
+    public function an_analyzer_that_throws_costs_that_field_not_the_route(): void
+    {
+        $this->partialMock(ResponseAnalyzer::class, function ($mock) {
+            $mock->shouldReceive('analyse')->andThrow(new RuntimeException('unreadable'));
+        });
+
+        $route = $this->route('POST:broken-request');
+
+        $this->assertNotNull($route, 'the endpoint is still listed');
+        $this->assertNull($route['response'], 'the client renders null as "not analysed"');
+        $this->assertSame('controller', $route['action']['type'], 'the rest is still described');
+    }
+
+    /** @return array<string, mixed>|null */
+    protected function route(string $id): ?array
+    {
+        return collect($this->getJson('/dissect/routes.json')->assertOk()->json('routes'))
+            ->firstWhere('id', $id);
+    }
 }
