@@ -5,6 +5,8 @@ namespace KdrDev\Dissect\Queue;
 use Illuminate\Bus\Batch;
 use Illuminate\Bus\BatchRepository;
 use Illuminate\Contracts\Container\Container;
+use Illuminate\Queue\Failed\DatabaseFailedJobProvider;
+use Illuminate\Queue\Failed\DatabaseUuidFailedJobProvider;
 use Illuminate\Queue\Failed\FailedJobProviderInterface;
 use Throwable;
 
@@ -48,7 +50,7 @@ class QueueHistory
         }
 
         try {
-            $all = $failer->all();
+            [$rows, $total] = $this->page($failer, $limit);
         } catch (Throwable $e) {
             return $this->unreadable(
                 'The failed jobs could not be read: '.$this->reason($e)
@@ -56,10 +58,43 @@ class QueueHistory
         }
 
         return [
-            'rows' => array_map($this->describeFailure(...), array_slice($all, 0, $limit)),
-            'total' => count($all),
+            'rows' => array_map($this->describeFailure(...), $rows),
+            'total' => $total,
             'unreadable' => null,
         ];
+    }
+
+    /**
+     * The newest `$limit` failures, and how many there are in all.
+     *
+     * `all()` is the only read the interface promises, and on the database
+     * stores it loads every row — payload and full stack trace included. This
+     * runs on every queue poll, and failed_jobs is the table nobody prunes, so
+     * the default stores are asked for one page and a count instead. A store
+     * the framework offers no narrower read for still gets `all()`.
+     *
+     * @return array{0: array<int, object>, 1: int}
+     */
+    protected function page(FailedJobProviderInterface $failer, int $limit): array
+    {
+        if ($failer instanceof DatabaseUuidFailedJobProvider || $failer instanceof DatabaseFailedJobProvider) {
+            $rows = $failer->getTable()->orderBy('id', 'desc')->limit($limit)->get()->all();
+
+            // The uuid store addresses a failure by its uuid, and all() swaps it
+            // into `id` for exactly that reason — so does this.
+            if ($failer instanceof DatabaseUuidFailedJobProvider) {
+                foreach ($rows as $row) {
+                    $row->id = $row->uuid;
+                    unset($row->uuid);
+                }
+            }
+
+            return [$rows, $failer->count()];
+        }
+
+        $all = $failer->all();
+
+        return [array_slice($all, 0, $limit), count($all)];
     }
 
     /**
