@@ -30,6 +30,9 @@ class RedisQueueReader implements QueueReader
     /** Returns members and scores interleaved, on either client. */
     protected const ZRANGE = "return redis.call('zrange', KEYS[1], ARGV[1], ARGV[2], 'WITHSCORES')";
 
+    /** @var array<int, string>|null */
+    protected ?array $names = null;
+
     public function __construct(
         protected RedisQueue $queue,
         protected PayloadDecoder $payloads,
@@ -146,18 +149,24 @@ class RedisQueueReader implements QueueReader
      * whether or not it has a key, because "the queue your workers are draining
      * is empty" is an answer, and its absence from a list is not.
      *
+     * Read once per reader, and a reader lives for one snapshot. Every section
+     * of the snapshot needs the names, and KEYS walks the whole keyspace and
+     * blocks the server while it does — four walks per poll on a Redis that
+     * also holds the cache and the sessions is four stalls for everything else.
+     *
      * @return array<int, string>
      */
     protected function names(): array
     {
+        if ($this->names !== null) {
+            return $this->names;
+        }
+
         $names = [$this->default];
 
         try {
             foreach ((array) $this->connection()->keys('queues:*') as $key) {
-                // Tolerates whatever prefix the Redis connection is configured
-                // with, and the braces a cluster adds — the same parsing the
-                // framework does when it asks itself this question.
-                $name = trim(Str::between((string) $key, 'queues:', ':'), '{}');
+                $name = $this->nameOf((string) $key);
 
                 if ($name !== '') {
                     $names[] = $name;
@@ -168,7 +177,31 @@ class RedisQueueReader implements QueueReader
             // the default queue, which is the one that matters most.
         }
 
-        return array_values(array_unique($names));
+        return $this->names = array_values(array_unique($names));
+    }
+
+    /**
+     * The queue a key belongs to.
+     *
+     * Everything after `queues:` — which tolerates whatever prefix the
+     * connection is configured with — less the suffix of the structure it
+     * names, and less the braces a cluster adds. Not "up to the next colon":
+     * `emails:high` is a perfectly good queue name, and cutting at the colon
+     * reported it as `emails`.
+     */
+    protected function nameOf(string $key): string
+    {
+        $name = Str::after($key, 'queues:');
+
+        foreach ([':delayed', ':reserved', ':notify'] as $suffix) {
+            if (str_ends_with($name, $suffix)) {
+                $name = substr($name, 0, -strlen($suffix));
+
+                break;
+            }
+        }
+
+        return trim($name, '{}');
     }
 
     /**
