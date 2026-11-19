@@ -114,4 +114,23 @@ class BrokenFilesTest extends TestCase
         $this->get('/dissect')->assertOk();
     }
 
+    #[Test]
+    public function the_job_list_survives_a_job_that_does_not_load(): void
+    {
+        $classes = array_column($this->getJson('/dissect/jobs.json')->assertOk()->json('jobs'), 'class');
+
+        $this->assertContains(PublishPost::class, $classes);
+        $this->assertNotContains('DissectBroken\\Jobs\\HalfSaved', $classes);
+        $this->assertNotContains('DissectBroken\\Jobs\\Orphaned', $classes);
+    }
+
+    #[Test]
+    public function the_provider_list_survives_a_provider_that_does_not_load(): void
+    {
+        $ids = array_column($this->getJson('/dissect/providers.json')->assertOk()->json('providers'), 'id');
+
+        $this->assertContains(BindingServiceProvider::class, $ids);
+        $this->assertNotContains('DissectBroken\\Providers\\HalfSaved', $ids);
+    }
+
 }

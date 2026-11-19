@@ -94,13 +94,15 @@ final class ProviderReader
      */
     protected function isProvider(string $class): bool
     {
-        // class_exists() first, so a file whose class cannot be autoloaded is
-        // skipped rather than fatal — the same guard the job scan uses.
-        if (! class_exists($class)) {
-            return false;
-        }
-
+        // Both steps can throw, not just the reflection: class_exists()
+        // includes the file, so a half-saved class raises a ParseError and one
+        // whose parent is gone raises an Error. Either way the file is skipped
+        // rather than fatal to the whole list.
         try {
+            if (! class_exists($class)) {
+                return false;
+            }
+
             $reflection = new ReflectionClass($class);
         } catch (Throwable) {
             return false;
