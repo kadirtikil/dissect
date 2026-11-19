@@ -34,6 +34,7 @@ use KdrDev\Dissect\Routes\RouteExporter;
 use KdrDev\Dissect\Routes\RouteFingerprint;
 use KdrDev\Dissect\Routes\RuleNormalizer;
 use KdrDev\Dissect\Routes\RuleSource;
+use KdrDev\Dissect\Support\CodeOwnership;
 use KdrDev\Dissect\Types\TypeNormalizerManager;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
@@ -68,7 +69,13 @@ class DissectServiceProvider extends ServiceProvider
             $app->make(Router::class),
         ));
 
-        $this->app->singleton(ActionResolver::class, fn () => new ActionResolver);
+        // One read of Composer's installed.json for every surface that asks
+        // whose code something is.
+        $this->app->singleton(CodeOwnership::class, fn () => new CodeOwnership);
+
+        $this->app->singleton(ActionResolver::class, fn (Application $app) => new ActionResolver(
+            $app->make(CodeOwnership::class),
+        ));
 
         $this->app->singleton(ClassSource::class, fn () => new ClassSource);
 
@@ -166,6 +173,7 @@ class DissectServiceProvider extends ServiceProvider
 
         $this->app->singleton(ProviderInspector::class, fn (Application $app) => new ProviderInspector(
             $app->make(ClassSource::class),
+            $app->make(CodeOwnership::class),
         ));
 
         $this->app->singleton(DependencyResolver::class, fn () => new DependencyResolver(
@@ -180,6 +188,7 @@ class DissectServiceProvider extends ServiceProvider
             // Constructed rather than resolved, for the same reason as the job
             // half: same mechanism, its own directories.
             new RouteFingerprint($this->watched('providers', ['app'], ['app/Providers'])),
+            $app->make(CodeOwnership::class),
         ));
 
         $this->app->singleton(PayloadDecoder::class, fn () => new PayloadDecoder);

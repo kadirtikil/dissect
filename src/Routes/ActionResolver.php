@@ -3,6 +3,7 @@
 namespace KdrDev\Dissect\Routes;
 
 use Illuminate\Routing\Route;
+use KdrDev\Dissect\Support\CodeOwnership;
 use ReflectionClass;
 use ReflectionFunction;
 use ReflectionFunctionAbstract;
@@ -24,6 +25,8 @@ class ActionResolver
         'Illuminate\Routing\ViewController' => 'view',
         'Illuminate\Routing\RedirectController' => 'redirect',
     ];
+
+    public function __construct(protected CodeOwnership $owners = new CodeOwnership) {}
 
     /**
      * @return array{type: string, class: string|null, method: string|null, label: string}
@@ -98,27 +101,11 @@ class ActionResolver
      * A namespace check would have to guess at the application's own prefix,
      * and gets the answer wrong for anything living outside `App\` — a Domain
      * folder, a path-repository package, or this package's own workbench.
-     * Where a file sits relative to `vendor/` is not a guess.
+     * {@see CodeOwnership} has the rules.
      */
     public function group(Route $route): string
     {
-        $file = $this->fileFor($route);
-
-        if ($file === null) {
-            // Nothing to inspect (an eval'd or generated action). The namespace
-            // is the only signal left.
-            return str_starts_with((string) $route->getActionName(), 'Illuminate\\')
-                ? 'framework'
-                : 'vendor';
-        }
-
-        $file = str_replace('\\', '/', $file);
-
-        if (str_contains($file, '/vendor/laravel/framework/')) {
-            return 'framework';
-        }
-
-        return str_contains($file, '/vendor/') ? 'vendor' : 'app';
+        return $this->owners->of((string) $route->getActionName(), $this->fileFor($route));
     }
 
     protected function fileFor(Route $route): ?string

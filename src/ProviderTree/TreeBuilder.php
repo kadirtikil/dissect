@@ -5,6 +5,7 @@ namespace KdrDev\Dissect\ProviderTree;
 use Closure;
 use Illuminate\Support\ServiceProvider;
 use KdrDev\Dissect\Jobs\ProjectPath;
+use KdrDev\Dissect\Support\CodeOwnership;
 use ReflectionClass;
 use Throwable;
 
@@ -57,8 +58,10 @@ final class TreeBuilder
     protected int $offset = 0;
 
     /** @param  class-string  $provider */
-    public function __construct(public readonly string $provider)
-    {
+    public function __construct(
+        public readonly string $provider,
+        protected CodeOwnership $owners = new CodeOwnership,
+    ) {
         $this->named($provider, NodeKind::Provider, 0, 'certain');
         $this->current = $provider;
         $this->read[$provider] = true;
@@ -301,13 +304,9 @@ final class TreeBuilder
     /** @param  ReflectionClass<object>|null  $reflection */
     protected function origin(?ReflectionClass $reflection): Origin
     {
-        return match (true) {
-            $reflection === null => Origin::None,
-            str_starts_with($reflection->getName(), 'Illuminate\\') => Origin::Framework,
-            $reflection->getFileName() === false,
-            str_contains($reflection->getFileName(), DIRECTORY_SEPARATOR.'vendor'.DIRECTORY_SEPARATOR) => Origin::Vendor,
-            default => Origin::App,
-        };
+        return $reflection === null
+            ? Origin::None
+            : Origin::from($this->owners->of($reflection->getName(), $reflection->getFileName()));
     }
 
     /**
