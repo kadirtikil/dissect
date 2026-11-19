@@ -89,7 +89,7 @@ config file is usually unnecessary.
 
 The rest are config-file only:
 
-- **`middleware`** — defaults to `['web']`. Add your auth middleware here if you enable the viewer outside local.
+- **`middleware`** — defaults to `['web']`. Add your auth middleware here if you enable the viewer outside local. The `viewDissect` gate check is always appended after it; see below.
 - **`layout_path`** — defaults to `base_path('.dissect/layout.json')`. Deliberately not in `storage/` (gitignored) or `vendor/` (wiped by `composer install`), because the layout is meant to be committed and shared.
 - **`views_path`** — defaults to `base_path('.dissect/views.json')`, for the same reason: "the billing models" is worth agreeing on once and reviewing in a pull request.
 - **`routes.watch_paths`** — defaults to `['app', 'routes']`. Which directories are watched to notice that the endpoint list has gone stale. Narrow it to the directories that actually hold HTTP code if your `app/` is large.
@@ -134,17 +134,36 @@ neither of them:
    on after somebody debugged something.
 
 Break either — a staging box left at `APP_ENV=local`, a deploy that installs dev
-dependencies — and the viewer is live. Unauthenticated, it serves your full
-schema, every route, every validation rule, and accepts two POSTs that write
-into your project root.
+dependencies — and the routes are live. That is why registering them is not the
+same as letting anybody in.
 
-If you enable it anywhere but your own machine, the middleware is the control
-that holds when the environment check does not:
+**Outside `local`, every dissect route asks the `viewDissect` gate**, the way
+Telescope asks `viewTelescope`. No gate defined means a 403. The check is added
+after your `middleware` list, so editing that list cannot remove it. To use the
+viewer on staging, enable it and say who may see it, for example in your
+`AppServiceProvider::boot()`:
 
 ```php
-'enabled' => true,
-'middleware' => ['web', 'auth', 'can:view-schema'],
+use Illuminate\Support\Facades\Gate;
+
+Gate::define('viewDissect', fn ($user) => in_array($user->email, [
+    'you@example.com',
+]));
 ```
+
+Give the closure a nullable user (`fn (?User $user = null) => …`) if the box is
+already behind a VPN or basic auth and guests should get in.
+
+Be clear about what the gate guards. Anyone who passes it sees:
+
+- your full schema, every route, every validation rule and every job;
+- **what is on your queues right now**: which jobs, on which queue, their
+  attempts and timings. The job's own arguments are never decoded or shown;
+- **failed jobs, including the first line of each exception**. dissect cuts SQL
+  out of database errors before showing them, but other exception messages are
+  shown as written, and applications do put user data in those;
+- two POST endpoints that write `.dissect/layout.json` and `.dissect/views.json`
+  into your project root.
 
 ### 🧷 Upgrades and your files
 

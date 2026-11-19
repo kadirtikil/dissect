@@ -8,6 +8,7 @@ use Illuminate\Database\DatabaseManager;
 use Illuminate\Database\Eloquent\ModelInspector;
 use Illuminate\Queue\QueueManager;
 use Illuminate\Routing\Router;
+use KdrDev\Dissect\Http\Middleware\Authorize;
 use KdrDev\Dissect\Jobs\DispatchScanner;
 use KdrDev\Dissect\Jobs\JobDiscovery;
 use KdrDev\Dissect\Jobs\JobExporter;
@@ -260,7 +261,9 @@ class DissectServiceProvider extends ServiceProvider
     {
         Route::group([
             'prefix' => config('dissect.path', 'dissect'),
-            'middleware' => config('dissect.middleware', ['web']),
+            // Authorize goes last and outside the config: it is the control
+            // that has to hold however the middleware list was edited.
+            'middleware' => [...(array) config('dissect.middleware', ['web']), Authorize::class],
         ], function () {
             $this->loadRoutesFrom(__DIR__.'/../routes/web.php');
         });
