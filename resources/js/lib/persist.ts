@@ -9,6 +9,12 @@ import { bootstrap } from '@/lib/bootstrap'
  */
 export type Revision = string | null | undefined
 
+/**
+ * Format of layout.json and views.json this page writes. 2 keys models by
+ * full class name; the package migrates a version 1 save from an older page.
+ */
+export const STATE_VERSION = 2
+
 /** Reads the revision out of a payload, tolerating hosts that send none. */
 export function revisionOf(payload: unknown): Revision {
   if (typeof payload !== 'object' || payload === null || !('revision' in payload)) return undefined

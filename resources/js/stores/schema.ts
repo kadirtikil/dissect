@@ -17,6 +17,7 @@ import { useRoutesStore } from '@/stores/routes'
 import { useJobsStore } from '@/stores/jobs'
 import { useProviderStore } from '@/stores/provider'
 import { bootstrap } from '@/lib/bootstrap'
+import { baseName, shortNames } from '@/lib/modelNames'
 
 type Status = 'idle' | 'loading' | 'ready' | 'error'
 
@@ -99,6 +100,17 @@ export const useSchemaStore = defineStore('schema', () => {
   }
 
   /** Models referenced by a relation but missing from `nodes`. */
+  /**
+   * What each node is called on screen. Ids are fully qualified class names;
+   * see lib/modelNames for how they are shortened.
+   */
+  const labels = computed(() => new Map(nodes.value.map((n) => [n.id, n.data?.label ?? n.id])))
+
+  /** A model's on-screen name, including one the graph does not hold. */
+  function labelOf(id: string): string {
+    return labels.value.get(id) ?? baseName(id)
+  }
+
   const externalModels = computed(() =>
     nodes.value.filter((n) => n.data?.external).map((n) => n.id),
   )
@@ -182,13 +194,15 @@ export const useSchemaStore = defineStore('schema', () => {
       }
     }
 
+    const names = shortNames([...declared.keys(), ...externalIds])
+
     const toNode = (id: string, model: SchemaNode | null): Node<ModelNodeData> => ({
       id,
       type: 'model',
       // Overwritten by layoutGraph below; the grid owns position.
       position: { x: 0, y: 0 },
       data: {
-        label: id,
+        label: names.get(id) ?? baseName(id),
         table: model?.table ?? '—',
         className: model?.class ?? id,
         columns: normaliseColumns(model?.columns),
@@ -412,6 +426,7 @@ export const useSchemaStore = defineStore('schema', () => {
     stats,
     generatedAt,
     externalModels,
+    labelOf,
     lastUpdated,
     expanded,
     highlighted,

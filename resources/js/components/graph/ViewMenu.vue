@@ -37,12 +37,21 @@ const members = computed(() =>
 const models = computed(() => {
   const term = search.value.trim().toLowerCase()
 
-  return nodes.value
-    .map((n) => ({ id: n.id, table: n.data?.table ?? '', external: n.data?.external ?? false }))
-    .filter(
-      (m) => !term || m.id.toLowerCase().includes(term) || m.table.toLowerCase().includes(term),
-    )
-    .sort((a, b) => a.id.localeCompare(b.id))
+  return (
+    nodes.value
+      .map((n) => ({
+        id: n.id,
+        label: n.data?.label ?? n.id,
+        table: n.data?.table ?? '',
+        external: n.data?.external ?? false,
+      }))
+      // The full class name is searched too, so "billing" finds every model in
+      // that namespace, not only the ones whose short name happens to say so.
+      .filter(
+        (m) => !term || m.id.toLowerCase().includes(term) || m.table.toLowerCase().includes(term),
+      )
+      .sort((a, b) => a.label.localeCompare(b.label))
+  )
 })
 
 /**
@@ -249,7 +258,7 @@ function isLastMember(id: string): boolean {
               @click="toggleModel(model.id)"
             >
               <Check class="size-3.5 shrink-0" :class="members.has(model.id) ? '' : 'opacity-0'" />
-              <span class="truncate">{{ model.id }}</span>
+              <span class="truncate" :title="model.id">{{ model.label }}</span>
               <span class="ml-auto shrink-0 text-[10px] text-muted-foreground">
                 {{ model.external ? 'not in scan' : model.table }}
               </span>

@@ -441,8 +441,8 @@ is a fatal error, not a catchable one. `confidence` grades the result on the
 same ladder the request and response shapes use, and `Confidence` keeps the
 weakest grade of everything that had to be read.
 
-**The two joins are the point.** `models` carries the class basenames the graph
-uses as node keys, read from the constructor signature — which is literally what
+**The two joins are the point.** `models` carries the full class names the
+graph uses as node keys, read from the constructor signature — which is literally what
 gets serialised onto the queue. `dispatched_by[].route` carries a route id from
 `routes.json`. `RouteMap` builds that second one by addressing both sides the
 same way: a controller by its fully qualified `Class@method`, a closure by where
@@ -712,7 +712,7 @@ selection as a new view or add it to the open one.
 ```jsonc
 {
   "nodes": [{
-    "id": "User",                     // class basename, the graph key
+    "id": "App\\Models\\User",          // full class name, the graph key
     "class": "App\\Models\\User",
     "table": "users",
     "connection": "pgsql",
@@ -726,7 +726,7 @@ selection as a new view or add it to the open one.
     }]
   }],
   "edges": [{
-    "source": "User", "target": "Team",
+    "source": "App\\Models\\User", "target": "App\\Models\\Team",
     "name": "teams",                  // the relation method
     "type": "BelongsToMany"
   }]
@@ -813,7 +813,7 @@ is committed and nothing has to be sanitised on write.
     "traits": { "batchable": true, "unique": false,
                 "encrypted": false, "afterCommit": true },
     "payload": [                          // the constructor signature — what goes on the wire
-      { "name": "invoice", "type": "App\\Models\\Invoice", "model": "Invoice",
+      { "name": "invoice", "type": "App\\Models\\Invoice", "model": "App\\Models\\Invoice",
         "optional": false, "variadic": false, "default": null }
     ],
     "middleware": ["WithoutOverlapping"], // class basenames, read from source
@@ -829,7 +829,7 @@ is committed and nothing has to be sanitised on write.
       "delayed": false, "afterCommit": true,
       "route": "POST:api/invoices"        // ← the join to routes.json
     }],
-    "models": ["Invoice"]                 // ← the join to schema.json
+    "models": ["App\\Models\\Invoice"]   // ← the join to schema.json
   }],
   "generated_at": "…",
   "fingerprint": "…"
@@ -934,7 +934,7 @@ opened.
 ### `layout.json` (authored — safe to commit and review)
 
 ```json
-{ "version": 1, "positions": { "User": { "x": 957, "y": 780 } } }
+{ "version": 2, "positions": { "App\\Models\\User": { "x": 957, "y": 780 } } }
 ```
 
 Kept separate from the schema on purpose: the schema is regenerated and would
@@ -946,15 +946,16 @@ of a shareable layout).
 
 ```json
 {
-  "version": 1,
-  "views": [{ "id": "billing", "name": "Billing", "models": ["Invoice", "Payment"] }]
+  "version": 2,
+  "views": [{ "id": "billing", "name": "Billing",
+              "models": ["App\\Models\\Invoice", "App\\Models\\Payment"] }]
 }
 ```
 
 Stored at `base_path('.dissect/views.json')`, for the same reasons: "the billing
 models" is worth agreeing on once and reviewing in a pull request. `id` is a
-slug of the name and addresses the view; `models` are node ids (class
-basenames). Both hosts validate against the same rules — `ViewRepository` on the
+slug of the name and addresses the view; `models` are node ids (full
+class names). Both hosts validate against the same rules — `ViewRepository` on the
 PHP side, `sanitiseViews()` in the dev-server plugin — so a file written by
 either is one the other accepts.
 
@@ -990,6 +991,16 @@ Writes go to a uniquely named temporary file beside the target and are renamed
 into place, with every step checked. A directory that cannot be created, a short
 write or a failed rename throws `StateFileException::unwritable()` (answered with
 500 and the reason), and the previous file is left untouched.
+
+**Format 2** replaced short class names with full ones as model ids, because two
+models called `Invoice` in different namespaces were one node. A version 1 file
+is upgraded as it is read, against the graph's model list (discovered only when
+there is such a file to read): a name one model has becomes that model; a name
+several share keeps all of them in a view and drops the position in a layout,
+where one spot for two nodes would hide one; a name no model has is dropped. A
+page opened before the upgrade still saves version 1, and the controller passes
+the version it sent along so those saves are migrated the same way.
+`tests/StateMigrationTest.php` pins the rules.
 
 The refusal direction matters more than the migration one. A migration is code
 you will write deliberately when you bump the format; the refusal protects

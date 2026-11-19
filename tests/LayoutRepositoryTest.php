@@ -49,9 +49,16 @@ class LayoutRepositoryTest extends PhpUnitTestCase
             'App\\Models\\Post' => ['x' => 1, 'y' => 2],
             '' => ['x' => 1, 'y' => 2],
             '9Lives' => ['x' => 1, 'y' => 2],
+            'App\\Models\\' => ['x' => 1, 'y' => 2],
+            'App\\\\Models' => ['x' => 1, 'y' => 2],
+            'App/Models/Tag' => ['x' => 1, 'y' => 2],
+            str_repeat('A', 256) => ['x' => 1, 'y' => 2],
         ]);
 
-        $this->assertSame(['Post' => ['x' => 1, 'y' => 2]], $this->repository()->get()['positions']);
+        $this->assertSame([
+            'Post' => ['x' => 1, 'y' => 2],
+            'App\\Models\\Post' => ['x' => 1, 'y' => 2],
+        ], $this->repository()->get()['positions']);
     }
 
     #[Test]

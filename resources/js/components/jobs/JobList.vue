@@ -4,9 +4,11 @@ import { storeToRefs } from 'pinia'
 import { ChevronDown, ChevronRight } from '@lucide/vue'
 import JobKindBadge from '@/components/jobs/JobKindBadge.vue'
 import { useJobsStore } from '@/stores/jobs'
+import { useSchemaStore } from '@/stores/schema'
 import { isUndispatched } from '@/lib/jobFilters'
 
 const store = useJobsStore()
+const schema = useSchemaStore()
 const { grouped, selectedId, search } = storeToRefs(store)
 
 /**
@@ -67,7 +69,7 @@ watch(search, () => collapsed.value.clear())
             <span
               v-if="job.models.length"
               class="shrink-0 font-mono text-[10px] text-muted-foreground tabular-nums"
-              :title="job.models.join(', ')"
+              :title="job.models.map(schema.labelOf).join(', ')"
             >
               {{ job.models.length }} ⬡
             </span>

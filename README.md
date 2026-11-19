@@ -173,9 +173,15 @@ your project rather than `vendor/`, so `composer update` cannot touch them.
 Both files record the format version they were written in, and dissect will not
 rewrite a file written by a **newer** version than the one you are running — it
 reads it, renders what it understands, and refuses the save with a message
-rather than quietly replacing your layout with the subset it recognised. If a
-future release does change the format, your file is copied to
-`.dissect/layout.json.v1.bak` before the first migrating write. An unparseable
+rather than quietly replacing your layout with the subset it recognised. When a
+release changes the format, your file is copied to
+`.dissect/layout.json.v1.bak` before the first migrating write.
+
+Format 2 identifies models by full class name (`App\Models\Invoice`) rather than
+short name, so two `Invoice` models in different namespaces are two nodes. An
+older file is upgraded automatically. A short name two models share stays in a
+view as both models, and loses its position in the layout, since there is no
+telling which of the two was dragged there. An unparseable
 file is copied to `.dissect/layout.json.corrupt.bak` before being replaced
 (`.corrupt.2.bak` and on for later ones, so no broken hand edit is lost).
 

@@ -187,7 +187,7 @@ class DissectController
         }
 
         try {
-            $saved = $this->layout->put($positions, $revision);
+            $saved = $this->layout->put($positions, $revision, $this->format($request, LayoutRepository::VERSION));
 
             // Read back rather than computed: the page's next save is based on
             // this, so it has to describe the file as it now is.
@@ -219,12 +219,27 @@ class DissectController
         }
 
         try {
-            $saved = $this->views->put($views, $revision);
+            $saved = $this->views->put($views, $revision, $this->format($request, ViewRepository::VERSION));
 
             return response()->json(['ok' => true, 'saved' => $saved, 'revision' => $this->views->revision()]);
         } catch (StateFileException $e) {
             return $this->refused($e);
         }
+    }
+
+    /**
+     * The file format the page says it sent.
+     *
+     * Every page so far has sent one, so it matters after an upgrade: a tab
+     * opened before it still sends version 1 ids, and they are migrated
+     * rather than stored as if they were current. A client that sends none is
+     * not one of ours and is taken to mean the current format.
+     */
+    protected function format(Request $request, int $current): int
+    {
+        $version = $request->input('version');
+
+        return is_int($version) && $version > 0 ? min($version, $current) : $current;
     }
 
     /**

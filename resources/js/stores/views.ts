@@ -2,7 +2,7 @@ import { defineStore } from 'pinia'
 import { computed, ref, shallowRef } from 'vue'
 import type { GraphView, ViewsFile } from '@/types/schema'
 import { bootstrap } from '@/lib/bootstrap'
-import { persist, revisionOf, type Revision } from '@/lib/persist'
+import { persist, revisionOf, STATE_VERSION, type Revision } from '@/lib/persist'
 
 /** Standalone dev-server fallback; the package injects its own route. */
 const DEV_ENDPOINT = '/__views'
@@ -190,7 +190,7 @@ export const useViewsStore = defineStore('views', () => {
     try {
       revision = await persist(
         bootstrap().saveViewsUrl ?? DEV_ENDPOINT,
-        { version: 1, views: views.value },
+        { version: STATE_VERSION, views: views.value },
         revision,
       )
     } catch (e) {

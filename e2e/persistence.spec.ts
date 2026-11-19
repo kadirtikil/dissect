@@ -20,7 +20,7 @@ test('a page on another origin cannot write the layout', async ({ request, baseU
   // no preflight, and an Origin the browser fills in and the page cannot fake.
   const res = await request.post('/__layout', {
     headers: { origin: 'https://evil.example', 'content-type': 'text/plain' },
-    data: JSON.stringify({ version: 1, positions: { Pwned: { x: 1, y: 1 } } }),
+    data: JSON.stringify({ version: 2, positions: { Pwned: { x: 1, y: 1 } } }),
   })
 
   expect(res.status()).toBe(403)
@@ -42,7 +42,7 @@ test('an oversized body is refused without being read to the end', async ({ requ
   const positions: Record<string, { x: number; y: number }> = {}
   for (let i = 0; i < 40_000; i++) positions[`Model${i}`] = { x: i, y: i }
 
-  const res = await request.post('/__layout', { data: { version: 1, positions } })
+  const res = await request.post('/__layout', { data: { version: 2, positions } })
 
   expect(res.status()).toBe(413)
   expect(readFileSync(LAYOUT, 'utf8')).toBe(before)

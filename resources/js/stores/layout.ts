@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, shallowRef } from 'vue'
 import { bootstrap } from '@/lib/bootstrap'
-import { persist, revisionOf, type Revision } from '@/lib/persist'
+import { persist, revisionOf, STATE_VERSION, type Revision } from '@/lib/persist'
 
 export interface NodePosition {
   x: number
@@ -112,7 +112,7 @@ export const useLayoutStore = defineStore('layout', () => {
     try {
       revision = await persist(
         bootstrap().saveUrl ?? DEV_ENDPOINT,
-        { version: 1, positions: body },
+        { version: STATE_VERSION, positions: body },
         revision,
       )
 

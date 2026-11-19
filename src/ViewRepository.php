@@ -2,6 +2,7 @@
 
 namespace KdrDev\Dissect;
 
+use Closure;
 use KdrDev\Dissect\Concerns\VersionedStateFile;
 use KdrDev\Dissect\Exceptions\StateFileException;
 
@@ -20,8 +21,12 @@ class ViewRepository
 {
     use VersionedStateFile;
 
-    /** Format of the file this version reads and writes. See VersionedStateFile. */
-    public const VERSION = 1;
+    /**
+     * Format of the file this version reads and writes. See VersionedStateFile.
+     *
+     * 2: models are listed by full class name. 1 listed them by short name.
+     */
+    public const VERSION = 2;
 
     /** Bounds on what will be accepted, so the file cannot be grown without limit. */
     protected const MAX_VIEWS = 100;
@@ -30,7 +35,11 @@ class ViewRepository
 
     protected const MAX_NAME_LENGTH = 64;
 
-    public function __construct(protected string $path) {}
+    /**
+     * @param  (Closure(): iterable<string>)|null  $models  The graph's model ids, for
+     *                                                      migrating a version 1 file.
+     */
+    public function __construct(protected string $path, protected ?Closure $models = null) {}
 
     /** @return array{version: int, views: array<int, array{id: string, name: string, models: array<int, string>}>, revision: string|null} */
     public function get(): array
@@ -42,7 +51,7 @@ class ViewRepository
 
         return [
             'version' => self::VERSION,
-            'views' => $this->sanitise($decoded['views'] ?? []),
+            'views' => $this->sanitise($decoded['views'] ?? [], $this->versionOf($decoded ?? [])),
             'revision' => $this->revisionOf($contents),
         ];
     }
@@ -52,12 +61,14 @@ class ViewRepository
      * @return int Number of views written.
      *
      * @param  string|null  $basedOn  The revision the client last read; see VersionedStateFile::save().
+     * @param  int  $format  The format the client sent. A page opened before an
+     *                       upgrade still sends version 1 ids.
      *
      * @throws StateFileException when the existing file must not be overwritten.
      */
-    public function put(array $views, ?string $basedOn = self::ANY_REVISION): int
+    public function put(array $views, ?string $basedOn = self::ANY_REVISION, int $format = self::VERSION): int
     {
-        $clean = $this->sanitise($views);
+        $clean = $this->sanitise($views, $format);
 
         $this->save(['version' => self::VERSION, 'views' => $clean], $basedOn);
 
@@ -70,7 +81,7 @@ class ViewRepository
      *
      * @return array<int, array{id: string, name: string, models: array<int, string>}>
      */
-    protected function sanitise(mixed $views): array
+    protected function sanitise(mixed $views, int $format = self::VERSION): array
     {
         if (! is_array($views)) {
             return [];
@@ -86,7 +97,7 @@ class ViewRepository
 
             $name = $this->cleanName($view['name'] ?? null);
             $id = $this->cleanId($view['id'] ?? null) ?: $this->cleanId($name);
-            $models = $this->cleanModels($view['models'] ?? null);
+            $models = $this->cleanModels($view['models'] ?? null, $format);
 
             // A view with no name, no id or nothing in it cannot be selected
             // or displayed, so it is not worth persisting.
@@ -137,13 +148,17 @@ class ViewRepository
     }
 
     /**
-     * Model ids are class basenames — the graph key, as exported by
+     * Model ids are class names — the graph key, as exported by
      * SchemaExporter. Anything that could not be one is dropped rather than
      * silently rendering a member that matches no node.
      *
+     * A version 1 short name becomes the model it names. When two models
+     * share it, the view keeps both: a view that shows one model too many is
+     * easy to fix, one that quietly lost a member is not.
+     *
      * @return array<int, string>
      */
-    protected function cleanModels(mixed $models): array
+    protected function cleanModels(mixed $models, int $format = self::VERSION): array
     {
         if (! is_array($models)) {
             return [];
@@ -152,14 +167,18 @@ class ViewRepository
         $clean = [];
 
         foreach ($models as $model) {
-            if (! is_string($model) || ! preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/', $model)) {
+            $model = $this->modelId($model);
+
+            if ($model === null) {
                 continue;
             }
 
-            $clean[$model] = true;
+            foreach ($format < 2 ? $this->upgradeModelId($model) : [$model] as $id) {
+                $clean[$id] = true;
 
-            if (count($clean) >= self::MAX_MODELS_PER_VIEW) {
-                break;
+                if (count($clean) >= self::MAX_MODELS_PER_VIEW) {
+                    break 2;
+                }
             }
         }
 

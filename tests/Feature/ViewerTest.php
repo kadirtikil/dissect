@@ -30,11 +30,17 @@ class ViewerTest extends TestCase
 
         $names = array_column($schema['nodes'], 'id');
 
-        $this->assertContains('Post', $names);
-        $this->assertContains('Author', $names);
+        // Ids are full class names: the one name two models cannot share.
+        $this->assertContains('Workbench\\App\\Models\\Post', $names);
+        $this->assertContains('Workbench\\App\\Models\\Author', $names);
         $this->assertNotEmpty($schema['edges']);
 
-        $post = collect($schema['nodes'])->firstWhere('id', 'Post');
+        foreach ($schema['edges'] as $edge) {
+            $this->assertStringContainsString('\\', $edge['source']);
+            $this->assertStringContainsString('\\', $edge['target']);
+        }
+
+        $post = collect($schema['nodes'])->firstWhere('id', 'Workbench\\App\\Models\\Post');
 
         $this->assertSame('posts', $post['table']);
         $this->assertNotEmpty($post['columns'], 'columns should be read from the real schema');

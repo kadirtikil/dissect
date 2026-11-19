@@ -1,6 +1,15 @@
 import { test, expect, type Page } from '@playwright/test'
 
 /**
+ * A graph node, by model. Node ids are full class names, and a backslash
+ * inside a CSS attribute value has to be escaped.
+ */
+function node(page: Page, model: string) {
+  const id = `App\\Models\\${model}`.replaceAll('\\', '\\\\')
+  return page.locator(`.vue-flow__node[data-id="${id}"]`)
+}
+
+/**
  * The graph is no longer what the app opens on, so a test that works with it
  * has to ask for it.
  *
@@ -74,8 +83,8 @@ test('saves a selection as a view, switches to it and deletes it', async ({ page
   // Box-select the first grid column's top two models. Coordinates come from
   // the nodes themselves: the grid is stable, but hard-coding pixels would
   // make this fail on any change to node height.
-  const first = (await page.locator('[data-id="AccessGrant"]').boundingBox())!
-  const second = (await page.locator('[data-id="Activity"]').boundingBox())!
+  const first = (await node(page, 'AccessGrant').boundingBox())!
+  const second = (await node(page, 'Activity').boundingBox())!
 
   // Clamped to the pane: the gutter left of the column is only canvas as far as
   // the sidebar, and a drag starting outside it never reaches Vue Flow at all.
@@ -163,10 +172,10 @@ test('builds a view from the model list and extends it afterwards', async ({ pag
 })
 
 /** Where Vue Flow has placed a node, in canvas coordinates rather than pixels. */
-async function flowPosition(page: Page, id: string): Promise<{ x: number; y: number }> {
-  const style = (await page.locator(`.vue-flow__node[data-id="${id}"]`).getAttribute('style')) ?? ''
+async function flowPosition(page: Page, model: string): Promise<{ x: number; y: number }> {
+  const style = (await node(page, model).getAttribute('style')) ?? ''
   const match = style.match(/translate\((-?[\d.]+)px,\s*(-?[\d.]+)px\)/)
-  if (!match) throw new Error(`no transform on ${id}: ${style}`)
+  if (!match) throw new Error(`no transform on ${model}: ${style}`)
   return { x: Number(match[1]), y: Number(match[2]) }
 }
 
@@ -181,7 +190,7 @@ test('a dragged node stays where it was put when the view changes', async ({ pag
   await expect(page.locator('.vue-flow__node')).toHaveCount(22)
 
   const grid = await flowPosition(page, 'User')
-  const box = (await page.locator('[data-id="User"]').boundingBox())!
+  const box = (await node(page, 'User').boundingBox())!
 
   const saved = page.waitForRequest('**/__layout')
   await page.mouse.move(box.x + box.width / 2, box.y + 12)

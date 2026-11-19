@@ -1,7 +1,7 @@
 {
     "nodes": [
         {
-            "id": "AccessGrant",
+            "id": "App\\Models\\AccessGrant",
             "class": "App\\Models\\AccessGrant",
             "table": "access_grants",
             "connection": "pgsql",
@@ -126,7 +126,7 @@
             ]
         },
         {
-            "id": "Activity",
+            "id": "App\\Models\\Activity",
             "class": "App\\Models\\Activity",
             "table": "activities",
             "connection": "pgsql",
@@ -225,7 +225,7 @@
             ]
         },
         {
-            "id": "Contact",
+            "id": "App\\Models\\Contact",
             "class": "App\\Models\\Contact",
             "table": "contacts",
             "connection": "pgsql",
@@ -363,7 +363,7 @@
             ]
         },
         {
-            "id": "Document",
+            "id": "App\\Models\\Document",
             "class": "App\\Models\\Document",
             "table": "documents",
             "connection": "pgsql",
@@ -514,7 +514,7 @@
             ]
         },
         {
-            "id": "DocumentType",
+            "id": "App\\Models\\DocumentType",
             "class": "App\\Models\\DocumentType",
             "table": "document_types",
             "connection": "pgsql",
@@ -600,7 +600,7 @@
             ]
         },
         {
-            "id": "Folder",
+            "id": "App\\Models\\Folder",
             "class": "App\\Models\\Folder",
             "table": "folders",
             "connection": "pgsql",
@@ -712,7 +712,7 @@
             ]
         },
         {
-            "id": "Invitation",
+            "id": "App\\Models\\Invitation",
             "class": "App\\Models\\Invitation",
             "table": "invitations",
             "connection": "pgsql",
@@ -876,7 +876,7 @@
             ]
         },
         {
-            "id": "MetadataField",
+            "id": "App\\Models\\MetadataField",
             "class": "App\\Models\\MetadataField",
             "table": "metadata_fields",
             "connection": "pgsql",
@@ -1014,7 +1014,7 @@
             ]
         },
         {
-            "id": "MetadataValue",
+            "id": "App\\Models\\MetadataValue",
             "class": "App\\Models\\MetadataValue",
             "table": "metadata_values",
             "connection": "pgsql",
@@ -1113,7 +1113,7 @@
             ]
         },
         {
-            "id": "ReviewComment",
+            "id": "App\\Models\\ReviewComment",
             "class": "App\\Models\\ReviewComment",
             "table": "review_comments",
             "connection": "pgsql",
@@ -1251,7 +1251,7 @@
             ]
         },
         {
-            "id": "Role",
+            "id": "App\\Models\\Role",
             "class": "App\\Models\\Role",
             "table": "roles",
             "connection": "pgsql",
@@ -1337,7 +1337,7 @@
             ]
         },
         {
-            "id": "Tag",
+            "id": "App\\Models\\Tag",
             "class": "App\\Models\\Tag",
             "table": "tags",
             "connection": "pgsql",
@@ -1423,7 +1423,7 @@
             ]
         },
         {
-            "id": "Team",
+            "id": "App\\Models\\Team",
             "class": "App\\Models\\Team",
             "table": "teams",
             "connection": "pgsql",
@@ -1509,7 +1509,7 @@
             ]
         },
         {
-            "id": "User",
+            "id": "App\\Models\\User",
             "class": "App\\Models\\User",
             "table": "users",
             "connection": "pgsql",
@@ -1660,7 +1660,7 @@
             ]
         },
         {
-            "id": "Variant",
+            "id": "App\\Models\\Variant",
             "class": "App\\Models\\Variant",
             "table": "variants",
             "connection": "pgsql",
@@ -1798,7 +1798,7 @@
             ]
         },
         {
-            "id": "Version",
+            "id": "App\\Models\\Version",
             "class": "App\\Models\\Version",
             "table": "versions",
             "connection": "pgsql",
@@ -2066,7 +2066,7 @@
             ]
         },
         {
-            "id": "VersionContent",
+            "id": "App\\Models\\VersionContent",
             "class": "App\\Models\\VersionContent",
             "table": "version_contents",
             "connection": "pgsql",
@@ -2139,7 +2139,7 @@
             ]
         },
         {
-            "id": "VersionReview",
+            "id": "App\\Models\\VersionReview",
             "class": "App\\Models\\VersionReview",
             "table": "version_reviews",
             "connection": "pgsql",
@@ -2264,7 +2264,7 @@
             ]
         },
         {
-            "id": "Workspace",
+            "id": "App\\Models\\Workspace",
             "class": "App\\Models\\Workspace",
             "table": "workspaces",
             "connection": "pgsql",
@@ -2363,7 +2363,7 @@
             ]
         },
         {
-            "id": "WorkspaceMembership",
+            "id": "App\\Models\\WorkspaceMembership",
             "class": "App\\Models\\WorkspaceMembership",
             "table": "user_workspace",
             "connection": "pgsql",
@@ -2451,442 +2451,442 @@
     ],
     "edges": [
         {
-            "target": "AccessGrant",
+            "target": "App\\Models\\AccessGrant",
             "type": "MorphTo",
             "name": "grantable",
-            "source": "AccessGrant"
+            "source": "App\\Models\\AccessGrant"
         },
         {
-            "target": "User",
+            "target": "App\\Models\\User",
             "type": "BelongsTo",
             "name": "grantedBy",
-            "source": "AccessGrant"
+            "source": "App\\Models\\AccessGrant"
         },
         {
-            "target": "AccessGrant",
+            "target": "App\\Models\\AccessGrant",
             "type": "MorphTo",
             "name": "grantee",
-            "source": "AccessGrant"
+            "source": "App\\Models\\AccessGrant"
         },
         {
-            "target": "Activity",
+            "target": "App\\Models\\Activity",
             "type": "MorphTo",
             "name": "subject",
-            "source": "Activity"
+            "source": "App\\Models\\Activity"
         },
         {
-            "target": "User",
+            "target": "App\\Models\\User",
             "type": "BelongsTo",
             "name": "user",
-            "source": "Activity"
+            "source": "App\\Models\\Activity"
         },
         {
-            "target": "Invitation",
+            "target": "App\\Models\\Invitation",
             "type": "HasMany",
             "name": "invitations",
-            "source": "Contact"
+            "source": "App\\Models\\Contact"
         },
         {
-            "target": "User",
+            "target": "App\\Models\\User",
             "type": "BelongsTo",
             "name": "owner",
-            "source": "Contact"
+            "source": "App\\Models\\Contact"
         },
         {
-            "target": "User",
+            "target": "App\\Models\\User",
             "type": "BelongsTo",
             "name": "user",
-            "source": "Contact"
+            "source": "App\\Models\\Contact"
         },
         {
-            "target": "AccessGrant",
+            "target": "App\\Models\\AccessGrant",
             "type": "MorphMany",
             "name": "accessGrants",
-            "source": "Document"
+            "source": "App\\Models\\Document"
         },
         {
-            "target": "Activity",
+            "target": "App\\Models\\Activity",
             "type": "MorphMany",
             "name": "activities",
-            "source": "Document"
+            "source": "App\\Models\\Document"
         },
         {
-            "target": "User",
+            "target": "App\\Models\\User",
             "type": "BelongsTo",
             "name": "creator",
-            "source": "Document"
+            "source": "App\\Models\\Document"
         },
         {
-            "target": "DocumentType",
+            "target": "App\\Models\\DocumentType",
             "type": "BelongsTo",
             "name": "documentType",
-            "source": "Document"
+            "source": "App\\Models\\Document"
         },
         {
-            "target": "Folder",
+            "target": "App\\Models\\Folder",
             "type": "BelongsTo",
             "name": "folder",
-            "source": "Document"
+            "source": "App\\Models\\Document"
         },
         {
-            "target": "Invitation",
+            "target": "App\\Models\\Invitation",
             "type": "MorphMany",
             "name": "invitations",
-            "source": "Document"
+            "source": "App\\Models\\Document"
         },
         {
-            "target": "MetadataValue",
+            "target": "App\\Models\\MetadataValue",
             "type": "MorphMany",
             "name": "metadataValues",
-            "source": "Document"
+            "source": "App\\Models\\Document"
         },
         {
-            "target": "Tag",
+            "target": "App\\Models\\Tag",
             "type": "MorphToMany",
             "name": "tags",
-            "source": "Document"
+            "source": "App\\Models\\Document"
         },
         {
-            "target": "Variant",
+            "target": "App\\Models\\Variant",
             "type": "HasMany",
             "name": "variants",
-            "source": "Document"
+            "source": "App\\Models\\Document"
         },
         {
-            "target": "Workspace",
+            "target": "App\\Models\\Workspace",
             "type": "BelongsTo",
             "name": "workspace",
-            "source": "Document"
+            "source": "App\\Models\\Document"
         },
         {
-            "target": "Document",
+            "target": "App\\Models\\Document",
             "type": "HasMany",
             "name": "documents",
-            "source": "DocumentType"
+            "source": "App\\Models\\DocumentType"
         },
         {
-            "target": "MetadataField",
+            "target": "App\\Models\\MetadataField",
             "type": "HasMany",
             "name": "metadataFields",
-            "source": "DocumentType"
+            "source": "App\\Models\\DocumentType"
         },
         {
-            "target": "AccessGrant",
+            "target": "App\\Models\\AccessGrant",
             "type": "MorphMany",
             "name": "accessGrants",
-            "source": "Folder"
+            "source": "App\\Models\\Folder"
         },
         {
-            "target": "Folder",
+            "target": "App\\Models\\Folder",
             "type": "HasMany",
             "name": "children",
-            "source": "Folder"
+            "source": "App\\Models\\Folder"
         },
         {
-            "target": "User",
+            "target": "App\\Models\\User",
             "type": "BelongsTo",
             "name": "creator",
-            "source": "Folder"
+            "source": "App\\Models\\Folder"
         },
         {
-            "target": "Document",
+            "target": "App\\Models\\Document",
             "type": "HasMany",
             "name": "documents",
-            "source": "Folder"
+            "source": "App\\Models\\Folder"
         },
         {
-            "target": "Invitation",
+            "target": "App\\Models\\Invitation",
             "type": "MorphMany",
             "name": "invitations",
-            "source": "Folder"
+            "source": "App\\Models\\Folder"
         },
         {
-            "target": "Folder",
+            "target": "App\\Models\\Folder",
             "type": "BelongsTo",
             "name": "parent",
-            "source": "Folder"
+            "source": "App\\Models\\Folder"
         },
         {
-            "target": "Workspace",
+            "target": "App\\Models\\Workspace",
             "type": "BelongsTo",
             "name": "workspace",
-            "source": "Folder"
+            "source": "App\\Models\\Folder"
         },
         {
-            "target": "Contact",
+            "target": "App\\Models\\Contact",
             "type": "BelongsTo",
             "name": "contact",
-            "source": "Invitation"
+            "source": "App\\Models\\Invitation"
         },
         {
-            "target": "Invitation",
+            "target": "App\\Models\\Invitation",
             "type": "MorphTo",
             "name": "invitable",
-            "source": "Invitation"
+            "source": "App\\Models\\Invitation"
         },
         {
-            "target": "User",
+            "target": "App\\Models\\User",
             "type": "BelongsTo",
             "name": "inviter",
-            "source": "Invitation"
+            "source": "App\\Models\\Invitation"
         },
         {
-            "target": "DocumentType",
+            "target": "App\\Models\\DocumentType",
             "type": "BelongsTo",
             "name": "documentType",
-            "source": "MetadataField"
+            "source": "App\\Models\\MetadataField"
         },
         {
-            "target": "MetadataValue",
+            "target": "App\\Models\\MetadataValue",
             "type": "HasMany",
             "name": "values",
-            "source": "MetadataField"
+            "source": "App\\Models\\MetadataField"
         },
         {
-            "target": "MetadataField",
+            "target": "App\\Models\\MetadataField",
             "type": "BelongsTo",
             "name": "field",
-            "source": "MetadataValue"
+            "source": "App\\Models\\MetadataValue"
         },
         {
-            "target": "MetadataValue",
+            "target": "App\\Models\\MetadataValue",
             "type": "MorphTo",
             "name": "metadatable",
-            "source": "MetadataValue"
+            "source": "App\\Models\\MetadataValue"
         },
         {
-            "target": "User",
+            "target": "App\\Models\\User",
             "type": "BelongsTo",
             "name": "author",
-            "source": "ReviewComment"
+            "source": "App\\Models\\ReviewComment"
         },
         {
-            "target": "VersionReview",
+            "target": "App\\Models\\VersionReview",
             "type": "BelongsTo",
             "name": "review",
-            "source": "ReviewComment"
+            "source": "App\\Models\\ReviewComment"
         },
         {
-            "target": "AccessGrant",
+            "target": "App\\Models\\AccessGrant",
             "type": "MorphMany",
             "name": "accessGrants",
-            "source": "Role"
+            "source": "App\\Models\\Role"
         },
         {
-            "target": "User",
+            "target": "App\\Models\\User",
             "type": "BelongsToMany",
             "name": "users",
-            "source": "Role"
+            "source": "App\\Models\\Role"
         },
         {
-            "target": "Document",
+            "target": "App\\Models\\Document",
             "type": "MorphToMany",
             "name": "documents",
-            "source": "Tag"
+            "source": "App\\Models\\Tag"
         },
         {
-            "target": "AccessGrant",
+            "target": "App\\Models\\AccessGrant",
             "type": "MorphMany",
             "name": "accessGrants",
-            "source": "Team"
+            "source": "App\\Models\\Team"
         },
         {
-            "target": "User",
+            "target": "App\\Models\\User",
             "type": "BelongsTo",
             "name": "creator",
-            "source": "Team"
+            "source": "App\\Models\\Team"
         },
         {
-            "target": "Invitation",
+            "target": "App\\Models\\Invitation",
             "type": "MorphMany",
             "name": "invitations",
-            "source": "Team"
+            "source": "App\\Models\\Team"
         },
         {
-            "target": "User",
+            "target": "App\\Models\\User",
             "type": "BelongsToMany",
             "name": "members",
-            "source": "Team"
+            "source": "App\\Models\\Team"
         },
         {
-            "target": "Contact",
+            "target": "App\\Models\\Contact",
             "type": "HasMany",
             "name": "contacts",
-            "source": "User"
+            "source": "App\\Models\\User"
         },
         {
-            "target": "Contact",
+            "target": "App\\Models\\Contact",
             "type": "HasMany",
             "name": "incomingContactRequests",
-            "source": "User"
+            "source": "App\\Models\\User"
         },
         {
-            "target": "DatabaseNotification",
+            "target": "Illuminate\\Notifications\\DatabaseNotification",
             "type": "MorphMany",
             "name": "notifications",
-            "source": "User"
+            "source": "App\\Models\\User"
         },
         {
-            "target": "Passkey",
+            "target": "Spatie\\LaravelPasskeys\\Models\\Passkey",
             "type": "HasMany",
             "name": "passkeys",
-            "source": "User"
+            "source": "App\\Models\\User"
         },
         {
-            "target": "Invitation",
+            "target": "App\\Models\\Invitation",
             "type": "HasManyThrough",
             "name": "receivedInvitations",
-            "source": "User"
+            "source": "App\\Models\\User"
         },
         {
-            "target": "Role",
+            "target": "App\\Models\\Role",
             "type": "BelongsToMany",
             "name": "roles",
-            "source": "User"
+            "source": "App\\Models\\User"
         },
         {
-            "target": "Invitation",
+            "target": "App\\Models\\Invitation",
             "type": "HasMany",
             "name": "sentInvitations",
-            "source": "User"
+            "source": "App\\Models\\User"
         },
         {
-            "target": "Team",
+            "target": "App\\Models\\Team",
             "type": "BelongsToMany",
             "name": "teams",
-            "source": "User"
+            "source": "App\\Models\\User"
         },
         {
-            "target": "Workspace",
+            "target": "App\\Models\\Workspace",
             "type": "BelongsToMany",
             "name": "workspaces",
-            "source": "User"
+            "source": "App\\Models\\User"
         },
         {
-            "target": "Version",
+            "target": "App\\Models\\Version",
             "type": "BelongsTo",
             "name": "currentVersion",
-            "source": "Variant"
+            "source": "App\\Models\\Variant"
         },
         {
-            "target": "Document",
+            "target": "App\\Models\\Document",
             "type": "BelongsTo",
             "name": "document",
-            "source": "Variant"
+            "source": "App\\Models\\Variant"
         },
         {
-            "target": "MetadataValue",
+            "target": "App\\Models\\MetadataValue",
             "type": "MorphMany",
             "name": "metadataValues",
-            "source": "Variant"
+            "source": "App\\Models\\Variant"
         },
         {
-            "target": "Version",
+            "target": "App\\Models\\Version",
             "type": "HasMany",
             "name": "versions",
-            "source": "Variant"
+            "source": "App\\Models\\Variant"
         },
         {
-            "target": "Activity",
+            "target": "App\\Models\\Activity",
             "type": "MorphMany",
             "name": "activities",
-            "source": "Version"
+            "source": "App\\Models\\Version"
         },
         {
-            "target": "User",
+            "target": "App\\Models\\User",
             "type": "BelongsTo",
             "name": "approver",
-            "source": "Version"
+            "source": "App\\Models\\Version"
         },
         {
-            "target": "VersionContent",
+            "target": "App\\Models\\VersionContent",
             "type": "HasOne",
             "name": "content",
-            "source": "Version"
+            "source": "App\\Models\\Version"
         },
         {
-            "target": "VersionReview",
+            "target": "App\\Models\\VersionReview",
             "type": "HasMany",
             "name": "reviews",
-            "source": "Version"
+            "source": "App\\Models\\Version"
         },
         {
-            "target": "User",
+            "target": "App\\Models\\User",
             "type": "BelongsTo",
             "name": "uploader",
-            "source": "Version"
+            "source": "App\\Models\\Version"
         },
         {
-            "target": "Variant",
+            "target": "App\\Models\\Variant",
             "type": "BelongsTo",
             "name": "variant",
-            "source": "Version"
+            "source": "App\\Models\\Version"
         },
         {
-            "target": "Version",
+            "target": "App\\Models\\Version",
             "type": "BelongsTo",
             "name": "version",
-            "source": "VersionContent"
+            "source": "App\\Models\\VersionContent"
         },
         {
-            "target": "ReviewComment",
+            "target": "App\\Models\\ReviewComment",
             "type": "HasMany",
             "name": "comments",
-            "source": "VersionReview"
+            "source": "App\\Models\\VersionReview"
         },
         {
-            "target": "User",
+            "target": "App\\Models\\User",
             "type": "BelongsTo",
             "name": "requester",
-            "source": "VersionReview"
+            "source": "App\\Models\\VersionReview"
         },
         {
-            "target": "User",
+            "target": "App\\Models\\User",
             "type": "BelongsTo",
             "name": "reviewer",
-            "source": "VersionReview"
+            "source": "App\\Models\\VersionReview"
         },
         {
-            "target": "Version",
+            "target": "App\\Models\\Version",
             "type": "BelongsTo",
             "name": "version",
-            "source": "VersionReview"
+            "source": "App\\Models\\VersionReview"
         },
         {
-            "target": "User",
+            "target": "App\\Models\\User",
             "type": "BelongsTo",
             "name": "creator",
-            "source": "Workspace"
+            "source": "App\\Models\\Workspace"
         },
         {
-            "target": "Invitation",
+            "target": "App\\Models\\Invitation",
             "type": "MorphMany",
             "name": "invitations",
-            "source": "Workspace"
+            "source": "App\\Models\\Workspace"
         },
         {
-            "target": "User",
+            "target": "App\\Models\\User",
             "type": "BelongsToMany",
             "name": "members",
-            "source": "Workspace"
+            "source": "App\\Models\\Workspace"
         },
         {
-            "target": "WorkspaceMembership",
+            "target": "App\\Models\\WorkspaceMembership",
             "type": "HasMany",
             "name": "memberships",
-            "source": "Workspace"
+            "source": "App\\Models\\Workspace"
         },
         {
-            "target": "User",
+            "target": "App\\Models\\User",
             "type": "BelongsTo",
             "name": "user",
-            "source": "WorkspaceMembership"
+            "source": "App\\Models\\WorkspaceMembership"
         },
         {
-            "target": "Workspace",
+            "target": "App\\Models\\Workspace",
             "type": "BelongsTo",
             "name": "workspace",
-            "source": "WorkspaceMembership"
+            "source": "App\\Models\\WorkspaceMembership"
         }
     ],
     "generated_at": "2026-07-19T21:10:41+00:00"

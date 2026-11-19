@@ -123,7 +123,7 @@ export interface GraphView {
   /** Slug, derived from the name. Addresses the view. */
   id: string
   name: string
-  /** Model ids (class basenames), matching `SchemaNode['id']`. */
+  /** Model ids (full class names), matching `SchemaNode['id']`. */
   models: string[]
 }
 

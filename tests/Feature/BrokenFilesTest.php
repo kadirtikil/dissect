@@ -104,7 +104,7 @@ class BrokenFilesTest extends TestCase
     {
         $response = $this->getJson('/dissect/schema.json')->assertOk();
 
-        $this->assertSame(['Healthy'], array_column($response->json('nodes'), 'id'));
+        $this->assertSame(['DissectBroken\\Models\\Healthy'], array_column($response->json('nodes'), 'id'));
     }
 
     #[Test]
