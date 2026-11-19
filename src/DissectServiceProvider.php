@@ -66,6 +66,7 @@ class DissectServiceProvider extends ServiceProvider
             $app->make(ColumnNormalizer::class),
             $app->make(MigrationState::class),
             $this->modelsPaths(),
+            $app->make(ContextResolver::class),
         ));
 
         $this->app->singleton(DomainFile::class, fn () => new DomainFile(
