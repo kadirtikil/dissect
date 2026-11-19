@@ -71,7 +71,6 @@ class WorkbenchServiceProvider extends ServiceProvider
 
         config([
             'dissect.models_path' => $useHuge ? $huge : $root.'/workbench/app/Models',
-            'dissect.models_namespace' => $useHuge ? 'Workbench\\App\\Huge' : 'Workbench\\App\\Models',
 
             // Same reason as the models path: base_path() is the throwaway
             // skeleton, so the defaults ('app', 'routes') would watch a tree

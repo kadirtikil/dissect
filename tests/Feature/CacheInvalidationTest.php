@@ -51,12 +51,27 @@ class CacheInvalidationTest extends TestCase
     {
         $this->assertNotEmpty($this->getJson('/dissect/schema.json')->json('nodes'));
 
-        // A new request with the namespace corrected — or, here, broken. No
-        // model file moved and no migration ran, so the fingerprint is the same.
-        $this->refreshApplication();
-        config()->set('dissect.models_namespace', 'Nowhere\\Models');
+        // A new request with the models directory corrected — or, here,
+        // pointed at a decoy. It has as many files as the real one and the
+        // same newest timestamp, so the fingerprint cannot tell them apart:
+        // only the config says the answer has changed.
+        $decoy = sys_get_temp_dir().'/dissect-decoy-models-'.uniqid();
+        mkdir($decoy);
 
-        $this->assertSame([], $this->getJson('/dissect/schema.json')->json('nodes'));
+        foreach (glob(__DIR__.'/../../workbench/app/Models/*.php') as $i => $model) {
+            file_put_contents($copy = $decoy.'/NotAModel'.$i.'.php', '<?php namespace DissectDecoy; class NotAModel'.$i.' {}');
+            touch($copy, filemtime($model));
+        }
+
+        try {
+            $this->refreshApplication();
+            config()->set('dissect.models.paths', [$decoy]);
+
+            $this->assertSame([], $this->getJson('/dissect/schema.json')->json('nodes'));
+        } finally {
+            array_map('unlink', glob($decoy.'/*.php'));
+            rmdir($decoy);
+        }
     }
 
     #[Test]

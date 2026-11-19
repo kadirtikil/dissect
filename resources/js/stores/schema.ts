@@ -6,10 +6,12 @@ import type {
   RawColumn,
   Schema,
   SchemaColumn,
+  RelationKeys,
   SchemaEdge,
   SchemaNode,
 } from '@/types/schema'
 import { familyFor } from '@/lib/relations'
+import { NODE_HANDLE, handleFor, keyColumns } from '@/lib/relationHandles'
 import { layoutGraph } from '@/lib/layout'
 import { useLayoutStore } from '@/stores/layout'
 import { useViewsStore } from '@/stores/views'
@@ -144,12 +146,67 @@ export const useSchemaStore = defineStore('schema', () => {
     })
   })
 
-  /** An edge needs both ends on screen, or it points into nothing. */
+  /**
+   * The columns each model has to offer a handle for, so a card draws a dot on
+   * exactly the rows an edge attaches to.
+   */
+  const keys = computed(() => keyColumns(lastSchema.value?.edges ?? []))
+
+  /** Each model's column names, in the order its card lists them. */
+  const columnNames = computed(
+    () => new Map(nodes.value.map((n) => [n.id, n.data?.columns.map((c) => c.name) ?? []])),
+  )
+
+  /**
+   * An edge needs both ends on screen, or it points into nothing.
+   *
+   * Handles are chosen here rather than in `applySchema` because they depend on
+   * whether a card is expanded: a key column past the first few is listed only
+   * then, and until it is the edge lands on the "+N more" row instead.
+   */
   const visibleEdges = computed(() => {
     const members = useViewsStore().activeModels
-    return members
+    const shown = members
       ? edges.value.filter((e) => members.has(e.source) && members.has(e.target))
       : edges.value
+
+    return shown.map((edge) => {
+      const keys = (edge.data as { keys?: RelationKeys } | undefined)?.keys
+      if (!keys) return edge
+
+      const sourceHandle = handleFor(
+        keys.source,
+        columnNames.value.get(edge.source) ?? [],
+        expanded.value.has(edge.source),
+        'out',
+      )
+      const targetHandle = handleFor(
+        keys.target,
+        columnNames.value.get(edge.target) ?? [],
+        expanded.value.has(edge.target),
+        'in',
+      )
+
+      // Unchanged edges keep their identity, so Vue Flow is not handed a whole
+      // new edge list every time one card opens.
+      return sourceHandle === edge.sourceHandle && targetHandle === edge.targetHandle
+        ? edge
+        : { ...edge, sourceHandle, targetHandle }
+    })
+  })
+
+  /**
+   * Cards an edge attaches to as a whole, by side. A card's own handle sits
+   * halfway down it, beside whichever column happens to be there; drawn where
+   * nothing uses it, it would read as that column being a key.
+   */
+  const cardHandlesInUse = computed(() => {
+    const used = { in: new Set<string>(), out: new Set<string>() }
+    for (const edge of visibleEdges.value) {
+      if ((edge.sourceHandle ?? NODE_HANDLE.out) === NODE_HANDLE.out) used.out.add(edge.source)
+      if ((edge.targetHandle ?? NODE_HANDLE.in) === NODE_HANDLE.in) used.in.add(edge.target)
+    }
+    return used
   })
 
   /**
@@ -423,6 +480,8 @@ export const useSchemaStore = defineStore('schema', () => {
     edges,
     visibleNodes,
     visibleEdges,
+    keys,
+    cardHandlesInUse,
     stats,
     generatedAt,
     externalModels,
@@ -488,9 +547,16 @@ function buildEdge(e: SchemaEdge): Edge {
     id: `${e.source}--${e.name}--${e.target}`,
     source: e.source,
     target: e.target,
-    label: e.name,
+    // The whole card until visibleEdges picks the key columns. Named rather
+    // than left out: without an id Vue Flow takes the first handle on the
+    // card, which is now whichever key row happens to come first.
+    sourceHandle: NODE_HANDLE.out,
+    targetHandle: NODE_HANDLE.in,
+    // A many-to-many's columns are both `id`; the pivot table is the part
+    // worth reading, so it rides along on the label.
+    label: e.keys?.via ? `${e.name} · ${e.keys.via}` : e.name,
     type: selfLoop ? 'smoothstep' : 'default',
-    data: { relationType: e.type, family: family.id },
+    data: { relationType: e.type, family: family.id, keys: e.keys },
     style: {
       stroke: family.color,
       strokeWidth: 1.5,

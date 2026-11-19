@@ -42,13 +42,27 @@ return [
     | application base path; absolute paths are used as given, so models can
     | live outside the application (a package, a Domain folder, a monorepo).
     |
-    | The namespace is inferred from the path for the usual `app/Models` layout.
-    | Set it explicitly when the mapping is not conventional — there is no
-    | reliable way to guess it.
+    | Each model's class name is read from its file, so a directory does not
+    | have to match its namespace.
     |
     */
 
     'models_path' => env('DISSECT_MODELS_PATH', 'app/Models'),
+
+    /*
+    | Several directories, for models that are not all in one place: one
+    | Models folder per domain, or a package's. A `*` stands for one directory
+    | name, so 'app/Domain/*' followed by '/Models' covers every domain in one
+    | entry. When this lists anything, `models_path` is not read.
+    |
+    | Class names are read from the files themselves, so no namespace has to
+    | be configured. `models_namespace` is no longer read; it is kept so an
+    | existing config that sets it is not an error.
+    */
+
+    'models' => [
+        'paths' => [],
+    ],
 
     'models_namespace' => env('DISSECT_MODELS_NAMESPACE'),
 

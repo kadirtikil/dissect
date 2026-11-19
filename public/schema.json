@@ -2454,7 +2454,12 @@
             "target": "App\\Models\\AccessGrant",
             "type": "MorphTo",
             "name": "grantable",
-            "source": "App\\Models\\AccessGrant"
+            "source": "App\\Models\\AccessGrant",
+            "keys": {
+                "source": "grantable_id",
+                "target": null,
+                "via": null
+            }
         },
         {
             "target": "App\\Models\\User",
@@ -2466,37 +2471,67 @@
             "target": "App\\Models\\AccessGrant",
             "type": "MorphTo",
             "name": "grantee",
-            "source": "App\\Models\\AccessGrant"
+            "source": "App\\Models\\AccessGrant",
+            "keys": {
+                "source": "grantee_id",
+                "target": null,
+                "via": null
+            }
         },
         {
             "target": "App\\Models\\Activity",
             "type": "MorphTo",
             "name": "subject",
-            "source": "App\\Models\\Activity"
+            "source": "App\\Models\\Activity",
+            "keys": {
+                "source": "subject_id",
+                "target": null,
+                "via": null
+            }
         },
         {
             "target": "App\\Models\\User",
             "type": "BelongsTo",
             "name": "user",
-            "source": "App\\Models\\Activity"
+            "source": "App\\Models\\Activity",
+            "keys": {
+                "source": "user_id",
+                "target": "id",
+                "via": null
+            }
         },
         {
             "target": "App\\Models\\Invitation",
             "type": "HasMany",
             "name": "invitations",
-            "source": "App\\Models\\Contact"
+            "source": "App\\Models\\Contact",
+            "keys": {
+                "source": "id",
+                "target": "contact_id",
+                "via": null
+            }
         },
         {
             "target": "App\\Models\\User",
             "type": "BelongsTo",
             "name": "owner",
-            "source": "App\\Models\\Contact"
+            "source": "App\\Models\\Contact",
+            "keys": {
+                "source": "owner_id",
+                "target": "id",
+                "via": null
+            }
         },
         {
             "target": "App\\Models\\User",
             "type": "BelongsTo",
             "name": "user",
-            "source": "App\\Models\\Contact"
+            "source": "App\\Models\\Contact",
+            "keys": {
+                "source": "user_id",
+                "target": "id",
+                "via": null
+            }
         },
         {
             "target": "App\\Models\\AccessGrant",
@@ -2520,13 +2555,23 @@
             "target": "App\\Models\\DocumentType",
             "type": "BelongsTo",
             "name": "documentType",
-            "source": "App\\Models\\Document"
+            "source": "App\\Models\\Document",
+            "keys": {
+                "source": "document_type_id",
+                "target": "id",
+                "via": null
+            }
         },
         {
             "target": "App\\Models\\Folder",
             "type": "BelongsTo",
             "name": "folder",
-            "source": "App\\Models\\Document"
+            "source": "App\\Models\\Document",
+            "keys": {
+                "source": "folder_id",
+                "target": "id",
+                "via": null
+            }
         },
         {
             "target": "App\\Models\\Invitation",
@@ -2550,25 +2595,45 @@
             "target": "App\\Models\\Variant",
             "type": "HasMany",
             "name": "variants",
-            "source": "App\\Models\\Document"
+            "source": "App\\Models\\Document",
+            "keys": {
+                "source": "id",
+                "target": "document_id",
+                "via": null
+            }
         },
         {
             "target": "App\\Models\\Workspace",
             "type": "BelongsTo",
             "name": "workspace",
-            "source": "App\\Models\\Document"
+            "source": "App\\Models\\Document",
+            "keys": {
+                "source": "workspace_id",
+                "target": "id",
+                "via": null
+            }
         },
         {
             "target": "App\\Models\\Document",
             "type": "HasMany",
             "name": "documents",
-            "source": "App\\Models\\DocumentType"
+            "source": "App\\Models\\DocumentType",
+            "keys": {
+                "source": "id",
+                "target": "document_type_id",
+                "via": null
+            }
         },
         {
             "target": "App\\Models\\MetadataField",
             "type": "HasMany",
             "name": "metadataFields",
-            "source": "App\\Models\\DocumentType"
+            "source": "App\\Models\\DocumentType",
+            "keys": {
+                "source": "id",
+                "target": "document_type_id",
+                "via": null
+            }
         },
         {
             "target": "App\\Models\\AccessGrant",
@@ -2592,7 +2657,12 @@
             "target": "App\\Models\\Document",
             "type": "HasMany",
             "name": "documents",
-            "source": "App\\Models\\Folder"
+            "source": "App\\Models\\Folder",
+            "keys": {
+                "source": "id",
+                "target": "folder_id",
+                "via": null
+            }
         },
         {
             "target": "App\\Models\\Invitation",
@@ -2604,25 +2674,45 @@
             "target": "App\\Models\\Folder",
             "type": "BelongsTo",
             "name": "parent",
-            "source": "App\\Models\\Folder"
+            "source": "App\\Models\\Folder",
+            "keys": {
+                "source": "parent_id",
+                "target": "id",
+                "via": null
+            }
         },
         {
             "target": "App\\Models\\Workspace",
             "type": "BelongsTo",
             "name": "workspace",
-            "source": "App\\Models\\Folder"
+            "source": "App\\Models\\Folder",
+            "keys": {
+                "source": "workspace_id",
+                "target": "id",
+                "via": null
+            }
         },
         {
             "target": "App\\Models\\Contact",
             "type": "BelongsTo",
             "name": "contact",
-            "source": "App\\Models\\Invitation"
+            "source": "App\\Models\\Invitation",
+            "keys": {
+                "source": "contact_id",
+                "target": "id",
+                "via": null
+            }
         },
         {
             "target": "App\\Models\\Invitation",
             "type": "MorphTo",
             "name": "invitable",
-            "source": "App\\Models\\Invitation"
+            "source": "App\\Models\\Invitation",
+            "keys": {
+                "source": "invitable_id",
+                "target": null,
+                "via": null
+            }
         },
         {
             "target": "App\\Models\\User",
@@ -2634,13 +2724,23 @@
             "target": "App\\Models\\DocumentType",
             "type": "BelongsTo",
             "name": "documentType",
-            "source": "App\\Models\\MetadataField"
+            "source": "App\\Models\\MetadataField",
+            "keys": {
+                "source": "document_type_id",
+                "target": "id",
+                "via": null
+            }
         },
         {
             "target": "App\\Models\\MetadataValue",
             "type": "HasMany",
             "name": "values",
-            "source": "App\\Models\\MetadataField"
+            "source": "App\\Models\\MetadataField",
+            "keys": {
+                "source": "id",
+                "target": "metadata_field_id",
+                "via": null
+            }
         },
         {
             "target": "App\\Models\\MetadataField",
@@ -2652,7 +2752,12 @@
             "target": "App\\Models\\MetadataValue",
             "type": "MorphTo",
             "name": "metadatable",
-            "source": "App\\Models\\MetadataValue"
+            "source": "App\\Models\\MetadataValue",
+            "keys": {
+                "source": "metadatable_id",
+                "target": null,
+                "via": null
+            }
         },
         {
             "target": "App\\Models\\User",
@@ -2712,13 +2817,23 @@
             "target": "App\\Models\\Contact",
             "type": "HasMany",
             "name": "contacts",
-            "source": "App\\Models\\User"
+            "source": "App\\Models\\User",
+            "keys": {
+                "source": "id",
+                "target": "user_id",
+                "via": null
+            }
         },
         {
             "target": "App\\Models\\Contact",
             "type": "HasMany",
             "name": "incomingContactRequests",
-            "source": "App\\Models\\User"
+            "source": "App\\Models\\User",
+            "keys": {
+                "source": "id",
+                "target": "user_id",
+                "via": null
+            }
         },
         {
             "target": "Illuminate\\Notifications\\DatabaseNotification",
@@ -2766,13 +2881,23 @@
             "target": "App\\Models\\Version",
             "type": "BelongsTo",
             "name": "currentVersion",
-            "source": "App\\Models\\Variant"
+            "source": "App\\Models\\Variant",
+            "keys": {
+                "source": "current_version_id",
+                "target": "id",
+                "via": null
+            }
         },
         {
             "target": "App\\Models\\Document",
             "type": "BelongsTo",
             "name": "document",
-            "source": "App\\Models\\Variant"
+            "source": "App\\Models\\Variant",
+            "keys": {
+                "source": "document_id",
+                "target": "id",
+                "via": null
+            }
         },
         {
             "target": "App\\Models\\MetadataValue",
@@ -2784,7 +2909,12 @@
             "target": "App\\Models\\Version",
             "type": "HasMany",
             "name": "versions",
-            "source": "App\\Models\\Variant"
+            "source": "App\\Models\\Variant",
+            "keys": {
+                "source": "id",
+                "target": "variant_id",
+                "via": null
+            }
         },
         {
             "target": "App\\Models\\Activity",
@@ -2802,13 +2932,23 @@
             "target": "App\\Models\\VersionContent",
             "type": "HasOne",
             "name": "content",
-            "source": "App\\Models\\Version"
+            "source": "App\\Models\\Version",
+            "keys": {
+                "source": "id",
+                "target": "version_id",
+                "via": null
+            }
         },
         {
             "target": "App\\Models\\VersionReview",
             "type": "HasMany",
             "name": "reviews",
-            "source": "App\\Models\\Version"
+            "source": "App\\Models\\Version",
+            "keys": {
+                "source": "id",
+                "target": "version_id",
+                "via": null
+            }
         },
         {
             "target": "App\\Models\\User",
@@ -2820,19 +2960,34 @@
             "target": "App\\Models\\Variant",
             "type": "BelongsTo",
             "name": "variant",
-            "source": "App\\Models\\Version"
+            "source": "App\\Models\\Version",
+            "keys": {
+                "source": "variant_id",
+                "target": "id",
+                "via": null
+            }
         },
         {
             "target": "App\\Models\\Version",
             "type": "BelongsTo",
             "name": "version",
-            "source": "App\\Models\\VersionContent"
+            "source": "App\\Models\\VersionContent",
+            "keys": {
+                "source": "version_id",
+                "target": "id",
+                "via": null
+            }
         },
         {
             "target": "App\\Models\\ReviewComment",
             "type": "HasMany",
             "name": "comments",
-            "source": "App\\Models\\VersionReview"
+            "source": "App\\Models\\VersionReview",
+            "keys": {
+                "source": "id",
+                "target": "version_review_id",
+                "via": null
+            }
         },
         {
             "target": "App\\Models\\User",
@@ -2850,7 +3005,12 @@
             "target": "App\\Models\\Version",
             "type": "BelongsTo",
             "name": "version",
-            "source": "App\\Models\\VersionReview"
+            "source": "App\\Models\\VersionReview",
+            "keys": {
+                "source": "version_id",
+                "target": "id",
+                "via": null
+            }
         },
         {
             "target": "App\\Models\\User",
@@ -2874,19 +3034,34 @@
             "target": "App\\Models\\WorkspaceMembership",
             "type": "HasMany",
             "name": "memberships",
-            "source": "App\\Models\\Workspace"
+            "source": "App\\Models\\Workspace",
+            "keys": {
+                "source": "id",
+                "target": "workspace_id",
+                "via": null
+            }
         },
         {
             "target": "App\\Models\\User",
             "type": "BelongsTo",
             "name": "user",
-            "source": "App\\Models\\WorkspaceMembership"
+            "source": "App\\Models\\WorkspaceMembership",
+            "keys": {
+                "source": "user_id",
+                "target": "id",
+                "via": null
+            }
         },
         {
             "target": "App\\Models\\Workspace",
             "type": "BelongsTo",
             "name": "workspace",
-            "source": "App\\Models\\WorkspaceMembership"
+            "source": "App\\Models\\WorkspaceMembership",
+            "keys": {
+                "source": "workspace_id",
+                "target": "id",
+                "via": null
+            }
         }
     ],
     "generated_at": "2026-07-19T21:10:41+00:00"

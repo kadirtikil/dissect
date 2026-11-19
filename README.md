@@ -3,7 +3,8 @@
 Visualise your Eloquent models and their relationships as an interactive graph.
 
 Point it at your models directory and open a page: every model becomes a node
-with its columns, every relation becomes an edge. Drag nodes into an
+with its columns, every relation becomes an edge from the column that links it
+(`posts.author_id`) to the one it points at (`authors.id`). Drag nodes into an
 arrangement that makes sense, and the layout is saved to a file you can commit
 so your team sees the same picture.
 
@@ -84,12 +85,12 @@ config file is usually unnecessary.
 | --- | --- | --- |
 | `DISSECT_ENABLED` | unset | Unset means "on in `local` only". Set to `true`/`false` to decide explicitly. |
 | `DISSECT_PATH` | `dissect` | URL prefix the viewer is served from. |
-| `DISSECT_MODELS_PATH` | `app/Models` | Directory scanned for models. Relative paths resolve from the base path; absolute paths are used as given. |
-| `DISSECT_MODELS_NAMESPACE` | inferred | Set this when your namespace does not follow the conventional `app/Models` → `App\Models` mapping. |
+| `DISSECT_MODELS_PATH` | `app/Models` | Directory scanned for models. Relative paths resolve from the base path; absolute paths are used as given. For more than one, see `models.paths`. |
 
 The rest are config-file only:
 
 - **`middleware`** — defaults to `['web']`. Add your auth middleware here if you enable the viewer outside local. The `viewDissect` gate check is always appended after it; see below.
+- **`models.paths`** — defaults to `[]`, which means "read `models_path`". A list of directories holding models; a `*` stands for one directory name. Each model's class name is read from its own file, so there is no namespace to configure.
 - **`layout_path`** — defaults to `base_path('.dissect/layout.json')`. Deliberately not in `storage/` (gitignored) or `vendor/` (wiped by `composer install`), because the layout is meant to be committed and shared.
 - **`views_path`** — defaults to `base_path('.dissect/views.json')`, for the same reason: "the billing models" is worth agreeing on once and reviewing in a pull request.
 - **`routes.watch_paths`** — defaults to `['app', 'routes']`. Which directories are watched to notice that the endpoint list has gone stale. Narrow it to the directories that actually hold HTTP code if your `app/` is large.
@@ -104,12 +105,27 @@ The rest are config-file only:
 
 ### 📁 Models outside `app/Models`
 
-For a domain-oriented or monorepo layout, set both the path and the namespace:
+One other directory is one variable:
 
 ```dotenv
 DISSECT_MODELS_PATH=src/Domain
-DISSECT_MODELS_NAMESPACE="Acme\\Domain"
 ```
+
+Models in several places, such as a Models folder per domain, go in the
+published config. A `*` stands for one directory name:
+
+```php
+'models' => [
+    'paths' => [
+        'app/Domain/*/Models',
+        'packages/billing/src/Models',
+    ],
+],
+```
+
+No namespace is needed: each model's class name is read from its file. Two
+models with the same class name in different domains are two nodes on the
+graph. `DISSECT_MODELS_NAMESPACE` is no longer read.
 
 ### 🔐 What actually keeps this off your production boxes
 

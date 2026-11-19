@@ -88,7 +88,6 @@ class BrokenFilesTest extends TestCase
         parent::defineEnvironment($app);
 
         $app['config']->set('dissect.models_path', static::$root.'/Models');
-        $app['config']->set('dissect.models_namespace', 'DissectBroken\\Models');
 
         $app['config']->push('dissect.jobs.paths', static::$root.'/Jobs');
         $app['config']->push('dissect.providers.paths', static::$root.'/Providers');
