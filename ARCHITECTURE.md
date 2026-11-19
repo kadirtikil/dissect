@@ -147,6 +147,7 @@ both:
   RouteExporter ────────┤ (fetched on demand)  public/routes.json
   JobExporter ──────────┤ (fetched on demand)  public/jobs.json
   ProviderExporter ─────┤ (fetched on demand)  public/providers.json
+  DomainMap ────────────┤ (fetched on demand)  public/domains.json
   QueueSnapshot ────────┘ (polled, never cached) public/queue.json
 ```
 
@@ -615,8 +616,10 @@ main.ts                 mounts App; no router (see "Decisions")
     │   ├── JobFilters     search + kind/queue chips, and the undispatched count
     │   ├── JobList        grouped by queue, collapsible
     │   └── JobDetail      queue, retries, payload, middleware, dispatchers, carries
-    └── QueuePanel      depth, then the three tenses; polls while it is open
-        └── QueueSection   one tense as a table, or why it could not be read
+    ├── QueuePanel      depth, then the three tenses; polls while it is open
+    │   └── QueueSection   one tense as a table, or why it could not be read
+    └── DomainsPanel    every domain, findings, unassigned; or what would count as one
+        └── DomainCard     name, how it was found, folders, classes by namespace
 
 stores/schema.ts        load → normalise → order → place → filter to the view
 stores/layout.ts        saved positions, debounce, prune, persist
@@ -625,6 +628,7 @@ stores/routes.ts        lazy load, filter state, selection
 stores/jobs.ts          the same, for the queue surface
 stores/provider.ts      lazy load, search, selection, which cards are open
 stores/queue.ts         the odd one: polled runtime state, nothing to cache
+stores/domains.ts       lazy load of the domain list; polled like the other surfaces
 stores/navigation.ts    which page is open: fragment, then storage, then default
 pages/registry.ts       every page there is — the one file a new surface is added to
 lib/toolbar.ts          where a page hangs its own header controls
@@ -639,6 +643,7 @@ lib/providerFilters.ts  search across a provider and every class in its tree
 lib/providerLayout.ts   tiers from the server's depth; order by parents' height
 lib/providerKinds.ts    node/edge kind → colour; confidence → dash
 lib/elapsed.ts          "2m ago" / "in 4h" — a queue is read in relative time
+lib/domains.ts          domain → colour (the ramp, then spread hues); how one was found, in words
 lib/bootstrap.ts        the host seam
 ```
 
@@ -1214,6 +1219,8 @@ Config (`config/dissect.php`): `enabled`, `path`, `middleware`,
 | Change how a provider tree is laid out | `resources/js/lib/providerLayout.ts` |
 | Change provider node/edge colours or dashes | `resources/js/lib/providerKinds.ts` |
 | Change what a provider card shows | `resources/js/components/provider-tree/tree/ProviderNode.vue` |
+| Change what the domain list shows | `resources/js/pages/DomainsPanel.vue`, `components/domains/DomainCard.vue` |
+| Change domain colours or how a source is worded | `resources/js/lib/domains.ts` |
 | Change the theme | `resources/js/assets/main.css` (tokens), `vue-flow-theme.css` (canvas) |
 | Change the page shell | `resources/views/app.blade.php` |
 
