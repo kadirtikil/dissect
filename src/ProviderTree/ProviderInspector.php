@@ -4,6 +4,7 @@ namespace KdrDev\Dissect\ProviderTree;
 
 use Illuminate\Contracts\Support\DeferrableProvider;
 use KdrDev\Dissect\Routes\Ast\ClassSource;
+use KdrDev\Dissect\Support\CodeOwnership;
 use PhpParser\Node\Arg;
 use PhpParser\Node\Expr;
 use PhpParser\Node\Expr\ArrowFunction;
@@ -85,8 +86,10 @@ class ProviderInspector
 
     protected Standard $printer;
 
-    public function __construct(protected ClassSource $source)
-    {
+    public function __construct(
+        protected ClassSource $source,
+        protected CodeOwnership $owners = new CodeOwnership,
+    ) {
         $this->printer = new Standard;
     }
 
@@ -108,7 +111,7 @@ class ProviderInspector
             return null;
         }
 
-        $tree = new TreeBuilder($reflection->getName());
+        $tree = new TreeBuilder($reflection->getName(), $this->owners);
 
         $this->read($reflection, $tree);
 

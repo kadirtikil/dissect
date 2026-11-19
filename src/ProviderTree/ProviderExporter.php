@@ -4,6 +4,7 @@ namespace KdrDev\Dissect\ProviderTree;
 
 use Illuminate\Support\Str;
 use KdrDev\Dissect\Routes\RouteFingerprint;
+use KdrDev\Dissect\Support\CodeOwnership;
 use Throwable;
 
 /**
@@ -21,6 +22,7 @@ class ProviderExporter
         protected ProviderInspector $inspector,
         protected DependencyResolver $resolver,
         protected RouteFingerprint $fingerprint,
+        protected CodeOwnership $owners = new CodeOwnership,
     ) {}
 
     /**
@@ -113,7 +115,7 @@ class ProviderExporter
     protected function unreadable(string $class, Throwable $e): ?array
     {
         try {
-            $tree = new TreeBuilder($class);
+            $tree = new TreeBuilder($class, $this->owners);
 
             $tree->edge(
                 $class,
