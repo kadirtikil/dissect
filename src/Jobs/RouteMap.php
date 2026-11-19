@@ -56,7 +56,7 @@ class RouteMap
             try {
                 $described = $this->collector->describe($route);
                 $action = $this->actions->describe($route);
-                $id = RouteExporter::id($described['methods'], $described['uri']);
+                $id = RouteExporter::id($described['methods'], $described['uri'], $described['domain']);
             } catch (Throwable) {
                 // One unreadable route costs its own link, not the map.
                 continue;
