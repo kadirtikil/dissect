@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { computed, ref, shallowRef } from 'vue'
 import type { GraphView, ViewsFile } from '@/types/schema'
 import { bootstrap } from '@/lib/bootstrap'
+import { persist, revisionOf, type Revision } from '@/lib/persist'
 
 /** Standalone dev-server fallback; the package injects its own route. */
 const DEV_ENDPOINT = '/__views'
@@ -28,6 +29,9 @@ export const useViewsStore = defineStore('views', () => {
   const saving = ref(false)
   const saveError = ref<string | null>(null)
 
+  /** The file this page last read or wrote; sent back with every save. */
+  let revision: Revision
+
   /** Active view id; null means the whole graph. */
   const activeId = ref<string | null>(null)
 
@@ -50,6 +54,7 @@ export const useViewsStore = defineStore('views', () => {
     const injected = bootstrap().views
     if (injected) {
       views.value = sanitise(injected.views)
+      revision = revisionOf(injected)
     } else {
       try {
         const res = await fetch(url)
@@ -57,6 +62,7 @@ export const useViewsStore = defineStore('views', () => {
         if (res.ok) {
           const payload = (await res.json()) as Partial<ViewsFile>
           views.value = sanitise(payload?.views)
+          revision = revisionOf(payload)
         }
       } catch {
         // A malformed file must never stop the graph rendering; the viewer is
@@ -181,19 +187,12 @@ export const useViewsStore = defineStore('views', () => {
     saving.value = true
     saveError.value = null
 
-    const { saveViewsUrl, csrfToken } = bootstrap()
-
     try {
-      const res = await fetch(saveViewsUrl ?? DEV_ENDPOINT, {
-        method: 'POST',
-        headers: {
-          'content-type': 'application/json',
-          // Laravel rejects the POST without this; harmless when standalone.
-          ...(csrfToken ? { 'x-csrf-token': csrfToken } : {}),
-        },
-        body: JSON.stringify({ version: 1, views: views.value }),
-      })
-      if (!res.ok) throw new Error(`${res.status} ${res.statusText}`)
+      revision = await persist(
+        bootstrap().saveViewsUrl ?? DEV_ENDPOINT,
+        { version: 1, views: views.value },
+        revision,
+      )
     } catch (e) {
       // The edit stays on screen: it is applied in memory either way, and
       // saying so is more useful than reverting what somebody just did.

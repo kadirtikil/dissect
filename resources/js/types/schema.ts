@@ -131,6 +131,8 @@ export interface GraphView {
 export interface ViewsFile {
   version: number
   views: GraphView[]
+  /** Only from the package; see lib/persist. */
+  revision?: string | null
 }
 
 /** Data carried on each Vue Flow node. */

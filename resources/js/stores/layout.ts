@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, shallowRef } from 'vue'
 import { bootstrap } from '@/lib/bootstrap'
+import { persist, revisionOf, type Revision } from '@/lib/persist'
 
 export interface NodePosition {
   x: number
@@ -11,6 +12,8 @@ export interface NodePosition {
 export interface LayoutFile {
   version: number
   positions: Record<string, NodePosition>
+  /** Only from the package; see lib/persist. */
+  revision?: string | null
 }
 
 /** Standalone dev-server fallback; the package injects its own route. */
@@ -36,11 +39,15 @@ export const useLayoutStore = defineStore('layout', () => {
   let timer: ReturnType<typeof setTimeout> | undefined
   let pendingIds: string[] | null = null
 
+  /** The file this page last read or wrote; sent back with every save. */
+  let revision: Revision
+
   async function load(url = `${import.meta.env.BASE_URL}layout.json`) {
     // Inlined by the package alongside the schema — no round trip needed.
     const injected = bootstrap().layout
     if (injected) {
       positions.value = sanitise(injected.positions)
+      revision = revisionOf(injected)
       loaded.value = true
       return
     }
@@ -51,6 +58,7 @@ export const useLayoutStore = defineStore('layout', () => {
       if (res.ok) {
         const payload = (await res.json()) as Partial<LayoutFile>
         positions.value = sanitise(payload?.positions)
+        revision = revisionOf(payload)
       }
     } catch {
       // Malformed layout must never stop the graph rendering — fall back to
@@ -101,19 +109,12 @@ export const useLayoutStore = defineStore('layout', () => {
       ? Object.fromEntries(Object.entries(sent).filter(([id]) => keep.includes(id)))
       : sent
 
-    const { saveUrl, csrfToken } = bootstrap()
-
     try {
-      const res = await fetch(saveUrl ?? DEV_ENDPOINT, {
-        method: 'POST',
-        headers: {
-          'content-type': 'application/json',
-          // Laravel rejects the POST without this; harmless when standalone.
-          ...(csrfToken ? { 'x-csrf-token': csrfToken } : {}),
-        },
-        body: JSON.stringify({ version: 1, positions: body }),
-      })
-      if (!res.ok) throw new Error(`${res.status} ${res.statusText}`)
+      revision = await persist(
+        bootstrap().saveUrl ?? DEV_ENDPOINT,
+        { version: 1, positions: body },
+        revision,
+      )
 
       // Forget the models that were pruned from the file — and only those.
       // Assigning what was sent back to `positions` would also erase every

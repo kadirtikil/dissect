@@ -11,8 +11,8 @@ import type { NodePosition } from '@/stores/layout'
  */
 export interface Bootstrap {
   schema?: Schema
-  layout?: { version: number; positions: Record<string, NodePosition> }
-  views?: { version: number; views: GraphView[] }
+  layout?: { version: number; positions: Record<string, NodePosition>; revision?: string | null }
+  views?: { version: number; views: GraphView[]; revision?: string | null }
   /** Endpoint that persists positions. */
   saveUrl?: string
   /** Endpoint that persists saved views. */

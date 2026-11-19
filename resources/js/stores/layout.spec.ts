@@ -8,15 +8,16 @@ import { useLayoutStore } from '@/stores/layout'
  */
 function heldFetch() {
   const calls: {
-    body: { positions: Record<string, unknown> }
-    release: (status?: number) => void
+    body: { positions: Record<string, unknown>; revision?: unknown }
+    release: (status?: number, answer?: object) => void
   }[] = []
 
   const fetch = vi.fn<(url: string, init: RequestInit) => Promise<Response>>((_url, init) => {
     return new Promise<Response>((resolve) => {
       calls.push({
         body: JSON.parse(String(init.body)),
-        release: (status = 200) => resolve(new Response('{"ok":true}', { status })),
+        release: (status = 200, answer: object = { ok: true }) =>
+          resolve(new Response(JSON.stringify(answer), { status })),
       })
     })
   })
@@ -38,6 +39,7 @@ describe('layout store saving', () => {
 
   afterEach(() => {
     vi.unstubAllGlobals()
+    delete window.__DISSECT__
   })
 
   it('keeps a drag made while a save is in flight', async () => {
@@ -108,5 +110,58 @@ describe('layout store saving', () => {
 
     expect(layout.saveError).toMatch(/409/)
     expect(layout.positions).toHaveProperty('Post')
+  })
+
+  it('sends back the revision it read, then the one each save returns', async () => {
+    window.__DISSECT__ = { layout: { version: 1, positions: {}, revision: 'aaaa' } }
+    const layout = useLayoutStore()
+    await layout.load()
+
+    layout.setPosition('Post', { x: 1, y: 1 })
+    const first = layout.save()
+    await settle()
+    expect(held.calls[0]!.body.revision).toBe('aaaa')
+    held.calls[0]!.release(200, { ok: true, saved: 1, revision: 'bbbb' })
+    await first
+
+    const second = layout.save()
+    await settle()
+    expect(held.calls[1]!.body.revision).toBe('bbbb')
+    held.calls[1]!.release()
+    await second
+  })
+
+  it('sends null when there was no file, and nothing when the host keeps no revisions', async () => {
+    window.__DISSECT__ = { layout: { version: 1, positions: {}, revision: null } }
+    const layout = useLayoutStore()
+    await layout.load()
+
+    const first = layout.save()
+    await settle()
+    expect(held.calls[0]!.body).toHaveProperty('revision', null)
+
+    // The dev server answers without one: from then on, nothing to send.
+    held.calls[0]!.release(200, { ok: true, saved: 0 })
+    await first
+
+    const second = layout.save()
+    await settle()
+    expect(held.calls[1]!.body).not.toHaveProperty('revision')
+    held.calls[1]!.release()
+    await second
+  })
+
+  it('reports what the server said when it refuses a stale save', async () => {
+    const layout = useLayoutStore()
+
+    const save = layout.save()
+    await settle()
+    held.calls[0]!.release(409, {
+      ok: false,
+      message: 'layout.json has changed since this page read it',
+    })
+    await save
+
+    expect(layout.saveError).toBe('layout.json has changed since this page read it')
   })
 })
