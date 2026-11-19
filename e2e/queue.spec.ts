@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { test, expect } from '@playwright/test'
 
 /**
@@ -83,4 +84,44 @@ test('stops polling when the page is left before its first reading arrives', asy
   // Several poll intervals later, nothing else has been asked for.
   await page.clock.runFor(30_000)
   expect(reads).toBe(1)
+})
+
+test('never shows a reading for the connection it just switched away from', async ({ page }) => {
+  const fixture = JSON.parse(readFileSync('public/queue.json', 'utf8'))
+  let release!: () => void
+  const held = new Promise<void>((resolve) => (release = resolve))
+  let reads = 0
+  let staleAnswered = false
+
+  await page.route('**/queue.json*', async (route) => {
+    const read = ++reads
+    const connection = new URL(route.request().url()).searchParams.get('connection') ?? 'database'
+
+    // The poll for `database` that is in flight when the switch happens comes
+    // back last.
+    if (read === 2) await held
+
+    try {
+      await route.fulfill({ json: { ...fixture, connection, driver: connection } })
+    } catch {
+      // The page may already have cancelled it, which is the point.
+    } finally {
+      if (read === 2) staleAnswered = true
+    }
+  })
+
+  await page.clock.install()
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Queue', exact: true }).click()
+  await expect(page.getByRole('heading', { name: 'database', exact: true })).toBeVisible()
+
+  await page.clock.runFor(5_000)
+  await expect.poll(() => reads).toBe(2)
+
+  await page.getByLabel('Queue connection').selectOption('redis')
+  await expect(page.getByRole('heading', { name: 'redis', exact: true })).toBeVisible()
+
+  release()
+  await expect.poll(() => staleAnswered).toBe(true)
+  await expect(page.getByRole('heading', { name: 'redis', exact: true })).toBeVisible()
 })
