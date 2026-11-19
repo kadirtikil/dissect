@@ -41,13 +41,14 @@ export default defineConfig({
       output: {
         // The entry and the stylesheet keep stable names: the Blade view
         // references them directly and the package ships them committed, so
-        // there is no manifest to read. The view busts them with a ?v= query
-        // carrying a hash of the file.
+        // there is no manifest to read. They are served `no-cache` with an
+        // ETag, so a browser revalidates them on every load. (Not a ?v= query:
+        // the chunks import the entry back as `./dissect.js`, and a second URL
+        // for it would evaluate it a second time as a separate module.)
         //
-        // Chunks are hashed instead. The entry imports them by relative name
-        // at runtime, so no query string can reach them — and they are served
-        // `immutable`, so an unhashed name would keep a browser on the old
-        // chunk after an update, against a new entry and new payloads.
+        // Chunks are hashed instead, and served `immutable`. The entry imports
+        // them by relative name, so a hash in the name is the only thing that
+        // can move a browser off the old chunk after an update.
         entryFileNames: 'dissect.js',
         chunkFileNames: 'dissect-[name]-[hash].js',
         assetFileNames: 'dissect.[ext]',

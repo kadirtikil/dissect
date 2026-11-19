@@ -257,10 +257,23 @@ class DissectController
 
         abort_unless(is_file($path), 404, 'Asset missing — the package was installed without its build output.');
 
-        return response()->file($path, [
+        // Chunks carry a content hash in their name, so a cached copy is
+        // never wrong. The entry and the stylesheet do not — the view names
+        // them directly — so they are revalidated on every load instead: a
+        // 304 when nothing changed, the new file after an update.
+        $hashed = ! isset($allowed[$file]);
+
+        $response = response()->file($path, [
             'Content-Type' => $type,
-            'Cache-Control' => 'public, max-age=31536000, immutable',
+            'Cache-Control' => $hashed ? 'public, max-age=31536000, immutable' : 'no-cache',
         ]);
+
+        if (! $hashed) {
+            $response->setAutoEtag();
+            $response->isNotModified(request());
+        }
+
+        return $response;
     }
 
     /**
