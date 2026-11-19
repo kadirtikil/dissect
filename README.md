@@ -157,7 +157,8 @@ reads it, renders what it understands, and refuses the save with a message
 rather than quietly replacing your layout with the subset it recognised. If a
 future release does change the format, your file is copied to
 `.dissect/layout.json.v1.bak` before the first migrating write. An unparseable
-file is copied to `.dissect/layout.json.corrupt.bak` before being replaced.
+file is copied to `.dissect/layout.json.corrupt.bak` before being replaced
+(`.corrupt.2.bak` and on for later ones, so no broken hand edit is lost).
 
 Nothing here needs an upgrade step from you. It is worth knowing the refusal
 exists, so that "layout not saved" on a machine running an older dissect reads

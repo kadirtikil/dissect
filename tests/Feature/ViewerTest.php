@@ -118,6 +118,75 @@ class ViewerTest extends TestCase
     }
 
     #[Test]
+    public function a_malformed_layout_is_cleaned_rather_than_failing_the_request(): void
+    {
+        // Both used to be 500s: invalid UTF-8 throws in json_encode(), and an
+        // out-of-range float is a cast warning Laravel promotes to an error.
+        $this->post('/dissect/layout', [
+            'positions' => [
+                "Po\xffst" => ['x' => 1, 'y' => 1],
+                'Comment' => ['x' => 1e300, 'y' => 1],
+                'Tag' => ['x' => 5, 'y' => 6],
+            ],
+        ])->assertOk()->assertJson(['ok' => true, 'saved' => 1]);
+    }
+
+    #[Test]
+    public function a_layout_save_based_on_a_stale_read_is_refused(): void
+    {
+        // The page inlines the revision it read; another tab saves first.
+        $page = $this->get('/dissect')->assertOk()->getContent();
+        $this->assertStringContainsString('"revision":null', (string) $page);
+
+        $first = $this->postJson('/dissect/layout', [
+            'positions' => ['Post' => ['x' => 1, 'y' => 1]],
+            'revision' => null,
+        ])->assertOk()->json('revision');
+
+        $this->postJson('/dissect/layout', [
+            'positions' => ['Post' => ['x' => 2, 'y' => 2]],
+            'revision' => null,
+        ])
+            ->assertStatus(409)
+            ->assertJsonPath('message', fn (string $message) => str_contains($message, 'layout.json has changed'));
+
+        // The tab that saved carries on with the revision it was given.
+        $this->postJson('/dissect/layout', [
+            'positions' => ['Post' => ['x' => 3, 'y' => 3]],
+            'revision' => $first,
+        ])->assertOk();
+    }
+
+    #[Test]
+    public function a_save_without_a_revision_is_let_through(): void
+    {
+        $this->postJson('/dissect/layout', ['positions' => ['Post' => ['x' => 1, 'y' => 1]]])->assertOk();
+        $this->postJson('/dissect/layout', ['positions' => ['Post' => ['x' => 2, 'y' => 2]]])->assertOk();
+    }
+
+    #[Test]
+    public function a_revision_that_is_not_a_string_is_rejected(): void
+    {
+        $this->postJson('/dissect/layout', ['positions' => [], 'revision' => 42])->assertStatus(422);
+        $this->postJson('/dissect/views', ['views' => [], 'revision' => ['x']])->assertStatus(422);
+    }
+
+    #[Test]
+    public function views_carry_a_revision_both_ways(): void
+    {
+        $this->getJson('/dissect/views.json')->assertOk()->assertJsonPath('revision', null);
+
+        $revision = $this->postJson('/dissect/views', [
+            'views' => [['id' => 'billing', 'name' => 'Billing', 'models' => ['Invoice']]],
+            'revision' => null,
+        ])->assertOk()->json('revision');
+
+        $this->getJson('/dissect/views.json')->assertJsonPath('revision', $revision);
+
+        $this->postJson('/dissect/views', ['views' => [], 'revision' => null])->assertStatus(409);
+    }
+
+    #[Test]
     public function it_reports_a_layout_written_by_a_newer_version_instead_of_replacing_it(): void
     {
         // The upgrade hazard, end to end: a developer running an older dissect
@@ -137,11 +206,31 @@ class ViewerTest extends TestCase
         );
     }
 
+    #[Test]
+    public function a_layout_the_filesystem_will_not_take_is_reported_with_its_reason(): void
+    {
+        // A file where .dissect-test/ should be, so the directory cannot be
+        // created. Before, this was a PHP warning turned 500 with nothing in
+        // the body to say which file or why.
+        $path = $this->layoutPath($this->app);
+        file_put_contents(dirname($path), 'not a directory');
+
+        try {
+            $this->post('/dissect/layout', ['positions' => ['Post' => ['x' => 1, 'y' => 1]]])
+                ->assertStatus(500)
+                ->assertJson(['ok' => false])
+                ->assertJsonPath('message', fn (string $message) => str_contains($message, 'layout.json'));
+        } finally {
+            unlink(dirname($path));
+        }
+    }
+
     protected function tearDown(): void
     {
         $path = $this->layoutPath($this->app);
 
-        foreach (glob($path.'*') ?: [] as $file) {
+        // The whole directory: views.json lives beside layout.json.
+        foreach (glob(dirname($path).'/*') ?: [] as $file) {
             unlink($file);
         }
 

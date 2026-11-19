@@ -154,6 +154,35 @@ class StateVersioningTest extends PhpUnitTestCase
         $this->assertSame($mangled, file_get_contents($path.'.corrupt.bak'));
     }
 
+    #[Test]
+    public function a_second_corrupt_file_gets_a_backup_of_its_own(): void
+    {
+        // Two different broken hand edits, a save after each. The never-
+        // overwrite rule for format backups would keep the first and replace
+        // the second with a fresh file, losing it.
+        $path = $this->write('layout.json', $first = '{"positions": { first edit');
+        (new LayoutRepository($path))->put([]);
+
+        file_put_contents($path, $second = '{"positions": { second edit');
+        (new LayoutRepository($path))->put([]);
+
+        $this->assertSame($first, file_get_contents($path.'.corrupt.bak'));
+        $this->assertSame($second, file_get_contents($path.'.corrupt.2.bak'));
+    }
+
+    #[Test]
+    public function the_same_corrupt_file_is_copied_only_once(): void
+    {
+        // A save that failed after the copy and was retried sees the same
+        // broken file again. One copy of it is the whole point; two is noise.
+        $path = $this->write('layout.json', $mangled = '{"positions": { broken');
+        file_put_contents($path.'.corrupt.bak', $mangled);
+
+        (new LayoutRepository($path))->put([]);
+
+        $this->assertFileDoesNotExist($path.'.corrupt.2.bak');
+    }
+
     // The ordinary path stays ordinary.
 
     #[Test]

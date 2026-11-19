@@ -974,8 +974,22 @@ makes it stick.
 | Newer than `VERSION` | Readable, **never writable**. `put()` throws `StateFileException`; the controller answers 409 and the page reports "not saved" |
 | Older than `VERSION` | Copied to `<path>.v<n>.bak` before the first migrating write. Never overwritten — the first copy is the one taken before any new-format write |
 | Equal | Ordinary write, no copy |
-| Unparseable | Copied to `<path>.corrupt.bak`, then replaced |
+| Unparseable | Copied to `<path>.corrupt.bak`, then replaced. A later, different corrupt file goes to `.corrupt.2.bak` and on; an identical one is not copied twice |
 | Missing or nonsense | Treated as format 1, so a typo cannot lock somebody out of their own file |
+
+Every read hands the page a `revision` (a hash of the file's bytes, or `null`
+when there is no file), and every save hands it back. A save based on a revision
+that is no longer on disk (a `git pull` landed, another tab saved) is refused
+with `StateFileException::changedSinceRead()` and a 409, so a stale tab cannot
+write its old copy over newer work. The check and the write share an exclusive
+lock (a file in the system temp directory, keyed by the state file's path). A
+save that sends no revision at all, like the dev-server plugin's, is not
+checked.
+
+Writes go to a uniquely named temporary file beside the target and are renamed
+into place, with every step checked. A directory that cannot be created, a short
+write or a failed rename throws `StateFileException::unwritable()` (answered with
+500 and the reason), and the previous file is left untouched.
 
 The refusal direction matters more than the migration one. A migration is code
 you will write deliberately when you bump the format; the refusal protects

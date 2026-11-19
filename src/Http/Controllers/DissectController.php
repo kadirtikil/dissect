@@ -180,8 +180,18 @@ class DissectController
             return response()->json(['ok' => false, 'message' => 'positions must be an object'], 422);
         }
 
+        $revision = $request->input('revision', LayoutRepository::ANY_REVISION);
+
+        if ($revision !== null && ! is_string($revision)) {
+            return response()->json(['ok' => false, 'message' => 'revision must be a string or null'], 422);
+        }
+
         try {
-            return response()->json(['ok' => true, 'saved' => $this->layout->put($positions)]);
+            $saved = $this->layout->put($positions, $revision);
+
+            // Read back rather than computed: the page's next save is based on
+            // this, so it has to describe the file as it now is.
+            return response()->json(['ok' => true, 'saved' => $saved, 'revision' => $this->layout->revision()]);
         } catch (StateFileException $e) {
             return $this->refused($e);
         }
@@ -202,24 +212,32 @@ class DissectController
             return response()->json(['ok' => false, 'message' => 'views must be an array'], 422);
         }
 
+        $revision = $request->input('revision', ViewRepository::ANY_REVISION);
+
+        if ($revision !== null && ! is_string($revision)) {
+            return response()->json(['ok' => false, 'message' => 'revision must be a string or null'], 422);
+        }
+
         try {
-            return response()->json(['ok' => true, 'saved' => $this->views->put($views)]);
+            $saved = $this->views->put($views, $revision);
+
+            return response()->json(['ok' => true, 'saved' => $saved, 'revision' => $this->views->revision()]);
         } catch (StateFileException $e) {
             return $this->refused($e);
         }
     }
 
     /**
-     * A write the repository declined to make, because making it would have
-     * destroyed what was already in the file.
+     * A write the repository declined or failed to make.
      *
-     * 409 rather than 500: nothing is broken and there is nothing to retry —
-     * the file on disk simply is not this version's to rewrite. The page keeps
-     * the edit on screen and reports that it was not saved.
+     * Usually 409: nothing is broken and there is nothing to retry — the file
+     * on disk simply is not this version's to rewrite. A filesystem that would
+     * not take the write is a 500, with the reason in the body either way. The
+     * page keeps the edit on screen and reports that it was not saved.
      */
     protected function refused(StateFileException $e): JsonResponse
     {
-        return response()->json(['ok' => false, 'message' => $e->getMessage()], 409);
+        return response()->json(['ok' => false, 'message' => $e->getMessage()], $e->status);
     }
 
     /**

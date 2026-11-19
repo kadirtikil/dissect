@@ -32,16 +32,18 @@ class ViewRepository
 
     public function __construct(protected string $path) {}
 
-    /** @return array{version: int, views: array<int, array{id: string, name: string, models: array<int, string>}>} */
+    /** @return array{version: int, views: array<int, array{id: string, name: string, models: array<int, string>}>, revision: string|null} */
     public function get(): array
     {
         // A missing or corrupt views file must never blank the page — the graph
         // is perfectly usable with no views at all.
-        $decoded = $this->decode();
+        $contents = $this->contents();
+        $decoded = $this->decode($contents);
 
         return [
             'version' => self::VERSION,
             'views' => $this->sanitise($decoded['views'] ?? []),
+            'revision' => $this->revisionOf($contents),
         ];
     }
 
@@ -49,15 +51,15 @@ class ViewRepository
      * @param  array<mixed>  $views
      * @return int Number of views written.
      *
+     * @param  string|null  $basedOn  The revision the client last read; see VersionedStateFile::save().
+     *
      * @throws StateFileException when the existing file must not be overwritten.
      */
-    public function put(array $views): int
+    public function put(array $views, ?string $basedOn = self::ANY_REVISION): int
     {
-        $this->guardWrite();
-
         $clean = $this->sanitise($views);
 
-        $this->writeAtomically(['version' => self::VERSION, 'views' => $clean]);
+        $this->save(['version' => self::VERSION, 'views' => $clean], $basedOn);
 
         return count($clean);
     }

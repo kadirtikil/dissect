@@ -15,6 +15,18 @@ use RuntimeException;
  */
 class StateFileException extends RuntimeException
 {
+    /**
+     * The HTTP status the controller answers with.
+     *
+     * 409 for a refusal — the file is fine and simply not this version's to
+     * rewrite. 500 for a write the filesystem would not take, which is a fault
+     * in the environment somebody needs to go and fix.
+     */
+    public function __construct(string $message, public readonly int $status = 409)
+    {
+        parent::__construct($message);
+    }
+
     public static function newerFormat(string $path, int $found, int $supported): self
     {
         return new self(sprintf(
@@ -33,6 +45,25 @@ class StateFileException extends RuntimeException
             .'Check the directory is writable.',
             basename($path),
             basename($backup),
+        ));
+    }
+
+    public static function unwritable(string $path, string $reason): self
+    {
+        return new self(sprintf(
+            'Could not save %s: %s. The previous file was left as it was. '
+            .'Check the directory is writable and the disk is not full.',
+            basename($path),
+            $reason,
+        ), 500);
+    }
+
+    public static function changedSinceRead(string $path): self
+    {
+        return new self(sprintf(
+            '%s has changed since this page read it — in another tab, or from a git pull. '
+            .'Nothing was saved, so those changes are safe. Reload to pick them up.',
+            basename($path),
         ));
     }
 }
