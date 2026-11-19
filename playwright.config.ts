@@ -112,7 +112,8 @@ export default defineConfig({
      * Use the preview server on CI for more realistic testing.
      * Playwright will re-use the local server if there is already a dev-server running.
      */
-    command: process.env.CI ? 'npm run preview' : `npm run dev -- --port ${DEV_PORT} --strictPort`,
+    // pnpm, like the rest of the repo: npm would ignore pnpm-lock.yaml.
+    command: process.env.CI ? 'pnpm preview' : `pnpm dev --port ${DEV_PORT} --strictPort`,
     port: process.env.CI ? 4173 : DEV_PORT,
     reuseExistingServer: !process.env.CI,
   },

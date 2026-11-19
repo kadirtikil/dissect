@@ -1,12 +1,6 @@
 import type { LucideIcon } from '@lucide/vue'
-import {
-  Activity,
-  Boxes,
-  House,
-  Route,
-  Timer,
-  TreePine
-} from '@lucide/vue'
+import type { Component } from 'vue'
+import { Activity, Boxes, House, Route, Timer, TreePine } from '@lucide/vue'
 
 /**
  * Every surface dissect has, in the order the sidebar lists them.
@@ -35,7 +29,7 @@ export interface PageEntry {
    * Lazily imported, so a page nobody opens costs nothing but an unfetched
    * chunk. Absent on a `persistent` entry, which the shell holds directly.
    */
-  component?: () => Promise<{ default: any}>
+  component?: () => Promise<{ default: Component }>
 }
 
 export const pages: readonly PageEntry[] = [
@@ -69,7 +63,7 @@ export const pages: readonly PageEntry[] = [
     label: 'Provider-Trees',
     icon: TreePine,
     component: () => import('@/pages/ProviderTreePanel.vue'),
-  }
+  },
 ]
 
 export function isPageId(value: unknown): value is PageId {

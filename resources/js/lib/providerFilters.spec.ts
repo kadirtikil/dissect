@@ -61,7 +61,11 @@ describe('matchesSearch', () => {
     const binds = provider({
       nodes: [
         node({ id: 'App\\Providers\\MediaServiceProvider', kind: 'provider', depth: 0 }),
-        node({ id: 'App\\Services\\FfmpegTranscoder', label: 'FfmpegTranscoder', class: 'App\\Services\\FfmpegTranscoder' }),
+        node({
+          id: 'App\\Services\\FfmpegTranscoder',
+          label: 'FfmpegTranscoder',
+          class: 'App\\Services\\FfmpegTranscoder',
+        }),
       ],
     })
 
@@ -70,7 +74,9 @@ describe('matchesSearch', () => {
 
   it('matches a container key, which has a label and no class', () => {
     const keyed = provider({
-      nodes: [node({ id: 'media.transcoder', label: 'media.transcoder', class: null, origin: 'none' })],
+      nodes: [
+        node({ id: 'media.transcoder', label: 'media.transcoder', class: null, origin: 'none' }),
+      ],
     })
 
     expect(matchesSearch(keyed, 'media.')).toBe(true)
@@ -82,7 +88,12 @@ describe('matchesSearch', () => {
     const opaque = provider({
       id: 'App\\Providers\\OpaqueServiceProvider',
       nodes: [
-        node({ id: 'unresolved:0', kind: 'unresolved', label: '$this->app->bind($abstract, $concrete)', class: null }),
+        node({
+          id: 'unresolved:0',
+          kind: 'unresolved',
+          label: '$this->app->bind($abstract, $concrete)',
+          class: null,
+        }),
       ],
     })
 

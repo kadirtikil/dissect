@@ -1,7 +1,7 @@
 {
   "extends": "@vue/tsconfig/tsconfig.dom.json",
   "include": ["env.d.ts", "resources/js/**/*", "resources/js/**/*.vue"],
-  "exclude": ["resources/js/**/__tests__/*"],
+  "exclude": ["resources/js/**/*.spec.ts"],
   "compilerOptions": {
     // Extra safety for array and object lookups, but may have false positives.
     "noUncheckedIndexedAccess": true,

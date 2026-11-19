@@ -19,8 +19,8 @@ function reload() {
     <div class="max-w-sm text-center font-mono">
       <p class="text-sm font-semibold">This page could not be loaded.</p>
       <p class="mt-2 text-xs text-muted-foreground">
-        Usually dissect was updated since this tab was opened, and the code it asked for has
-        been replaced. Reloading fetches the current version.
+        Usually dissect was updated since this tab was opened, and the code it asked for has been
+        replaced. Reloading fetches the current version.
       </p>
       <Button class="mt-4" size="sm" variant="outline" @click="reload">Reload</Button>
     </div>

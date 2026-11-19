@@ -3,12 +3,7 @@ import { computed } from 'vue'
 import { Handle, Position, type NodeProps } from '@vue-flow/core'
 import type { ProviderNodeData } from '@/types/providers'
 import type { Confidence } from '@/types/routes'
-import {
-  CONFIDENCE_NOTE,
-  ORIGIN_NOTE,
-  SIDE_EFFECT_LABELS,
-  nodeKindSpec,
-} from '@/lib/providerKinds'
+import { CONFIDENCE_NOTE, ORIGIN_NOTE, SIDE_EFFECT_LABELS, nodeKindSpec } from '@/lib/providerKinds'
 import { PROVIDER_NODE_WIDTH } from '@/lib/providerLayout'
 import { useProviderStore } from '@/stores/provider'
 
@@ -109,7 +104,10 @@ function onKeydown(event: KeyboardEvent) {
         {{ node.confidence }}
       </span>
 
-      <span v-if="data.root && data.deferred" title="Deferred — loaded only when something it provides is resolved">
+      <span
+        v-if="data.root && data.deferred"
+        title="Deferred — loaded only when something it provides is resolved"
+      >
         deferred
       </span>
     </div>
@@ -127,7 +125,9 @@ function onKeydown(event: KeyboardEvent) {
     </div>
 
     <div v-if="expanded" class="mt-1 flex flex-col gap-1 border-t pt-1">
-      <p v-if="node.summary" class="text-[11px] leading-snug text-foreground/90">{{ node.summary }}</p>
+      <p v-if="node.summary" class="text-[11px] leading-snug text-foreground/90">
+        {{ node.summary }}
+      </p>
 
       <!-- The fully qualified class is what you need to go and open the file,
            and too long to carry on a collapsed card. -->
@@ -139,7 +139,10 @@ function onKeydown(event: KeyboardEvent) {
         {{ node.file }}
       </span>
 
-      <div v-if="data.root && data.provides.length" class="font-mono text-[9px] text-muted-foreground">
+      <div
+        v-if="data.root && data.provides.length"
+        class="font-mono text-[9px] text-muted-foreground"
+      >
         provides: {{ data.provides.join(', ') }}
       </div>
     </div>

@@ -58,3 +58,46 @@ jobs:
 
       - name: Run tests
         run: vendor/bin/phpunit
+
+  # The frontend half. dist/ is what users install, and dist.yml only checks it
+  # was rebuilt, not that what it was built from type-checks, lints or passes
+  # its own tests. Playwright is not here: the preview build CI would serve has
+  # no fixture data (public/ is not copied into dist/), so it needs its own
+  # setup first.
+  frontend:
+    runs-on: ubuntu-latest
+    name: frontend · types, lint, unit tests
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # No `packageManager` field in package.json to read the version from, so
+      # it is pinned here. pnpm-workspace.yaml's `allowBuilds` needs 11+.
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 12
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Type-check
+        run: pnpm type-check
+
+      # The same linters as `pnpm lint`, without its --fix: CI reports, it does
+      # not rewrite. ESLint runs from inside each tree, as the scripts do.
+      - name: Lint
+        run: |
+          pnpm exec oxlint resources/js e2e
+          (cd resources/js && pnpm exec eslint .)
+          (cd e2e && pnpm exec eslint .)
+
+      - name: Formatting
+        run: pnpm exec prettier --check resources/js/
+
+      - name: Unit tests
+        run: pnpm exec vitest run

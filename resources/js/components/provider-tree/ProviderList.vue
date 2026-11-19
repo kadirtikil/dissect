@@ -43,7 +43,10 @@ onMounted(() => store.load())
       </li>
     </ul>
 
-    <p v-if="loaded && !visible.length" class="px-3 py-4 font-mono text-[11px] text-muted-foreground">
+    <p
+      v-if="loaded && !visible.length"
+      class="px-3 py-4 font-mono text-[11px] text-muted-foreground"
+    >
       No provider matches the current filter.
     </p>
   </div>

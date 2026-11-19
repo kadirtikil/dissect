@@ -17,7 +17,12 @@ function route(overrides: Partial<ApiRoute> & Pick<ApiRoute, 'id'>): ApiRoute {
     middleware: [],
     stack: 'web',
     group: 'app',
-    action: { type: 'controller', class: 'App\\Http\\Controllers\\ThingController', method: 'index', label: 'ThingController@index' },
+    action: {
+      type: 'controller',
+      class: 'App\\Http\\Controllers\\ThingController',
+      method: 'index',
+      label: 'ThingController@index',
+    },
     parameters: [],
     ...overrides,
   }
@@ -36,7 +41,12 @@ const ROUTES: ApiRoute[] = [
     id: 'GET:api/authors',
     uri: 'api/authors',
     name: 'authors.index',
-    action: { type: 'controller', class: 'App\\Http\\Controllers\\AuthorController', method: 'index', label: 'AuthorController@index' },
+    action: {
+      type: 'controller',
+      class: 'App\\Http\\Controllers\\AuthorController',
+      method: 'index',
+      label: 'AuthorController@index',
+    },
   }),
   route({
     id: 'GET:_debug',
