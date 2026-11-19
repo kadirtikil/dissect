@@ -11,6 +11,7 @@ use Workbench\App\Jobs\RebuildSearchIndex;
 use Workbench\App\Jobs\SyncAuthorProfile;
 use Workbench\App\Listeners\NotifyFollowers;
 use Workbench\App\Mail\WeeklyDigest;
+use Workbench\App\Models\Post;
 
 /**
  * The job list.
@@ -154,8 +155,8 @@ class JobsTest extends TestCase
         // The join to the graph, and the same ids schema.json uses as keys.
         $job = $this->jobs()[PublishPost::class];
 
-        $this->assertSame(['Post'], $job['models']);
-        $this->assertSame('Post', $job['payload'][0]['model']);
+        $this->assertSame([Post::class], $job['models']);
+        $this->assertSame(Post::class, $job['payload'][0]['model']);
         $this->assertSame('notifyFollowers', $job['payload'][1]['name']);
         $this->assertTrue($job['payload'][1]['optional']);
         $this->assertNull($job['payload'][1]['model']);

@@ -40,7 +40,10 @@ class SchemaExporter
         $edges = [];
 
         foreach ($this->discoverModels() as $class) {
-            $id = class_basename($class);
+            // The fully qualified class name: the one name two models cannot
+            // share. `Billing\Invoice` and `Sales\Invoice` used to collapse
+            // into one `Invoice` node. The page shortens it for display.
+            $id = ltrim($class, '\\');
 
             try {
                 // ModelInspector::inspect() returns a plain array on Laravel
@@ -242,7 +245,7 @@ class SchemaExporter
 
         foreach ($relations as $relation) {
             $edges[] = [
-                'target' => class_basename($relation['related']),
+                'target' => ltrim($relation['related'], '\\'),
                 'type' => $relation['type'],
                 'name' => $relation['name'],
             ];

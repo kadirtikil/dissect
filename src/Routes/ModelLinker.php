@@ -8,9 +8,9 @@ use Throwable;
 /**
  * Turns a class name into a node id the graph can address.
  *
- * Used by the jobs surface, for a queued class's payload type hints:
- * `App\Models\Author` and a bare `Author` are two ways of naming one node, and
- * both have to land on the id `schema.json` uses as a key.
+ * Node ids are fully qualified class names. Used by the jobs surface, for a
+ * queued class's payload type hints: `App\Models\Author` is the node itself,
+ * and a bare `Author` lands on it too when exactly one model has that name.
  *
  * The routes surface deliberately does not use this. An endpoint is described
  * by its own contract, and a rule's `exists:authors,id` travels verbatim rather
@@ -28,9 +28,12 @@ class ModelLinker
     /** @var array<string, string>|null fully qualified class => node id */
     protected ?array $byClass = null;
 
+    /** @var array<string, array<int, string>>|null short class name => node ids */
+    protected ?array $byBasename = null;
+
     public function __construct(protected SchemaExporter $models) {}
 
-    /** `authors` => `Author` */
+    /** `authors` => `App\Models\Author` */
     public function forTable(?string $table): ?string
     {
         if ($table === null) {
@@ -43,11 +46,14 @@ class ModelLinker
     }
 
     /**
-     * `App\Models\Author` => `Author`, and a bare `Author` too.
+     * `App\Models\Author` => `App\Models\Author`, and a bare `Author` too.
      *
-     * The basename fallback is what makes a convention-derived guess
-     * ("AuthorResource describes an Author") checkable: it only answers when
-     * the graph actually holds a node by that name.
+     * A namespaced name must match exactly. It used to fall back to its short
+     * name, which linked a `Billing\Data\Invoice` DTO to the `Invoice` model.
+     *
+     * A bare name is a convention-derived guess ("AuthorResource describes an
+     * Author"). It answers only when exactly one model has that name: with two
+     * `Invoice` models there is no telling which was meant.
      */
     public function forClass(?string $class): ?string
     {
@@ -63,11 +69,13 @@ class ModelLinker
             return $this->byClass[$class];
         }
 
-        $basename = str_contains($class, '\\')
-            ? substr($class, strrpos($class, '\\') + 1)
-            : $class;
+        if (str_contains($class, '\\')) {
+            return null;
+        }
 
-        return in_array($basename, $this->byClass ?? [], true) ? $basename : null;
+        $candidates = $this->byBasename[$class] ?? [];
+
+        return count($candidates) === 1 ? $candidates[0] : null;
     }
 
     /** Whether the graph holds a node by this id. */
@@ -86,12 +94,14 @@ class ModelLinker
 
         $this->byTable = [];
         $this->byClass = [];
+        $this->byBasename = [];
 
         try {
             foreach ($this->models->tables() as $class => $table) {
-                $id = class_basename($class);
+                $id = ltrim($class, '\\');
 
-                $this->byClass[ltrim($class, '\\')] = $id;
+                $this->byClass[$id] = $id;
+                $this->byBasename[class_basename($id)][] = $id;
 
                 // Two models can share a table (single-table inheritance, or a
                 // read-only variant). First one wins rather than last, so the
