@@ -18,6 +18,7 @@ import { useViewsStore } from '@/stores/views'
 import { useRoutesStore } from '@/stores/routes'
 import { useJobsStore } from '@/stores/jobs'
 import { useProviderStore } from '@/stores/provider'
+import { useDomainsStore } from '@/stores/domains'
 import { bootstrap } from '@/lib/bootstrap'
 import { baseName, shortNames } from '@/lib/classNames'
 
@@ -398,6 +399,7 @@ export const useSchemaStore = defineStore('schema', () => {
       const routes = useRoutesStore()
       const jobs = useJobsStore()
       const providers = useProviderStore()
+      const domains = useDomainsStore()
 
       try {
         // The derived surfaces all walk a far wider tree than the model signal
@@ -408,6 +410,7 @@ export const useSchemaStore = defineStore('schema', () => {
           routes.loaded ? 'routes=1' : null,
           jobs.loaded ? 'jobs=1' : null,
           providers.loaded ? 'providers=1' : null,
+          domains.loaded ? 'domains=1' : null,
         ].filter((part) => part !== null)
 
         const res = await fetch(asked.length ? `${url!}?${asked.join('&')}` : url!, {
@@ -436,6 +439,13 @@ export const useSchemaStore = defineStore('schema', () => {
         // need touch a model, a route or a job.
         if (typeof payload?.providers === 'string' && payload.providers !== providers.fingerprint) {
           await providers.refresh()
+        }
+
+        // And the domain list, which moves when a class is added, moved or
+        // re-attributed anywhere under the source folders, or domains.json
+        // is edited.
+        if (typeof payload?.domains === 'string' && payload.domains !== domains.fingerprint) {
+          await domains.refresh()
         }
 
         if (typeof next !== 'string' || next === fingerprint.value) return
