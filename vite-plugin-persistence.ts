@@ -8,6 +8,21 @@ export const LAYOUT_FILE = 'public/layout.json'
 export const VIEWS_ENDPOINT = '/__views'
 export const VIEWS_FILE = 'public/views.json'
 
+/** Same format as the package's LayoutRepository and ViewRepository::VERSION. */
+const STATE_VERSION = 2
+
+/**
+ * A model id: a class name, namespaced or not. Mirrors the package's
+ * VersionedStateFile::MODEL_ID, so both hosts accept the same ids.
+ */
+const MODEL_ID = /^[A-Za-z_]\w*(?:\\[A-Za-z_]\w*)*$/
+
+function modelId(value: unknown): string | null {
+  if (typeof value !== 'string') return null
+  const id = value.replace(/^\\+/, '')
+  return id.length <= 255 && MODEL_ID.test(id) ? id : null
+}
+
 interface LayoutPayload {
   version: number
   positions: Record<string, { x: number; y: number }>
@@ -185,7 +200,7 @@ export function sameOrigin(origin: string | undefined, host: string | undefined)
 }
 
 /**
- * Only finite numeric coordinates keyed by model name survive. Without this the
+ * Only finite numeric coordinates keyed by a model id survive. Without this the
  * endpoint would happily write NaN or arbitrary nested junk into the file that
  * the app then has to defend against on every load.
  */
@@ -197,15 +212,16 @@ function sanitiseLayout(input: unknown): LayoutPayload {
 
   const positions: LayoutPayload['positions'] = {}
 
-  for (const [id, value] of Object.entries(source as Record<string, unknown>)) {
-    if (typeof value !== 'object' || value === null) continue
+  for (const [key, value] of Object.entries(source as Record<string, unknown>)) {
+    const id = modelId(key)
+    if (id === null || typeof value !== 'object' || value === null) continue
     const { x, y } = value as { x?: unknown; y?: unknown }
     if (typeof x !== 'number' || typeof y !== 'number') continue
     if (!Number.isFinite(x) || !Number.isFinite(y)) continue
     positions[id] = { x: Math.round(x), y: Math.round(y) }
   }
 
-  return { version: 1, positions }
+  return { version: STATE_VERSION, positions }
 }
 
 /**
@@ -238,9 +254,8 @@ function sanitiseViews(input: unknown): ViewsPayload {
       .replace(/[\x00-\x1f\x7f]/g, '')
       .trim()
       .slice(0, 64)
-    const members = [
-      ...new Set(models.filter((m): m is string => typeof m === 'string' && /^\w+$/.test(m))),
-    ].slice(0, 500)
+    const ids = models.map(modelId).filter((m): m is string => m !== null)
+    const members = [...new Set(ids)].slice(0, 500)
 
     // A view with no name, no id or nothing in it cannot be selected or
     // displayed, so it is not worth persisting.
@@ -252,5 +267,5 @@ function sanitiseViews(input: unknown): ViewsPayload {
     if (views.length >= 100) break
   }
 
-  return { version: 1, views }
+  return { version: STATE_VERSION, views }
 }
