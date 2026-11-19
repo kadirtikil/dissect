@@ -9,6 +9,7 @@ Route::get('/routes.json', [DissectController::class, 'routesJson'])->name('diss
 Route::get('/jobs.json', [DissectController::class, 'jobsJson'])->name('dissect.jobs');
 Route::get('/providers.json', [DissectController::class, 'providersJson'])->name('dissect.providers');
 Route::get('/queue.json', [DissectController::class, 'queueJson'])->name('dissect.queue');
+Route::get('/domains.json', [DissectController::class, 'domainsJson'])->name('dissect.domains');
 Route::get('/fingerprint', [DissectController::class, 'fingerprintJson'])->name('dissect.fingerprint');
 Route::post('/layout', [DissectController::class, 'saveLayout'])->name('dissect.layout');
 Route::get('/views.json', [DissectController::class, 'viewsJson'])->name('dissect.views');

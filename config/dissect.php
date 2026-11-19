@@ -68,6 +68,45 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Domains
+    |--------------------------------------------------------------------------
+    |
+    | The bounded contexts an application is split into, and which one each
+    | class belongs to. Nothing here needs setting for an application that
+    | follows a common layout: domains are read off the folders, from
+    | `Modules/*`, `app-modules/*`, `app/Domain/*`, `src/Domain/*`,
+    | `packages/*`, hexagonal `src/{Name}/{Domain,Application,Infrastructure}`
+    | and `app/Models/{Name}` beside `app/Http/Controllers/{Name}`.
+    |
+    | `file` is where domains are written down by hand, for an application
+    | with no layout to follow or a folder in the wrong place. A class can also
+    | carry its own `#[Domain('Billing')]` attribute; the attribute class is
+    | the application's, matched by its short name.
+    |
+    | An application that follows no convention, has no file and no attribute
+    | has no domains, and nothing on the page changes. `enabled` false turns
+    | all of it off.
+    |
+    | `root` is where the folders are read from. `paths` is where classes are
+    | looked for when listing every domain's members; each domain's own
+    | folders are always included.
+    |
+    */
+
+    'domains' => [
+
+        'enabled' => env('DISSECT_DOMAINS', true),
+
+        'root' => base_path(),
+
+        'file' => base_path('.dissect/domains.json'),
+
+        'paths' => ['app', 'src', 'Modules', 'app-modules', 'packages'],
+
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Routes
     |--------------------------------------------------------------------------
     |
