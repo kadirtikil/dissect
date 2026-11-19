@@ -155,6 +155,7 @@ class DissectServiceProvider extends ServiceProvider
             $app->make(ResponseAnalyzer::class),
             $app->make(RouteFingerprint::class),
             $app->make(DocumentAnalyzer::class),
+            $app->make(ContextResolver::class),
         ));
 
         $this->app->singleton(JobDiscovery::class, fn () => new JobDiscovery(

@@ -34,6 +34,37 @@ class DomainContextTest extends TestCase
     }
 
     #[Test]
+    public function every_route_carries_its_controllers_domain(): void
+    {
+        $routes = collect($this->getJson('/dissect/routes.json')->assertOk()->json('routes'))
+            ->pluck('context', 'uri')->all();
+
+        $this->assertSame('Billing', $routes['api/domains/invoices']);
+        $this->assertSame('Billing', $routes['api/domains/invoices/{invoice}/send']);
+        $this->assertSame('Sales', $routes['api/domains/quotes']);
+        // An invokable controller, put in Identity by domains.json.
+        $this->assertSame('Identity', $routes['api/domains/login']);
+    }
+
+    #[Test]
+    public function a_closure_route_takes_the_domain_of_the_file_it_is_in(): void
+    {
+        $file = $this->domainFixture().'/app/Domain/Sales/routes-'.uniqid().'.php';
+        file_put_contents($file, "<?php\n\\Illuminate\\Support\\Facades\\Route::get('api/domains/ping', fn () => 'pong');\n");
+
+        try {
+            require $file;
+            $this->app['router']->getRoutes()->refreshNameLookups();
+            $routes = collect($this->getJson('/dissect/routes.json')->assertOk()->json('routes'))
+                ->pluck('context', 'uri')->all();
+        } finally {
+            unlink($file);
+        }
+
+        $this->assertSame('Sales', $routes['api/domains/ping']);
+    }
+
+    #[Test]
     public function switched_off_every_row_says_none(): void
     {
         config()->set('dissect.domains.enabled', false);
