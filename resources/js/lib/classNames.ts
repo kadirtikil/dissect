@@ -1,10 +1,11 @@
 /**
- * What a model is called on screen.
+ * What a class is called on screen.
  *
- * A model's id is its fully qualified class name — the only name two models
- * cannot share. That is right for keys and wrong for a card title, so this
- * turns ids back into something readable: the class name alone, or as much of
- * the namespace as it takes to tell two models apart.
+ * Models and controllers are addressed by fully qualified class name — the
+ * only name two of them cannot share. That is right for keys and wrong for a
+ * card title or a list heading, so this turns them back into something
+ * readable: the class name alone, or as much of the namespace as it takes to
+ * tell two apart.
  */
 
 /** `App\Models\Billing\Invoice` → `Invoice`. */

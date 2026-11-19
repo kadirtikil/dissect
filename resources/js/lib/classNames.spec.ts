@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { baseName, shortNames } from '@/lib/modelNames'
+import { baseName, shortNames } from '@/lib/classNames'
 
 describe('baseName', () => {
   it('drops the namespace', () => {
