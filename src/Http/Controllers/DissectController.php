@@ -7,6 +7,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Cache;
+use KdrDev\Dissect\Architecture\DomainMap;
 use KdrDev\Dissect\Exceptions\StateFileException;
 use KdrDev\Dissect\Jobs\JobExporter;
 use KdrDev\Dissect\LayoutRepository;
@@ -29,6 +30,8 @@ class DissectController
 
     protected ?string $providerFingerprint = null;
 
+    protected ?string $domainFingerprint = null;
+
     protected ?string $stamp = null;
 
     public function __construct(
@@ -39,6 +42,7 @@ class DissectController
         protected QueueSnapshot $queue,
         protected LayoutRepository $layout,
         protected ViewRepository $views,
+        protected DomainMap $domains,
     ) {}
 
     /** The single page. Schema and layout are inlined, so it makes no XHR on boot. */
@@ -90,6 +94,11 @@ class DissectController
         // because a constructor anywhere down a tree can change it.
         if ($request->boolean('providers')) {
             $payload['providers'] = $this->providerFingerprint();
+        }
+
+        // And for the domain list, which reads every source folder.
+        if ($request->boolean('domains')) {
+            $payload['domains'] = $this->domainFingerprint();
         }
 
         // The whole point is to see the current value; a cached 200 would make
@@ -151,6 +160,19 @@ class DissectController
     {
         return response()
             ->json($this->providers() + ['fingerprint' => $this->providerFingerprint()])
+            ->header('Cache-Control', 'no-store');
+    }
+
+    /**
+     * Every domain, how it was found, and the classes in it.
+     *
+     * Fetched when the domain list is opened, never inlined: building it
+     * reads every PHP file under the application's source folders.
+     */
+    public function domainsJson(): JsonResponse
+    {
+        return response()
+            ->json($this->domains() + ['fingerprint' => $this->domainFingerprint()])
             ->header('Cache-Control', 'no-store');
     }
 
@@ -422,6 +444,23 @@ class DissectController
             $this->cacheKey('jobs', $this->jobFingerprint()),
             now()->addHour(),
             fn () => $this->jobs->export(),
+        );
+    }
+
+    protected function domainFingerprint(): string
+    {
+        return $this->domainFingerprint ??= $this->domains->fingerprint();
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function domains(): array
+    {
+        return Cache::remember(
+            $this->cacheKey('domains', $this->domainFingerprint()),
+            now()->addHour(),
+            fn () => $this->domains->export(),
         );
     }
 

@@ -1,0 +1,9 @@
+{
+    "version": 1,
+    "domains": [
+        {
+            "name": "Identity",
+            "paths": ["app/Http/Controllers/Auth"]
+        }
+    ]
+}

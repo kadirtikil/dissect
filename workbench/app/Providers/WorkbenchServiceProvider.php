@@ -122,6 +122,37 @@ class WorkbenchServiceProvider extends ServiceProvider
             'cache.default' => 'array',
 
         ]);
+
+        if ($this->usesDomainFixture()) {
+            $domains = $root.'/workbench/domains';
+
+            // The domain fixture instead of the plain app: two folder domains,
+            // one from domains.json and an attribute, a stale override and an
+            // unassigned class. Its routes are added to the plain app's, which
+            // then show up as unassigned.
+            config([
+                'dissect.domains.root' => $domains,
+                'dissect.domains.file' => $domains.'/.dissect/domains.json',
+                'dissect.models.paths' => [$domains.'/app/Models', $domains.'/app/Domain/*/Models'],
+                // Jobs and providers take no `*` yet, unlike models.
+                'dissect.jobs.paths' => [$domains.'/app/Domain/Billing/Jobs', $domains.'/app/Domain/Sales/Jobs'],
+                'dissect.jobs.watch_paths' => [$domains.'/app'],
+                'dissect.routes.watch_paths' => [$root.'/workbench/app', $root.'/workbench/routes', $domains],
+                'dissect.providers.paths' => [$domains.'/app/Domain/Billing/Providers'],
+                'dissect.providers.watch_paths' => [$domains.'/app'],
+            ]);
+        }
+    }
+
+    /**
+     * Whether `serve` runs the domain fixture in workbench/domains.
+     *
+     * A file toggle for the same reason as .workbench-dev: `serve` never sees
+     * shell variables. Touch .workbench-domains to switch, delete it to go back.
+     */
+    protected function usesDomainFixture(): bool
+    {
+        return is_file(dirname(__DIR__, 3).'/.workbench-domains') && ! $this->app->environment('testing');
     }
 
     public function boot(): void
@@ -130,5 +161,9 @@ class WorkbenchServiceProvider extends ServiceProvider
         // line: nothing about the class itself says so, and the dispatcher is
         // the only place it is written down.
         Event::listen(PostPublished::class, NotifyFollowers::class);
+
+        if ($this->usesDomainFixture()) {
+            $this->loadRoutesFrom(dirname(__DIR__, 3).'/workbench/domains/routes.php');
+        }
     }
 }

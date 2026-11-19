@@ -94,6 +94,24 @@ real schema has. Half the models declare `$fillable`, some declare `$hidden`,
 and casts follow the column kinds — which is what gives an expanded card
 something to show.
 
+### An app split into domains
+
+The plain workbench app has no domains, on purpose: it proves that an app
+without them is left alone. `workbench/domains` is a second, small app that has
+them, with Billing and Sales under `app/Domain`, an Identity domain made of a
+`domains.json` entry and a `#[Domain]` attribute, a stale override (an attribute
+that disagrees with its folder) and a class no domain claims.
+
+```bash
+touch .workbench-domains   # serve the domain fixture instead
+composer serve
+rm .workbench-domains      # back to the plain app
+```
+
+Tests opt in with `Tests\Concerns\UsesDomainFixture`. Its tables are created by
+the workbench migrations either way, and nothing reads them unless the fixture
+is switched on.
+
 ### The two frontend hosts
 
 `pnpm dev` on its own still works and is the fastest loop for pure styling work,
@@ -177,6 +195,12 @@ DissectServiceProvider    wiring; registers routes only when enabled
   │     ├── DependencyResolver  bound concretes → their constructors, breadth-first, capped
   │     ├── TreeBuilder         nodes and edges keyed by id while a tree is read
   │     └── RouteFingerprint    its own instance, over providers.watch_paths
+  ├── Architecture\           which domain (bounded context) a class belongs to
+  │     ├── ContextResolver     attribute → domains.json → folder layout → unassigned
+  │     ├── Conventions         the folder layouts the ecosystem already uses
+  │     ├── DomainFile          .dissect/domains.json, read only, problems reported in words
+  │     ├── DomainAttribute     #[Domain('…')] read from tokens, never by loading the class
+  │     └── DomainMap           /domains.json: every domain and its classes, built on demand
   ├── Support\CodeOwnership   app / vendor / framework, for routes and provider trees alike
   ├── QueueSnapshot           what is on the queue *right now* — never cached
   │     ├── QueueReaderFactory  driver → a reader, or the reason there isn't one
@@ -939,6 +963,46 @@ There is deliberately no `payload` and no `batch` id: the first is somebody's
 data, and the second only exists inside the serialised command, which is never
 opened.
 
+### `domains.json` (generated — never hand-edited, never written)
+
+Served at `/dissect/domains.json` and fetched only when asked for, since
+building it reads every PHP file under `domains.paths`.
+
+```json
+{
+  "enabled": true,
+  "domains": [
+    { "name": "Billing", "sources": ["domain-folder"], "roots": ["app/Domain/Billing"],
+      "classes": ["App\\Domain\\Billing\\Models\\Invoice"] }
+  ],
+  "unassigned": ["App\\Support\\Clock"],
+  "findings": [
+    { "kind": "override-disagrees", "class": "App\\Domain\\Sales\\TaxRate",
+      "file": "app/Domain/Sales/TaxRate.php", "context": "Billing", "folder": "Sales",
+      "message": "#[Domain('Billing')] on a class in Sales's folder." }
+  ],
+  "problems": [],
+  "fingerprint": "1efe273e893d7bb8"
+}
+```
+
+`sources` says how a domain was found: `config`, `attribute`, `modules`,
+`app-modules`, `domain-folder`, `hexagonal`, `layer-folders` or `packages`. One
+domain found two ways lists both. `findings` are `override-disagrees` and
+`unknown-domain`. `problems` are what is wrong with `.dissect/domains.json`, in
+words; the file being broken never makes the endpoint fail.
+
+### `.dissect/domains.json` (authored — safe to commit and review)
+
+```json
+{ "version": 1, "conventions": true,
+  "domains": [{ "name": "Identity", "paths": ["app/Models/User.php", "app/Http/Controllers/Auth"] }] }
+```
+
+Read, never written: there is no editor for it yet. Paths are relative to
+`domains.root` or absolute, `*` stands for one directory name, and a path may
+name one file. `conventions: false` turns folder detection off.
+
 ### `layout.json` (authored — safe to commit and review)
 
 ```json
@@ -1059,6 +1123,10 @@ are running. `tests/StateVersioningTest.php` pins all of it.
 | **A contract the provider does not bind is a leaf** | Another provider decides it, and naming which would report the running container as a static fact |
 | **Side effects are badges, not edges** | Drawn as arrows, events, gates and config merges outnumber the dependencies and bury them; dropped entirely, a provider made only of them renders as an empty tree |
 | **Provider trees are laid out by hand, not by a layout library** | The server's `depth` already is the tier a tree layout computes; the rest is one ordering pass, and the canvas stays a pure function of the payload |
+| **Domains come from folders first** | A folder cannot drift from where a file lives; a per-class marker on every class would. The attribute is kept as the exception for the odd class in the wrong place, and is checked against its folder so a stale one is reported |
+| **An unassigned class is never guessed into a domain** | A guess shown with the same weight as a fact is the "confidently wrong" this package refuses elsewhere. Suggesting domains is a separate, later feature that says it is a suggestion |
+| **`#[Domain]` is matched by short name and read from tokens** | The app owns the attribute class, so no dev dependency leaks into production code. Reading tokens means listing every class never loads one |
+| **A plain app gets no domains** | Detection only matches layouts that mean "domains". A starter kit's `Auth` folders under controllers and requests are not one, which is why the layer-first rule requires `app/Models/{Name}` |
 | **Highlight is not selection** | Canvas selection is a gesture that feeds view membership; opening an endpoint must not quietly change what a new view would contain |
 
 ---
@@ -1077,7 +1145,8 @@ Config (`config/dissect.php`): `enabled`, `path`, `middleware`,
 `models_path`, `models.paths`, `layout_path`, `views_path`,
 `routes.watch_paths`, `jobs.paths`, `jobs.watch_paths`, `providers.paths`,
 `providers.max_depth`, `providers.max_nodes`, `providers.watch_paths`,
-`queue.rows`, `queue.poll_interval`.
+`queue.rows`, `queue.poll_interval`, `domains.enabled`, `domains.root`,
+`domains.file`, `domains.paths`.
 
 ---
 
@@ -1103,6 +1172,9 @@ Config (`config/dissect.php`): `enabled`, `path`, `middleware`,
 | Support another response type | `src/Routes/ResponseAnalyzer.php` |
 | Change how a rule string is read | `src/Routes/RuleNormalizer.php` (no Illuminate imports) |
 | Change how a name resolves to a node id (jobs only) | `src/Routes/ModelLinker.php` |
+| Recognise another folder layout as domains | `src/Architecture/Conventions.php` |
+| Change which domain wins for a class | `src/Architecture/ContextResolver.php` |
+| Change what the domain list reports | `src/Architecture/DomainMap.php` |
 | Change what counts as the application's code | `src/Support/CodeOwnership.php` |
 | Change what counts as a route change | `src/Routes/RouteFingerprint.php`, `routes.watch_paths` |
 | Change how the endpoint list is filtered or grouped | `resources/js/lib/routeFilters.ts` |

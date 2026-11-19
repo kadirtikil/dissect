@@ -43,6 +43,7 @@
         "psr-4": {
             "KdrDev\\Dissect\\Tests\\": "tests/",
             "Workbench\\App\\": "workbench/app/",
+            "Workbench\\Domains\\": "workbench/domains/app/",
             "Workbench\\Database\\Factories\\": "workbench/database/factories/",
             "Workbench\\Database\\Seeders\\": "workbench/database/seeders/"
         }

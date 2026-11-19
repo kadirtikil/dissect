@@ -8,6 +8,10 @@ use Illuminate\Database\DatabaseManager;
 use Illuminate\Database\Eloquent\ModelInspector;
 use Illuminate\Queue\QueueManager;
 use Illuminate\Routing\Router;
+use KdrDev\Dissect\Architecture\ContextResolver;
+use KdrDev\Dissect\Architecture\Conventions;
+use KdrDev\Dissect\Architecture\DomainFile;
+use KdrDev\Dissect\Architecture\DomainMap;
 use KdrDev\Dissect\Http\Middleware\Authorize;
 use KdrDev\Dissect\Jobs\DispatchScanner;
 use KdrDev\Dissect\Jobs\JobDiscovery;
@@ -62,6 +66,24 @@ class DissectServiceProvider extends ServiceProvider
             $app->make(ColumnNormalizer::class),
             $app->make(MigrationState::class),
             $this->modelsPaths(),
+        ));
+
+        $this->app->singleton(DomainFile::class, fn () => new DomainFile(
+            (string) config('dissect.domains.file', base_path('.dissect/domains.json')),
+            $this->domainsRoot(),
+        ));
+
+        $this->app->singleton(ContextResolver::class, fn (Application $app) => new ContextResolver(
+            (bool) config('dissect.domains.enabled', true),
+            $this->domainsRoot(),
+            $app->make(DomainFile::class),
+            new Conventions,
+        ));
+
+        $this->app->singleton(DomainMap::class, fn (Application $app) => new DomainMap(
+            $app->make(ContextResolver::class),
+            $app->make(DomainFile::class),
+            (array) config('dissect.domains.paths', ['app', 'src', 'Modules', 'app-modules', 'packages']),
         ));
 
         $this->app->singleton(RouteCollector::class, fn (Application $app) => new RouteCollector(
@@ -279,6 +301,14 @@ class DissectServiceProvider extends ServiceProvider
         ));
 
         return $paths !== [] ? $paths : [(string) config('dissect.models_path', 'app/Models')];
+    }
+
+    /** Where domain folders are read from: the application, unless configured. */
+    protected function domainsRoot(): string
+    {
+        $root = config('dissect.domains.root');
+
+        return is_string($root) && $root !== '' ? $root : base_path();
     }
 
     protected function shouldRegisterRoutes(): bool
