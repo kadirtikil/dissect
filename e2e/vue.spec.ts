@@ -161,3 +161,55 @@ test('builds a view from the model list and extends it afterwards', async ({ pag
   await page.getByRole('button', { name: 'Confirm deleting People' }).click()
   await expect(page.locator('.vue-flow__node')).toHaveCount(22)
 })
+
+/** Where Vue Flow has placed a node, in canvas coordinates rather than pixels. */
+async function flowPosition(page: Page, id: string): Promise<{ x: number; y: number }> {
+  const style = (await page.locator(`.vue-flow__node[data-id="${id}"]`).getAttribute('style')) ?? ''
+  const match = style.match(/translate\((-?[\d.]+)px,\s*(-?[\d.]+)px\)/)
+  if (!match) throw new Error(`no transform on ${id}: ${style}`)
+  return { x: Number(match[1]), y: Number(match[2]) }
+}
+
+test('a dragged node stays where it was put when the view changes', async ({ page }) => {
+  // Answered here rather than by the dev server, so the run leaves
+  // public/layout.json and public/views.json as it found them.
+  await page.route('**/__layout', (route) => route.fulfill({ json: { ok: true, saved: 1 } }))
+  await page.route('**/__views', (route) => route.fulfill({ json: { ok: true, saved: 1 } }))
+
+  await page.setViewportSize({ width: 1400, height: 900 })
+  await openGraph(page)
+  await expect(page.locator('.vue-flow__node')).toHaveCount(22)
+
+  const grid = await flowPosition(page, 'User')
+  const box = (await page.locator('[data-id="User"]').boundingBox())!
+
+  const saved = page.waitForRequest('**/__layout')
+  await page.mouse.move(box.x + box.width / 2, box.y + 12)
+  await page.mouse.down()
+  await page.mouse.move(box.x + box.width / 2 + 240, box.y + 12 + 160, { steps: 12 })
+  await page.mouse.up()
+  await saved
+
+  const dragged = await flowPosition(page, 'User')
+  expect(dragged).not.toEqual(grid)
+
+  // Narrow to a view, then back out. Every switch hands Vue Flow a new node
+  // list, and the list used to carry the position from before the drag.
+  // The drag left User selected, and a new view starts from the selection.
+  await page.getByRole('button', { name: /^View:/ }).click()
+  await page.getByLabel('Filter models').fill('user')
+  await expect(page.getByRole('menuitemcheckbox', { name: /^User / })).toBeChecked()
+  await page.getByLabel('Filter models').fill('team')
+  await page.getByRole('menuitemcheckbox', { name: /^Team / }).click()
+  await page.getByLabel('Name for the new view').fill('People')
+  await page.getByRole('button', { name: 'Save', exact: true }).click()
+  await expect(page.locator('.vue-flow__node')).toHaveCount(2)
+
+  expect(await flowPosition(page, 'User')).toEqual(dragged)
+
+  // The menu stays open after saving, so "All models" is right there.
+  await page.getByRole('menuitem', { name: 'All models' }).click()
+  await expect(page.locator('.vue-flow__node')).toHaveCount(22)
+
+  expect(await flowPosition(page, 'User')).toEqual(dragged)
+})

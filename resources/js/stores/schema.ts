@@ -110,10 +110,26 @@ export const useSchemaStore = defineStore('schema', () => {
    * Filtering happens here rather than in `applySchema` so that positions,
    * slot order and the saved-layout pruning all keep working from the complete
    * set — a view changes what you see, never what is stored.
+   *
+   * Saved positions are laid over the top for the same reason `applySchema`
+   * lays them over the grid. `nodes` is only rebuilt when the schema changes,
+   * so it still holds where each node was before anybody dragged it — and
+   * every view switch hands Vue Flow this list afresh, which used to snap
+   * each dragged node back to that spot. Only moved nodes are copied, so the
+   * rest keep their identity.
    */
   const visibleNodes = computed(() => {
     const members = useViewsStore().activeModels
-    return members ? nodes.value.filter((n) => members.has(n.id)) : nodes.value
+    const saved = useLayoutStore().positions
+    const shown = members ? nodes.value.filter((n) => members.has(n.id)) : nodes.value
+
+    return shown.map((node) => {
+      const position = saved[node.id]
+      if (!position || (position.x === node.position.x && position.y === node.position.y)) {
+        return node
+      }
+      return { ...node, position: { ...position } }
+    })
   })
 
   /** An edge needs both ends on screen, or it points into nothing. */
