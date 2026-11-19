@@ -3,6 +3,7 @@
 namespace KdrDev\Dissect\Tests;
 
 use Illuminate\Foundation\Application;
+use Illuminate\Support\Facades\Gate;
 use Orchestra\Testbench\Concerns\WithWorkbench;
 use Orchestra\Testbench\TestCase as BaseTestCase;
 
@@ -21,6 +22,8 @@ abstract class TestCase extends BaseTestCase
         // default — switch them on deliberately, and point the exporter at the
         // Workbench fixture models rather than a non-existent app/Models.
         $app['config']->set('dissect.enabled', true);
+
+        $this->defineGate();
         $app['config']->set('dissect.models_path', __DIR__.'/../workbench/app/Models');
         $app['config']->set('dissect.models_namespace', 'Workbench\\App\\Models');
         $app['config']->set('dissect.routes.watch_paths', [
@@ -43,6 +46,15 @@ abstract class TestCase extends BaseTestCase
         $app['config']->set('dissect.views_path', $app->basePath('.dissect-test/views.json'));
 
         $app['config']->set('database.default', 'testing');
+    }
+
+    /**
+     * Tests do not run in `local`, so the viewer is closed until the
+     * application says otherwise — which is what a suite that uses it does.
+     */
+    protected function defineGate(): void
+    {
+        Gate::define('viewDissect', fn ($user = null) => true);
     }
 
     protected function layoutPath(Application $app): string
