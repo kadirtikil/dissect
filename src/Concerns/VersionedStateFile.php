@@ -2,8 +2,10 @@
 
 namespace KdrDev\Dissect\Concerns;
 
+use Closure;
 use JsonException;
 use KdrDev\Dissect\Exceptions\StateFileException;
+use Throwable;
 
 /**
  * Shared handling for the two JSON files dissect keeps in the application.
@@ -19,11 +21,24 @@ use KdrDev\Dissect\Exceptions\StateFileException;
  * So the rule is: a file from the future is readable but never writable, and a
  * file from the past is copied aside before this version rewrites it.
  *
- * The using class must declare a `VERSION` constant and hold the file location
- * in `$this->path`.
+ * The using class must declare a `VERSION` constant, hold the file location
+ * in `$this->path` and, to migrate version 1 model ids, a closure listing the
+ * graph's model ids in `$this->models`.
  */
 trait VersionedStateFile
 {
+    /**
+     * A model id: a class name, namespaced or not. Version 1 ids were short
+     * class names, which this matches too, so the same rule reads both.
+     */
+    protected const MODEL_ID = '/^[A-Za-z_][A-Za-z0-9_]*(?:\\\\[A-Za-z_][A-Za-z0-9_]*)*$/';
+
+    /** Longer than any real class name, short enough to bound the file. */
+    protected const MAX_MODEL_ID_LENGTH = 255;
+
+    /** @var array<string, array<int, string>>|null short class name => model ids */
+    protected ?array $byBasename = null;
+
     /**
      * Sent by a client that has no revision to offer: the dev-server plugin,
      * or a page from before revisions existed. Its write is let through
@@ -96,6 +111,63 @@ trait VersionedStateFile
         $version = $decoded['version'] ?? 1;
 
         return is_numeric($version) ? (int) $version : 1;
+    }
+
+    /** The id with any leading backslash dropped, or null when it cannot be a model id. */
+    protected function modelId(mixed $id): ?string
+    {
+        if (! is_string($id)) {
+            return null;
+        }
+
+        $id = ltrim($id, '\\');
+
+        return strlen($id) <= self::MAX_MODEL_ID_LENGTH && preg_match(self::MODEL_ID, $id) ? $id : null;
+    }
+
+    /**
+     * The current ids a version 1 id stands for.
+     *
+     * Version 1 keyed models by short class name, which two models can share.
+     * One match is the model. Several are the ambiguity the short name had
+     * all along, handed back for the caller to decide. None means the model
+     * is gone, and the id goes with it, as it would have on the next save.
+     *
+     * Without a model list there is nothing to resolve against, so the id is
+     * kept as it is. A short name is still a valid id, for a model in the
+     * global namespace.
+     *
+     * @return array<int, string>
+     */
+    protected function upgradeModelId(string $id): array
+    {
+        if (! $this->models instanceof Closure) {
+            return [$id];
+        }
+
+        if (str_contains($id, '\\')) {
+            return [$id];
+        }
+
+        if ($this->byBasename === null) {
+            $this->byBasename = [];
+
+            // Discovery is lazy: only a version 1 file pays for it. It reads
+            // the filesystem and boots models, so it can fail on a broken
+            // app; a layout that loses its old positions is better than a
+            // page that does not load.
+            try {
+                foreach (($this->models)() as $model) {
+                    $model = ltrim((string) $model, '\\');
+                    $short = substr((string) strrchr('\\'.$model, '\\'), 1);
+
+                    $this->byBasename[$short][] = $model;
+                }
+            } catch (Throwable) {
+            }
+        }
+
+        return $this->byBasename[$id] ?? [];
     }
 
     /**

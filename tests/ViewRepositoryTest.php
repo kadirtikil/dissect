@@ -42,7 +42,7 @@ class ViewRepositoryTest extends PhpUnitTestCase
 
     public function test_a_missing_file_reads_as_no_views(): void
     {
-        $this->assertSame(['version' => 1, 'views' => [], 'revision' => null], $this->repository()->get());
+        $this->assertSame(['version' => ViewRepository::VERSION, 'views' => [], 'revision' => null], $this->repository()->get());
     }
 
     public function test_it_writes_and_reads_back_a_view(): void
@@ -53,7 +53,7 @@ class ViewRepositoryTest extends PhpUnitTestCase
 
         $this->assertSame(1, $written);
         $this->assertSame([
-            'version' => 1,
+            'version' => ViewRepository::VERSION,
             'views' => [
                 ['id' => 'billing', 'name' => 'Billing', 'models' => ['Invoice', 'Payment']],
             ],
@@ -69,7 +69,7 @@ class ViewRepositoryTest extends PhpUnitTestCase
         // The graph is perfectly usable with no views; blanking the page over a
         // bad file is not. It still has a revision: a save is based on what
         // was on disk, readable or not.
-        $this->assertSame(['version' => 1, 'views' => []], array_diff_key($this->repository()->get(), ['revision' => 0]));
+        $this->assertSame(['version' => ViewRepository::VERSION, 'views' => []], array_diff_key($this->repository()->get(), ['revision' => 0]));
         $this->assertNotNull($this->repository()->get()['revision']);
     }
 
@@ -110,15 +110,16 @@ class ViewRepositoryTest extends PhpUnitTestCase
         $this->assertSame('First', $views[0]['name']);
     }
 
-    public function test_it_rejects_model_ids_that_are_not_class_basenames(): void
+    public function test_it_rejects_model_ids_that_are_not_class_names(): void
     {
         $this->repository()->put([
-            ['id' => 'v', 'name' => 'V', 'models' => ['Invoice', 'App\\Models\\Payment', '../etc', 42, 'Invoice']],
+            ['id' => 'v', 'name' => 'V', 'models' => ['Invoice', 'App\\Models\\Payment', '../etc', 42, 'Invoice', '\\App\\Models\\Payment']],
         ]);
 
-        // Duplicates collapse, and anything that could not be a node id is
-        // dropped rather than rendering a member matching nothing.
-        $this->assertSame(['Invoice'], $this->repository()->get()['views'][0]['models']);
+        // Duplicates collapse (a leading backslash is the same class), and
+        // anything that could not be a node id is dropped rather than
+        // rendering a member matching nothing.
+        $this->assertSame(['Invoice', 'App\\Models\\Payment'], $this->repository()->get()['views'][0]['models']);
     }
 
     public function test_it_strips_control_characters_from_a_name(): void

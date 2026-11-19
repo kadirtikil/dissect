@@ -200,12 +200,17 @@ class DissectServiceProvider extends ServiceProvider
             $app->make(QueueHistory::class),
         ));
 
+        // Model discovery only runs if a version 1 file has to be migrated.
+        $models = fn () => array_keys($this->app->make(SchemaExporter::class)->tables());
+
         $this->app->singleton(LayoutRepository::class, fn () => new LayoutRepository(
             (string) config('dissect.layout_path', base_path('.dissect/layout.json')),
+            $models,
         ));
 
         $this->app->singleton(ViewRepository::class, fn () => new ViewRepository(
             (string) config('dissect.views_path', base_path('.dissect/views.json')),
+            $models,
         ));
     }
 

@@ -73,7 +73,7 @@ class StateFileWriteTest extends PhpUnitTestCase
         $this->skipIfRoot();
 
         $path = $this->directory.'/layout.json';
-        file_put_contents($path, $before = '{"version": 1, "positions": {"Post": {"x": 7, "y": 9}}}');
+        file_put_contents($path, $before = '{"version": 2, "positions": {"Post": {"x": 7, "y": 9}}}');
         chmod($this->directory, 0555);
 
         try {

@@ -60,7 +60,7 @@ class StateVersioningTest extends PhpUnitTestCase
     public function it_refuses_to_overwrite_a_layout_written_by_a_newer_version(): void
     {
         $path = $this->write('layout.json', json_encode([
-            'version' => 2,
+            'version' => LayoutRepository::VERSION + 1,
             'positions' => ['Post' => ['x' => 10, 'y' => 20]],
         ]));
 
@@ -79,7 +79,7 @@ class StateVersioningTest extends PhpUnitTestCase
     public function it_refuses_to_overwrite_views_written_by_a_newer_version(): void
     {
         $path = $this->write('views.json', json_encode([
-            'version' => 2,
+            'version' => LayoutRepository::VERSION + 1,
             'views' => [['id' => 'billing', 'name' => 'Billing', 'models' => ['Invoice']]],
         ]));
 
@@ -100,7 +100,7 @@ class StateVersioningTest extends PhpUnitTestCase
         // Refusing to write must not mean refusing to render: the page shows
         // what this version can make sense of, and simply cannot save.
         $path = $this->write('layout.json', json_encode([
-            'version' => 2,
+            'version' => LayoutRepository::VERSION + 1,
             'positions' => ['Post' => ['x' => 10, 'y' => 20]],
         ]));
 
@@ -217,7 +217,7 @@ class StateVersioningTest extends PhpUnitTestCase
 
         (new LayoutRepository($path))->put(['Post' => ['x' => 3, 'y' => 4]]);
 
-        $this->assertCount(0, glob($this->directory.'/*.bak') ?: [], 'version 1 is current, so nothing to migrate');
+        $this->assertFileExists($path.'.v1.bak', 'read as version 1, so copied aside before the upgrade');
     }
 
     #[Test]

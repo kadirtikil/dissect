@@ -2,6 +2,7 @@
 
 namespace KdrDev\Dissect;
 
+use Closure;
 use KdrDev\Dissect\Concerns\VersionedStateFile;
 use KdrDev\Dissect\Exceptions\StateFileException;
 
@@ -17,8 +18,12 @@ class LayoutRepository
 {
     use VersionedStateFile;
 
-    /** Format of the file this version reads and writes. See VersionedStateFile. */
-    public const VERSION = 1;
+    /**
+     * Format of the file this version reads and writes. See VersionedStateFile.
+     *
+     * 2: positions are keyed by full class name. 1 keyed them by short name.
+     */
+    public const VERSION = 2;
 
     /**
      * Far more models than the graph draws usefully, and few enough that a
@@ -33,7 +38,11 @@ class LayoutRepository
      */
     protected const MAX_COORDINATE = 1000000;
 
-    public function __construct(protected string $path) {}
+    /**
+     * @param  (Closure(): iterable<string>)|null  $models  The graph's model ids, for
+     *                                                      migrating a version 1 file.
+     */
+    public function __construct(protected string $path, protected ?Closure $models = null) {}
 
     /** @return array{version: int, positions: array<string, array{x: int, y: int}>, revision: string|null} */
     public function get(): array
@@ -45,7 +54,7 @@ class LayoutRepository
 
         return [
             'version' => self::VERSION,
-            'positions' => $this->sanitise($decoded['positions'] ?? []),
+            'positions' => $this->sanitise($decoded['positions'] ?? [], $this->versionOf($decoded ?? [])),
             'revision' => $this->revisionOf($contents),
         ];
     }
@@ -55,12 +64,14 @@ class LayoutRepository
      * @return int Number of positions written.
      *
      * @param  string|null  $basedOn  The revision the client last read; see VersionedStateFile::save().
+     * @param  int  $format  The format the client sent. A page opened before an
+     *                       upgrade still sends version 1 ids.
      *
      * @throws StateFileException when the existing file must not be overwritten.
      */
-    public function put(array $positions, ?string $basedOn = self::ANY_REVISION): int
+    public function put(array $positions, ?string $basedOn = self::ANY_REVISION, int $format = self::VERSION): int
     {
-        $clean = $this->sanitise($positions);
+        $clean = $this->sanitise($positions, $format);
 
         $this->save(['version' => self::VERSION, 'positions' => $clean], $basedOn);
 
@@ -73,14 +84,18 @@ class LayoutRepository
      * the page consumes.
      *
      * Ids are held to the same rule as ViewRepository's model ids: nodes are
-     * keyed by class basename, so anything else is not a node. That also keeps
+     * keyed by class name, so anything else is not a node. That also keeps
      * invalid UTF-8 out, which json_encode() would otherwise throw on — a 500
      * from a request that was merely malformed.
+     *
+     * A version 1 short name moves to the model it names. When two models
+     * share it, neither gets the position: there is no telling which one was
+     * dragged there, and both on one spot would hide one under the other.
      *
      * @param  mixed  $positions
      * @return array<string, array{x: int, y: int}>
      */
-    protected function sanitise(mixed $positions): array
+    protected function sanitise(mixed $positions, int $format = self::VERSION): array
     {
         if (! is_array($positions)) {
             return [];
@@ -89,8 +104,20 @@ class LayoutRepository
         $clean = [];
 
         foreach ($positions as $id => $position) {
-            if (! is_string($id) || ! preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/', $id) || ! is_array($position)) {
+            $id = $this->modelId($id);
+
+            if ($id === null || ! is_array($position)) {
                 continue;
+            }
+
+            if ($format < 2) {
+                $ids = $this->upgradeModelId($id);
+
+                if (count($ids) !== 1) {
+                    continue;
+                }
+
+                $id = $ids[0];
             }
 
             $x = $position['x'] ?? null;
