@@ -150,7 +150,7 @@ const retry = computed(() => {
             :disabled="!known.has(field.model)"
             @click="openModel(field.model)"
           >
-            carries {{ field.model }}
+            carries {{ schema.labelOf(field.model) }}
           </button>
           <span v-if="field.optional" class="text-[10px] text-muted-foreground">optional</span>
         </li>
@@ -252,7 +252,7 @@ const retry = computed(() => {
           :title="known.has(model) ? `Show ${model} on the graph` : `${model} is not in the graph`"
           @click="openModel(model)"
         >
-          {{ model }}
+          {{ schema.labelOf(model) }}
           <ArrowUpRight v-if="known.has(model)" class="size-3" />
         </button>
       </div>

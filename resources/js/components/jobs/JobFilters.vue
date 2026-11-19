@@ -4,11 +4,13 @@ import { storeToRefs } from 'pinia'
 import { Layers, X } from '@lucide/vue'
 import { useJobsStore } from '@/stores/jobs'
 import { useViewsStore } from '@/stores/views'
+import { useSchemaStore } from '@/stores/schema'
 import { kindColor, kindRank, kindSpec } from '@/lib/jobKinds'
 import { DEFAULT_QUEUE, MIXED_QUEUE } from '@/lib/jobFilters'
 
 const store = useJobsStore()
 const views = useViewsStore()
+const schema = useSchemaStore()
 const { search, kinds, queues, modelFilter, scopeToView, undispatchedOnly, facets, stats } =
   storeToRefs(store)
 const { active } = storeToRefs(views)
@@ -162,10 +164,10 @@ const filtered = computed(
       <button
         v-if="modelFilter"
         class="flex items-center gap-1 rounded-sm border border-ring/40 px-1.5 py-0.5 font-mono text-[10px]"
-        :aria-label="`Stop filtering to ${modelFilter}`"
+        :aria-label="`Stop filtering to ${schema.labelOf(modelFilter)}`"
         @click="store.filterByModel(null)"
       >
-        carrying {{ modelFilter }}
+        carrying {{ schema.labelOf(modelFilter) }}
         <X class="size-3" />
       </button>
     </div>
