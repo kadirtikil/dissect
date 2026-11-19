@@ -20,7 +20,7 @@
         {
           "name": "document",
           "type": "App\\Models\\Document",
-          "model": "Document",
+          "model": "App\\Models\\Document",
           "optional": false,
           "variadic": false,
           "default": null
@@ -28,7 +28,7 @@
         {
           "name": "variant",
           "type": "App\\Models\\Variant",
-          "model": "Variant",
+          "model": "App\\Models\\Variant",
           "optional": true,
           "variadic": false,
           "default": null
@@ -51,7 +51,7 @@
           "route": "POST:api/documents"
         }
       ],
-      "models": ["Document", "Variant"]
+      "models": ["App\\Models\\Document", "App\\Models\\Variant"]
     },
     {
       "id": "App\\Jobs\\RenderThumbnail",
@@ -73,7 +73,7 @@
         {
           "name": "variant",
           "type": "App\\Models\\Variant",
-          "model": "Variant",
+          "model": "App\\Models\\Variant",
           "optional": false,
           "variadic": false,
           "default": null
@@ -96,7 +96,7 @@
           "route": null
         }
       ],
-      "models": ["Variant"]
+      "models": ["App\\Models\\Variant"]
     },
     {
       "id": "App\\Jobs\\PurgeDeletedDocuments",
@@ -141,7 +141,7 @@
         {
           "name": "workspace",
           "type": "App\\Models\\Workspace",
-          "model": "Workspace",
+          "model": "App\\Models\\Workspace",
           "optional": false,
           "variadic": false,
           "default": null
@@ -176,7 +176,7 @@
           "route": null
         }
       ],
-      "models": ["Workspace"]
+      "models": ["App\\Models\\Workspace"]
     },
     {
       "id": "App\\Listeners\\RevokeAccess",
@@ -221,7 +221,7 @@
         {
           "name": "invitation",
           "type": "App\\Models\\Invitation",
-          "model": "Invitation",
+          "model": "App\\Models\\Invitation",
           "optional": false,
           "variadic": false,
           "default": null
@@ -244,7 +244,7 @@
           "route": "GET:api/workspaces/{workspace}/members"
         }
       ],
-      "models": ["Invitation"]
+      "models": ["App\\Models\\Invitation"]
     },
     {
       "id": "App\\Notifications\\ReviewRequested",
@@ -266,7 +266,7 @@
         {
           "name": "review",
           "type": "App\\Models\\VersionReview",
-          "model": "VersionReview",
+          "model": "App\\Models\\VersionReview",
           "optional": false,
           "variadic": false,
           "default": null
@@ -289,7 +289,7 @@
           "route": "GET:api/documents/{document}"
         }
       ],
-      "models": ["VersionReview"]
+      "models": ["App\\Models\\VersionReview"]
     }
   ],
   "generated_at": "2026-08-31T09:00:00+00:00",
