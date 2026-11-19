@@ -145,3 +145,29 @@ test('ages the reading on screen and says when a poll fails', async ({ page }) =
   await expect(page.getByText('last read failed')).toBeVisible()
   await expect(page.getByRole('heading', { name: 'database', exact: true })).toBeVisible()
 })
+
+test('reads a Redis reservation by when it expires', async ({ page }) => {
+  const fixture = JSON.parse(readFileSync('public/queue.json', 'utf8'))
+
+  // Redis records when a reservation runs out, not when it was taken.
+  const reserved = {
+    ...fixture.now.reserved,
+    rows: fixture.now.reserved.rows.map(({ reserved_at, ...row }: Record<string, unknown>) => ({
+      ...row,
+      reserved_until: reserved_at,
+    })),
+  }
+
+  await page.route('**/queue.json*', (route) =>
+    route.fulfill({
+      json: { ...fixture, driver: 'redis', now: { ...fixture.now, reserved } },
+    }),
+  )
+
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Queue', exact: true }).click()
+
+  const section = page.locator('section', { hasText: 'RESERVED' }).first()
+  await expect(section.getByRole('columnheader', { name: 'expires' })).toBeVisible()
+  await expect(section.getByRole('row').nth(1)).not.toContainText('—')
+})
