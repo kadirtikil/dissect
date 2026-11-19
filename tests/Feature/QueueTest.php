@@ -158,6 +158,75 @@ class QueueTest extends TestCase
     }
 
     #[Test]
+    public function it_reads_one_page_of_failures_however_many_there_are(): void
+    {
+        foreach (range(1, 12) as $i) {
+            DB::table('failed_jobs')->insert([
+                'uuid' => (string) Str::uuid(),
+                'connection' => 'database',
+                'queue' => 'publishing',
+                'payload' => $this->payload('Workbench\App\Jobs\PublishPost'),
+                'exception' => "RuntimeException: failure {$i}\n".str_repeat('#0 /app/vendor/frame'."\n", 200),
+                'failed_at' => now()->addSeconds($i),
+            ]);
+        }
+
+        DB::enableQueryLog();
+        $failed = $this->snapshot(limit: 5)['past']['failed'];
+        $reads = collect(DB::getQueryLog())->pluck('query')
+            ->filter(fn (string $sql) => str_contains($sql, 'failed_jobs'));
+
+        // The whole table is counted; only one page of it is ever loaded.
+        $this->assertSame(12, $failed['total']);
+        $this->assertCount(5, $failed['rows']);
+        $this->assertSame('RuntimeException: failure 12', $failed['rows'][0]['exception'], 'newest first');
+
+        $this->assertTrue(
+            $reads->every(fn (string $sql) => str_contains($sql, 'count(') || str_contains($sql, 'limit')),
+            "every read of failed_jobs is a count or a page:\n".$reads->implode("\n"),
+        );
+    }
+
+    #[Test]
+    public function it_sends_a_failure_time_with_its_timezone(): void
+    {
+        config(['app.timezone' => 'Europe/Berlin']);
+
+        DB::table('failed_jobs')->insert([
+            'uuid' => (string) Str::uuid(),
+            'connection' => 'database',
+            'queue' => 'publishing',
+            'payload' => $this->payload('Workbench\App\Jobs\PublishPost'),
+            'exception' => 'RuntimeException: once',
+            // How the store writes it: no offset, in the app's timezone.
+            'failed_at' => '2026-08-31 11:30:00',
+        ]);
+
+        // Read in Berlin it is 09:30 UTC; read in the browser's zone, which is
+        // what a bare string invites, it would be anything.
+        $this->assertSame(
+            '2026-08-31T11:30:00+02:00',
+            $this->snapshot()['past']['failed']['rows'][0]['failed_at'],
+        );
+    }
+
+    #[Test]
+    public function it_addresses_a_failure_by_its_uuid(): void
+    {
+        DB::table('failed_jobs')->insert([
+            'uuid' => $uuid = (string) Str::uuid(),
+            'connection' => 'database',
+            'queue' => 'publishing',
+            'payload' => $this->payload('Workbench\App\Jobs\PublishPost'),
+            'exception' => 'RuntimeException: once',
+            'failed_at' => now(),
+        ]);
+
+        // What `queue:retry` takes, and what the framework's own all() reports.
+        $this->assertSame($uuid, $this->snapshot()['past']['failed']['rows'][0]['id']);
+    }
+
+    #[Test]
     public function it_reports_batches_as_the_other_half_of_the_past(): void
     {
         DB::table('job_batches')->insert([

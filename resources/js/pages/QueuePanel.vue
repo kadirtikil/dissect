@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted } from 'vue'
 import { storeToRefs } from 'pinia'
+import { useNow } from '@vueuse/core'
 import QueueSection from '@/components/queue/QueueSection.vue'
 import { PAGE_ACTIONS, PAGE_CONTEXT } from '@/lib/toolbar'
 import { useQueueStore } from '@/stores/queue'
@@ -21,17 +22,43 @@ const { status, error, snapshot, reading, loaded, readable, depths, totals } = s
  */
 let stop: (() => void) | undefined
 
-onMounted(async () => {
-  await store.read()
+// The poller starts synchronously, before the first read is awaited. Started
+// after it, a page left while that read was still in flight unmounted with
+// nothing to stop — and the timer it then started polled for the rest of the
+// session.
+onMounted(() => {
   stop = store.watchQueue()
+  void store.read()
 })
 
 onUnmounted(() => stop?.())
 
+/**
+ * What the "Reserved" column can say, which depends on the driver.
+ *
+ * The database table records when a worker took the job. Redis records only
+ * when the reservation runs out — a different moment, so it gets a different
+ * label rather than being passed off as the first.
+ */
+const reservedTime = computed(() =>
+  snapshot.value?.driver === 'redis'
+    ? { label: 'expires', field: 'reserved_until' as const }
+    : { label: 'taken', field: 'reserved_at' as const },
+)
+
 /** Totals across every queue, which is the headline the page opens with. */
 const depth = computed(() => totals.value.waiting + totals.value.reserved)
 
-const readAt = computed(() => relative(snapshot.value?.read_at ?? null))
+/**
+ * The age of the reading on screen, kept current.
+ *
+ * Computed from `read_at` alone it only re-evaluated when a new snapshot
+ * landed — so while polls were failing it said "just now" indefinitely, which
+ * is the one moment the age matters.
+ */
+const now = useNow({ interval: 1000 })
+
+const readAt = computed(() => relative(snapshot.value?.read_at ?? null, now.value.getTime()))
 </script>
 
 <template>
@@ -71,6 +98,17 @@ const readAt = computed(() => relative(snapshot.value?.read_at ?? null))
         :title="absolute(snapshot?.read_at ?? null) ?? ''"
       >
         {{ reading ? 'reading…' : `read ${readAt}` }}
+      </span>
+
+      <!-- The last good reading stays up when a poll fails, so the page has to
+           say that the one on screen is no longer the latest. -->
+      <span
+        v-if="loaded && error"
+        class="font-mono text-[10px] text-destructive"
+        role="status"
+        :title="error"
+      >
+        last read failed
       </span>
     </Teleport>
 
@@ -137,8 +175,8 @@ const readAt = computed(() => relative(snapshot.value?.read_at ?? null))
               title="Reserved"
               hint="taken by a worker and not yet finished"
               :section="snapshot.now.reserved"
-              time-label="taken"
-              time-field="reserved_at"
+              :time-label="reservedTime.label"
+              :time-field="reservedTime.field"
               empty="No worker is holding anything."
             />
           </div>

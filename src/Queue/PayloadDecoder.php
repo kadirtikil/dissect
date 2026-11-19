@@ -44,10 +44,31 @@ class PayloadDecoder
             'name' => $class === null ? 'Unknown job' : class_basename($class),
             'attempts' => is_int($envelope['attempts'] ?? null) ? $envelope['attempts'] : 0,
             'maxTries' => is_int($envelope['maxTries'] ?? null) ? $envelope['maxTries'] : null,
-            // Written by Laravel 11+; absent on a payload queued by an older
-            // release, which is a queue this can still describe otherwise.
-            'pushed_at' => $this->stringOrNull($envelope['pushedAt'] ?? null),
+            'pushed_at' => $this->pushedAt($envelope),
         ];
+    }
+
+    /**
+     * When the job was put on the queue, as ISO 8601.
+     *
+     * The framework writes `createdAt`, in whole Unix seconds. `pushedAt` is
+     * Horizon's, a microtime string, and the more precise of the two where it
+     * exists. Either way the client gets a date it can parse: a bare
+     * `"1732012345.1234"` reads as an invalid date in every browser.
+     *
+     * @param  array<string, mixed>  $envelope
+     */
+    protected function pushedAt(array $envelope): ?string
+    {
+        foreach (['pushedAt', 'createdAt'] as $key) {
+            $value = $envelope[$key] ?? null;
+
+            if (is_numeric($value)) {
+                return date(DATE_ATOM, (int) $value);
+            }
+        }
+
+        return null;
     }
 
     /**

@@ -36,6 +36,12 @@ export const useQueueStore = defineStore('queue', () => {
   /** Set while a poll is in flight, so the header can say it is working. */
   const reading = ref(false)
 
+  /**
+   * The request whose answer will be shown. A newer read replaces it, and an
+   * answer that comes back for a replaced one is dropped.
+   */
+  let current: AbortController | null = null
+
   /** True once a first reading has landed, whatever happens afterwards. */
   const loaded = computed(() => snapshot.value !== null)
 
@@ -71,16 +77,24 @@ export const useQueueStore = defineStore('queue', () => {
    *
    * Unlike the other stores this is not a "load it if you have not already":
    * every call is a fresh reading, because that is the only kind there is.
+   *
+   * A poll that finds a read in flight skips its turn. `replace` is for a read
+   * whose question changed — another connection — and cancels the one in
+   * flight instead: that one is answering for the old connection, and showing
+   * its answer under the new name is exactly what must not happen.
    */
-  async function read(): Promise<boolean> {
-    if (reading.value) return false
+  async function read(replace = false): Promise<boolean> {
+    if (reading.value && !replace) return false
+
+    current?.abort()
+    const mine = (current = new AbortController())
 
     reading.value = true
 
     if (status.value === 'idle') status.value = 'loading'
 
     try {
-      const res = await fetch(endpoint(), { cache: 'no-store' })
+      const res = await fetch(endpoint(), { cache: 'no-store', signal: mine.signal })
       if (!res.ok) throw new Error(`${res.status} ${res.statusText}`)
 
       const payload = (await res.json()) as QueueFile
@@ -88,12 +102,18 @@ export const useQueueStore = defineStore('queue', () => {
         throw new Error('Expected a queue snapshot')
       }
 
+      if (mine !== current) return false
+
       snapshot.value = payload
       status.value = 'ready'
       error.value = null
 
       return true
     } catch (e) {
+      // Cancelled because a newer read took its place: not a failure, and
+      // nothing to report.
+      if (mine !== current) return false
+
       error.value = e instanceof Error ? e.message : String(e)
       // Only the very first failure is allowed to become an error screen. After
       // that the last good reading stays up and the poller keeps trying.
@@ -101,7 +121,10 @@ export const useQueueStore = defineStore('queue', () => {
 
       return false
     } finally {
-      reading.value = false
+      if (mine === current) {
+        reading.value = false
+        current = null
+      }
     }
   }
 
@@ -109,7 +132,7 @@ export const useQueueStore = defineStore('queue', () => {
    *  would make the control feel broken. */
   async function use(next: string | null): Promise<void> {
     connection.value = next
-    await read()
+    await read(true)
   }
 
   /**
