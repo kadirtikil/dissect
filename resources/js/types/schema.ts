@@ -79,6 +79,12 @@ export interface SchemaNode {
   class: string
   table: string
   columns: RawColumn[]
+  /**
+   * The domain (bounded context) this belongs to, or null. Called `context`
+   * because routes already use `domain` for the host. Optional because a host
+   * may be running a version of the package from before it was emitted.
+   */
+  context?: string | null
 }
 
 /** Eloquent relation types the exporter emits. */
