@@ -38,7 +38,7 @@ export default defineConfigWithVueTs(
 
   {
     ...pluginVitest.configs.recommended,
-    files: ['resources/js/**/__tests__/*'],
+    files: ['resources/js/**/*.spec.ts'],
   },
 
   // Absolute: the linters run with their cwd inside the source tree (see the

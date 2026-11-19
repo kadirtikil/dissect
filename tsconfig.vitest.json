@@ -3,7 +3,7 @@
 
   // Override to include only test files and clear exclusions.
   // Application code imported in tests is automatically included via module resolution.
-  "include": ["resources/js/**/__tests__/*", "env.d.ts"],
+  "include": ["resources/js/**/*.spec.ts", "env.d.ts"],
   "exclude": [],
 
   "compilerOptions": {
