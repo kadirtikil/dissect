@@ -2,12 +2,14 @@
 
 namespace KdrDev\Dissect\Queue;
 
+use DateTimeInterface;
 use Illuminate\Bus\Batch;
 use Illuminate\Bus\BatchRepository;
 use Illuminate\Contracts\Container\Container;
 use Illuminate\Queue\Failed\DatabaseFailedJobProvider;
 use Illuminate\Queue\Failed\DatabaseUuidFailedJobProvider;
 use Illuminate\Queue\Failed\FailedJobProviderInterface;
+use Illuminate\Support\Carbon;
 use Throwable;
 
 /**
@@ -151,7 +153,7 @@ class QueueHistory
             ...$this->payloads->decode($this->stringOrNull($failure->payload ?? null)),
             'queue' => $this->stringOrNull($failure->queue ?? null),
             'connection' => $this->stringOrNull($failure->connection ?? null),
-            'failed_at' => $this->stringOrNull($failure->failed_at ?? null),
+            'failed_at' => $this->date($failure->failed_at ?? null),
             'exception' => $this->summarise($this->stringOrNull($failure->exception ?? null)),
         ];
     }
@@ -202,6 +204,28 @@ class QueueHistory
             // Bound by the framework's own service providers. An application
             // that has somehow not bound one still gets every other section.
             return $this->container->bound($abstract) ? $this->container->make($abstract) : null;
+        } catch (Throwable) {
+            return null;
+        }
+    }
+
+    /**
+     * A failure time as ISO 8601, with its offset.
+     *
+     * The database store writes a bare `Y-m-d H:i:s` in the application's
+     * timezone. Passed through, a browser reads that as *its own* local time —
+     * so a job that failed a minute ago shows as failing hours in the future or
+     * the past, by the distance between the two zones.
+     */
+    protected function date(mixed $value): ?string
+    {
+        try {
+            return match (true) {
+                is_numeric($value) => Carbon::createFromTimestamp((int) $value)->toIso8601String(),
+                is_string($value) && $value !== '' => Carbon::parse($value, config('app.timezone'))->toIso8601String(),
+                $value instanceof DateTimeInterface => Carbon::instance($value)->toIso8601String(),
+                default => null,
+            };
         } catch (Throwable) {
             return null;
         }

@@ -188,6 +188,29 @@ class QueueTest extends TestCase
     }
 
     #[Test]
+    public function it_sends_a_failure_time_with_its_timezone(): void
+    {
+        config(['app.timezone' => 'Europe/Berlin']);
+
+        DB::table('failed_jobs')->insert([
+            'uuid' => (string) Str::uuid(),
+            'connection' => 'database',
+            'queue' => 'publishing',
+            'payload' => $this->payload('Workbench\App\Jobs\PublishPost'),
+            'exception' => 'RuntimeException: once',
+            // How the store writes it: no offset, in the app's timezone.
+            'failed_at' => '2026-08-31 11:30:00',
+        ]);
+
+        // Read in Berlin it is 09:30 UTC; read in the browser's zone, which is
+        // what a bare string invites, it would be anything.
+        $this->assertSame(
+            '2026-08-31T11:30:00+02:00',
+            $this->snapshot()['past']['failed']['rows'][0]['failed_at'],
+        );
+    }
+
+    #[Test]
     public function it_addresses_a_failure_by_its_uuid(): void
     {
         DB::table('failed_jobs')->insert([
