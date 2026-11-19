@@ -65,9 +65,7 @@ export const useRoutesStore = defineStore('routes', () => {
 
   const facets = computed(() => facetCounts(routes.value, filters.value))
 
-  const selected = computed(
-    () => visible.value.find((r) => r.id === selectedId.value) ?? null,
-  )
+  const selected = computed(() => visible.value.find((r) => r.id === selectedId.value) ?? null)
 
   const stats = computed(() => ({
     total: routes.value.length,

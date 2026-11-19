@@ -23,9 +23,7 @@ const methodOptions = computed(() =>
 const GROUP_ORDER = ['app', 'vendor', 'framework']
 
 const groupOptions = computed(() =>
-  Object.keys(facets.value.groups).sort(
-    (a, b) => GROUP_ORDER.indexOf(a) - GROUP_ORDER.indexOf(b),
-  ),
+  Object.keys(facets.value.groups).sort((a, b) => GROUP_ORDER.indexOf(a) - GROUP_ORDER.indexOf(b)),
 )
 
 /**

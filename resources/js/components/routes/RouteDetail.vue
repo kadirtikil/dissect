@@ -39,7 +39,10 @@ const requestSummary = computed(() => {
       <span class="min-w-0 font-mono text-sm break-all">{{ selected.uri }}</span>
     </div>
 
-    <section :style="sectionSurface('endpoint')" class="mt-3 rounded-md border border-l-2 px-3 py-2">
+    <section
+      :style="sectionSurface('endpoint')"
+      class="mt-3 rounded-md border border-l-2 px-3 py-2"
+    >
       <h3
         :style="{ color: sectionColor('endpoint') }"
         class="font-mono text-[10px] font-semibold tracking-wide uppercase"
@@ -141,7 +144,10 @@ const requestSummary = computed(() => {
         </span>
       </div>
 
-      <p v-if="!selected.request" class="mt-1 font-mono text-[11px] text-muted-foreground/70 italic">
+      <p
+        v-if="!selected.request"
+        class="mt-1 font-mono text-[11px] text-muted-foreground/70 italic"
+      >
         Not analysed.
       </p>
 
@@ -159,7 +165,10 @@ const requestSummary = computed(() => {
       </template>
     </section>
 
-    <section :style="sectionSurface('response')" class="mt-3 rounded-md border border-l-2 px-3 py-2">
+    <section
+      :style="sectionSurface('response')"
+      class="mt-3 rounded-md border border-l-2 px-3 py-2"
+    >
       <div class="flex items-baseline gap-2">
         <h3
           :style="{ color: sectionColor('response') }"

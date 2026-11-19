@@ -155,7 +155,5 @@ function constraintsOf(field: Field): string | null {
     </p>
   </div>
 
-  <p v-else class="mt-1 font-mono text-[11px] text-muted-foreground/70 italic">
-    No fields found.
-  </p>
+  <p v-else class="mt-1 font-mono text-[11px] text-muted-foreground/70 italic">No fields found.</p>
 </template>

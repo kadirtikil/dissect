@@ -80,7 +80,9 @@ export const useProviderStore = defineStore('provider-store', () => {
 
     const payload = (await res.json()) as Partial<ProvidersFile> & { fingerprint?: string }
 
-    return Array.isArray(payload?.providers) ? (payload as ProvidersFile & { fingerprint?: string }) : null
+    return Array.isArray(payload?.providers)
+      ? (payload as ProvidersFile & { fingerprint?: string })
+      : null
   }
 
   /**
