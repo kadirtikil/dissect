@@ -1,3 +1,4 @@
+import { shortNames } from '@/lib/classNames'
 import type { ApiRoute } from '@/types/routes'
 
 /**
@@ -42,6 +43,7 @@ export function matchesSearch(route: ApiRoute, search: string): boolean {
 
   return (
     route.uri.toLowerCase().includes(term) ||
+    (route.domain?.toLowerCase().includes(term) ?? false) ||
     (route.name?.toLowerCase().includes(term) ?? false) ||
     route.action.label.toLowerCase().includes(term) ||
     (route.action.class?.toLowerCase().includes(term) ?? false)
@@ -128,6 +130,11 @@ export interface RouteGrouping {
  * A controller is the unit people think in — "the invoice endpoints" — and it
  * is also what keeps a list of four hundred routes navigable without a tree
  * widget. Closures have no class, so they bucket by the file they live in.
+ *
+ * A bucket is one class, by its full name: `Api\V1\PostController` and
+ * `Api\V2\PostController` used to be one heading because they share a short
+ * name. The heading shows the short name, and only as much of the namespace
+ * as it takes to tell two apart.
  */
 export function groupRoutes(routes: ApiRoute[]): RouteGrouping[] {
   const buckets = new Map<string, RouteGrouping>()
@@ -140,14 +147,22 @@ export function groupRoutes(routes: ApiRoute[]): RouteGrouping[] {
     else buckets.set(key, { key, label: key, routes: [route] })
   }
 
+  const names = shortNames(routes.flatMap((r) => (r.action.class ? [classOf(r.action.class)] : [])))
+
+  for (const bucket of buckets.values()) {
+    bucket.label = names.get(bucket.key) ?? bucket.key
+  }
+
   return [...buckets.values()].sort((a, b) => a.label.localeCompare(b.label))
 }
 
+/** `\App\Http\Controllers\PostController` → `App\Http\Controllers\PostController`. */
+function classOf(name: string): string {
+  return name.replace(/^\\+/, '')
+}
+
 function bucketFor(route: ApiRoute): string {
-  if (route.action.class) {
-    const parts = route.action.class.split('\\')
-    return parts[parts.length - 1] || route.action.class
-  }
+  if (route.action.class) return classOf(route.action.class)
 
   // `api.php:22` → `api.php`, so every closure in one file lands together.
   const [file] = route.action.label.split(':')
