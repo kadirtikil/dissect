@@ -65,6 +65,18 @@ class DomainContextTest extends TestCase
     }
 
     #[Test]
+    public function every_job_carries_its_domain(): void
+    {
+        $jobs = collect($this->getJson('/dissect/jobs.json')->assertOk()->json('jobs'))
+            ->pluck('context', 'class')->all();
+
+        $this->assertSame([
+            self::NS.'Domain\\Sales\\Jobs\\ExpireQuotes' => 'Sales',
+            self::NS.'Domain\\Billing\\Jobs\\SendInvoice' => 'Billing',
+        ], $jobs);
+    }
+
+    #[Test]
     public function switched_off_every_row_says_none(): void
     {
         config()->set('dissect.domains.enabled', false);

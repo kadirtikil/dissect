@@ -188,6 +188,7 @@ class DissectServiceProvider extends ServiceProvider
             // mechanism, different question, so it must not be the same
             // instance.
             new RouteFingerprint($this->watched('jobs', ['app', 'routes'], ['app/Jobs'])),
+            $app->make(ContextResolver::class),
         ));
 
         $this->app->singleton(ProviderReader::class, fn () => new ProviderReader(
