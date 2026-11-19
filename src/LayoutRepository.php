@@ -35,16 +35,18 @@ class LayoutRepository
 
     public function __construct(protected string $path) {}
 
-    /** @return array{version: int, positions: array<string, array{x: int, y: int}>} */
+    /** @return array{version: int, positions: array<string, array{x: int, y: int}>, revision: string|null} */
     public function get(): array
     {
         // A missing or corrupt layout must never blank the page — fall back to
         // the computed grid instead.
-        $decoded = $this->decode();
+        $contents = $this->contents();
+        $decoded = $this->decode($contents);
 
         return [
             'version' => self::VERSION,
             'positions' => $this->sanitise($decoded['positions'] ?? []),
+            'revision' => $this->revisionOf($contents),
         ];
     }
 
@@ -52,15 +54,15 @@ class LayoutRepository
      * @param  array<string, mixed>  $positions
      * @return int Number of positions written.
      *
+     * @param  string|null  $basedOn  The revision the client last read; see VersionedStateFile::save().
+     *
      * @throws StateFileException when the existing file must not be overwritten.
      */
-    public function put(array $positions): int
+    public function put(array $positions, ?string $basedOn = self::ANY_REVISION): int
     {
-        $this->guardWrite();
-
         $clean = $this->sanitise($positions);
 
-        $this->writeAtomically(['version' => self::VERSION, 'positions' => $clean]);
+        $this->save(['version' => self::VERSION, 'positions' => $clean], $basedOn);
 
         return count($clean);
     }

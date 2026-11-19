@@ -42,7 +42,7 @@ class ViewRepositoryTest extends PhpUnitTestCase
 
     public function test_a_missing_file_reads_as_no_views(): void
     {
-        $this->assertSame(['version' => 1, 'views' => []], $this->repository()->get());
+        $this->assertSame(['version' => 1, 'views' => [], 'revision' => null], $this->repository()->get());
     }
 
     public function test_it_writes_and_reads_back_a_view(): void
@@ -57,6 +57,7 @@ class ViewRepositoryTest extends PhpUnitTestCase
             'views' => [
                 ['id' => 'billing', 'name' => 'Billing', 'models' => ['Invoice', 'Payment']],
             ],
+            'revision' => $this->repository()->revision(),
         ], $this->repository()->get());
     }
 
@@ -66,8 +67,10 @@ class ViewRepositoryTest extends PhpUnitTestCase
         file_put_contents($this->path, '{ this is not json');
 
         // The graph is perfectly usable with no views; blanking the page over a
-        // bad file is not.
-        $this->assertSame(['version' => 1, 'views' => []], $this->repository()->get());
+        // bad file is not. It still has a revision: a save is based on what
+        // was on disk, readable or not.
+        $this->assertSame(['version' => 1, 'views' => []], array_diff_key($this->repository()->get(), ['revision' => 0]));
+        $this->assertNotNull($this->repository()->get()['revision']);
     }
 
     public function test_it_derives_a_missing_id_from_the_name(): void

@@ -180,8 +180,18 @@ class DissectController
             return response()->json(['ok' => false, 'message' => 'positions must be an object'], 422);
         }
 
+        $revision = $request->input('revision', LayoutRepository::ANY_REVISION);
+
+        if ($revision !== null && ! is_string($revision)) {
+            return response()->json(['ok' => false, 'message' => 'revision must be a string or null'], 422);
+        }
+
         try {
-            return response()->json(['ok' => true, 'saved' => $this->layout->put($positions)]);
+            $saved = $this->layout->put($positions, $revision);
+
+            // Read back rather than computed: the page's next save is based on
+            // this, so it has to describe the file as it now is.
+            return response()->json(['ok' => true, 'saved' => $saved, 'revision' => $this->layout->revision()]);
         } catch (StateFileException $e) {
             return $this->refused($e);
         }
@@ -202,8 +212,16 @@ class DissectController
             return response()->json(['ok' => false, 'message' => 'views must be an array'], 422);
         }
 
+        $revision = $request->input('revision', ViewRepository::ANY_REVISION);
+
+        if ($revision !== null && ! is_string($revision)) {
+            return response()->json(['ok' => false, 'message' => 'revision must be a string or null'], 422);
+        }
+
         try {
-            return response()->json(['ok' => true, 'saved' => $this->views->put($views)]);
+            $saved = $this->views->put($views, $revision);
+
+            return response()->json(['ok' => true, 'saved' => $saved, 'revision' => $this->views->revision()]);
         } catch (StateFileException $e) {
             return $this->refused($e);
         }

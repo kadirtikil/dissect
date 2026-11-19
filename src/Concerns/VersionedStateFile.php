@@ -25,18 +25,55 @@ use KdrDev\Dissect\Exceptions\StateFileException;
 trait VersionedStateFile
 {
     /**
-     * The decoded file, or null when it is missing, unreadable or not JSON.
-     *
-     * @return array<string, mixed>|null
+     * Sent by a client that has no revision to offer: the dev-server plugin,
+     * or a page from before revisions existed. Its write is let through
+     * unchecked, as every write was before.
      */
-    protected function decode(): ?array
+    public const ANY_REVISION = '*';
+
+    /**
+     * A fingerprint of the file as it is on disk, or null when there is none.
+     *
+     * Handed to the page with the contents, and handed back with every save:
+     * a save based on contents that are no longer on disk is refused rather
+     * than allowed to replace them. See save().
+     */
+    public function revision(): ?string
+    {
+        return $this->revisionOf($this->contents());
+    }
+
+    protected function revisionOf(?string $contents): ?string
+    {
+        return $contents === null ? null : substr(hash('sha256', $contents), 0, 16);
+    }
+
+    protected function contents(): ?string
     {
         if (! is_file($this->path)) {
             return null;
         }
 
+        $contents = @file_get_contents($this->path);
+
+        return $contents === false ? null : $contents;
+    }
+
+    /**
+     * The decoded file, or null when it is missing, unreadable or not JSON.
+     *
+     * @return array<string, mixed>|null
+     */
+    protected function decode(?string $contents = null): ?array
+    {
+        $contents ??= $this->contents();
+
+        if ($contents === null) {
+            return null;
+        }
+
         try {
-            $decoded = json_decode((string) file_get_contents($this->path), true, 512, JSON_THROW_ON_ERROR);
+            $decoded = json_decode($contents, true, 512, JSON_THROW_ON_ERROR);
         } catch (JsonException) {
             return null;
         }
@@ -59,6 +96,61 @@ trait VersionedStateFile
         $version = $decoded['version'] ?? 1;
 
         return is_numeric($version) ? (int) $version : 1;
+    }
+
+    /**
+     * Replaces the file, provided it is still the one the client last read.
+     *
+     * Both files are rewritten whole, so a page that read the file an hour ago
+     * would otherwise save its hour-old copy over whatever happened since — a
+     * teammate's views arriving with a `git pull`, or a layout arranged in
+     * another tab. Comparing revisions turns that into a refusal the page can
+     * report. The check and the write share a lock, or two saves could both
+     * pass the check and the second would still overwrite the first.
+     *
+     * @param  array<string, mixed>  $payload
+     *
+     * @throws StateFileException when the file changed, must not be
+     *                            overwritten, or could not be written.
+     */
+    protected function save(array $payload, ?string $basedOn): void
+    {
+        $this->exclusively(function () use ($payload, $basedOn) {
+            if ($basedOn !== self::ANY_REVISION && $basedOn !== $this->revision()) {
+                throw StateFileException::changedSinceRead($this->path);
+            }
+
+            $this->guardWrite();
+            $this->writeAtomically($payload);
+        });
+    }
+
+    /**
+     * Runs the callback holding an exclusive lock on this file.
+     *
+     * The lock file lives in the system temp directory rather than beside the
+     * state file, which sits in the application and is often committed. If it
+     * cannot be opened the write goes ahead unlocked, exactly as it did before
+     * there was a lock: it guards a race, and a save that cannot happen at all
+     * would be worse than the race.
+     */
+    protected function exclusively(callable $callback): void
+    {
+        $lock = @fopen(sys_get_temp_dir().'/dissect-'.sha1($this->path).'.lock', 'c');
+
+        if ($lock === false) {
+            $callback();
+
+            return;
+        }
+
+        try {
+            flock($lock, LOCK_EX);
+            $callback();
+        } finally {
+            flock($lock, LOCK_UN);
+            fclose($lock);
+        }
     }
 
     /**

@@ -132,6 +132,61 @@ class ViewerTest extends TestCase
     }
 
     #[Test]
+    public function a_layout_save_based_on_a_stale_read_is_refused(): void
+    {
+        // The page inlines the revision it read; another tab saves first.
+        $page = $this->get('/dissect')->assertOk()->getContent();
+        $this->assertStringContainsString('"revision":null', (string) $page);
+
+        $first = $this->postJson('/dissect/layout', [
+            'positions' => ['Post' => ['x' => 1, 'y' => 1]],
+            'revision' => null,
+        ])->assertOk()->json('revision');
+
+        $this->postJson('/dissect/layout', [
+            'positions' => ['Post' => ['x' => 2, 'y' => 2]],
+            'revision' => null,
+        ])
+            ->assertStatus(409)
+            ->assertJsonPath('message', fn (string $message) => str_contains($message, 'layout.json has changed'));
+
+        // The tab that saved carries on with the revision it was given.
+        $this->postJson('/dissect/layout', [
+            'positions' => ['Post' => ['x' => 3, 'y' => 3]],
+            'revision' => $first,
+        ])->assertOk();
+    }
+
+    #[Test]
+    public function a_save_without_a_revision_is_let_through(): void
+    {
+        $this->postJson('/dissect/layout', ['positions' => ['Post' => ['x' => 1, 'y' => 1]]])->assertOk();
+        $this->postJson('/dissect/layout', ['positions' => ['Post' => ['x' => 2, 'y' => 2]]])->assertOk();
+    }
+
+    #[Test]
+    public function a_revision_that_is_not_a_string_is_rejected(): void
+    {
+        $this->postJson('/dissect/layout', ['positions' => [], 'revision' => 42])->assertStatus(422);
+        $this->postJson('/dissect/views', ['views' => [], 'revision' => ['x']])->assertStatus(422);
+    }
+
+    #[Test]
+    public function views_carry_a_revision_both_ways(): void
+    {
+        $this->getJson('/dissect/views.json')->assertOk()->assertJsonPath('revision', null);
+
+        $revision = $this->postJson('/dissect/views', [
+            'views' => [['id' => 'billing', 'name' => 'Billing', 'models' => ['Invoice']]],
+            'revision' => null,
+        ])->assertOk()->json('revision');
+
+        $this->getJson('/dissect/views.json')->assertJsonPath('revision', $revision);
+
+        $this->postJson('/dissect/views', ['views' => [], 'revision' => null])->assertStatus(409);
+    }
+
+    #[Test]
     public function it_reports_a_layout_written_by_a_newer_version_instead_of_replacing_it(): void
     {
         // The upgrade hazard, end to end: a developer running an older dissect
@@ -174,7 +229,8 @@ class ViewerTest extends TestCase
     {
         $path = $this->layoutPath($this->app);
 
-        foreach (glob($path.'*') ?: [] as $file) {
+        // The whole directory: views.json lives beside layout.json.
+        foreach (glob(dirname($path).'/*') ?: [] as $file) {
             unlink($file);
         }
 

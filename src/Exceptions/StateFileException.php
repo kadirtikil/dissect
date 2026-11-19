@@ -57,4 +57,13 @@ class StateFileException extends RuntimeException
             $reason,
         ), 500);
     }
+
+    public static function changedSinceRead(string $path): self
+    {
+        return new self(sprintf(
+            '%s has changed since this page read it — in another tab, or from a git pull. '
+            .'Nothing was saved, so those changes are safe. Reload to pick them up.',
+            basename($path),
+        ));
+    }
 }
