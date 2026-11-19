@@ -2,6 +2,7 @@
 
 namespace KdrDev\Dissect\Http\Controllers;
 
+use Composer\InstalledVersions;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -15,6 +16,7 @@ use KdrDev\Dissect\Routes\RouteExporter;
 use KdrDev\Dissect\SchemaExporter;
 use KdrDev\Dissect\ViewRepository;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
+use Throwable;
 
 class DissectController
 {
@@ -26,6 +28,8 @@ class DissectController
     protected ?string $jobFingerprint = null;
 
     protected ?string $providerFingerprint = null;
+
+    protected ?string $stamp = null;
 
     public function __construct(
         protected SchemaExporter $exporter,
@@ -277,6 +281,46 @@ class DissectController
         return rtrim($url, '/');
     }
 
+    /**
+     * Where a surface's export is cached.
+     *
+     * The fingerprint says whether the *source* moved. It cannot say whether
+     * the package that reads it changed, or how it was told to read it: a
+     * `composer update` that reshapes a payload, or a corrected
+     * `DISSECT_MODELS_NAMESPACE`, leaves every file it stats untouched — and
+     * the export from before would be served for the rest of the hour. The
+     * stamp covers both.
+     */
+    protected function cacheKey(string $surface, string $fingerprint): string
+    {
+        return 'dissect.'.$surface.'.'.$this->stamp().'.'.$fingerprint;
+    }
+
+    /** The installed package version and this package's config, hashed. */
+    protected function stamp(): string
+    {
+        return $this->stamp ??= substr(sha1(json_encode([
+            $this->packageVersion(),
+            config('dissect'),
+        ], JSON_PARTIAL_OUTPUT_ON_ERROR) ?: ''), 0, 12);
+    }
+
+    /**
+     * The commit Composer installed, falling back to the version string.
+     *
+     * A VCS install of a branch keeps the same pretty version across updates
+     * (`dev-main`), so the reference is the part that actually moves.
+     */
+    protected function packageVersion(): string
+    {
+        try {
+            return (InstalledVersions::getReference('kdr-dev/dissect') ?? '')
+                .'@'.(InstalledVersions::getPrettyVersion('kdr-dev/dissect') ?? '');
+        } catch (Throwable) {
+            return 'unknown';
+        }
+    }
+
     /** Memoised: index() renders it and keys the schema cache with it. */
     protected function fingerprint(): string
     {
@@ -297,7 +341,7 @@ class DissectController
         // resource behind the table gets reflected and parsed — so the cache
         // matters more here, not less.
         return Cache::remember(
-            'dissect.routes.'.$this->routeFingerprint(),
+            $this->cacheKey('routes', $this->routeFingerprint()),
             now()->addHour(),
             fn () => $this->routes->export(),
         );
@@ -329,7 +373,7 @@ class DissectController
         // parsed, not just stat'd, so this wants the cache more than either of
         // the others — and gets exactly the same one.
         return Cache::remember(
-            'dissect.jobs.'.$this->jobFingerprint(),
+            $this->cacheKey('jobs', $this->jobFingerprint()),
             now()->addHour(),
             fn () => $this->jobs->export(),
         );
@@ -348,7 +392,7 @@ class DissectController
         // Every provider parsed and every constructor down its tree reflected —
         // cached on the signal like the other source-derived surfaces.
         return Cache::remember(
-            'dissect.providers.'.$this->providerFingerprint(),
+            $this->cacheKey('providers', $this->providerFingerprint()),
             now()->addHour(),
             fn () => $this->providers->export(),
         );
@@ -363,7 +407,7 @@ class DissectController
         // fingerprint means that work happens once per model edit or applied
         // migration rather than once per request.
         return Cache::remember(
-            'dissect.schema.'.$this->fingerprint(),
+            $this->cacheKey('schema', $this->fingerprint()),
             now()->addHour(),
             fn () => $this->exporter->export(),
         );
