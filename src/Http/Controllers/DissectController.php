@@ -210,16 +210,16 @@ class DissectController
     }
 
     /**
-     * A write the repository declined to make, because making it would have
-     * destroyed what was already in the file.
+     * A write the repository declined or failed to make.
      *
-     * 409 rather than 500: nothing is broken and there is nothing to retry —
-     * the file on disk simply is not this version's to rewrite. The page keeps
-     * the edit on screen and reports that it was not saved.
+     * Usually 409: nothing is broken and there is nothing to retry — the file
+     * on disk simply is not this version's to rewrite. A filesystem that would
+     * not take the write is a 500, with the reason in the body either way. The
+     * page keeps the edit on screen and reports that it was not saved.
      */
     protected function refused(StateFileException $e): JsonResponse
     {
-        return response()->json(['ok' => false, 'message' => $e->getMessage()], 409);
+        return response()->json(['ok' => false, 'message' => $e->getMessage()], $e->status);
     }
 
     /**

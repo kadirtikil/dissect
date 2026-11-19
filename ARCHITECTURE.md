@@ -977,6 +977,11 @@ makes it stick.
 | Unparseable | Copied to `<path>.corrupt.bak`, then replaced |
 | Missing or nonsense | Treated as format 1, so a typo cannot lock somebody out of their own file |
 
+Writes go to a uniquely named temporary file beside the target and are renamed
+into place, with every step checked. A directory that cannot be created, a short
+write or a failed rename throws `StateFileException::unwritable()` (answered with
+500 and the reason), and the previous file is left untouched.
+
 The refusal direction matters more than the migration one. A migration is code
 you will write deliberately when you bump the format; the refusal protects
 people you will never hear from — a teammate on an older install, someone who

@@ -137,6 +137,25 @@ class ViewerTest extends TestCase
         );
     }
 
+    #[Test]
+    public function a_layout_the_filesystem_will_not_take_is_reported_with_its_reason(): void
+    {
+        // A file where .dissect-test/ should be, so the directory cannot be
+        // created. Before, this was a PHP warning turned 500 with nothing in
+        // the body to say which file or why.
+        $path = $this->layoutPath($this->app);
+        file_put_contents(dirname($path), 'not a directory');
+
+        try {
+            $this->post('/dissect/layout', ['positions' => ['Post' => ['x' => 1, 'y' => 1]]])
+                ->assertStatus(500)
+                ->assertJson(['ok' => false])
+                ->assertJsonPath('message', fn (string $message) => str_contains($message, 'layout.json'));
+        } finally {
+            unlink(dirname($path));
+        }
+    }
+
     protected function tearDown(): void
     {
         $path = $this->layoutPath($this->app);

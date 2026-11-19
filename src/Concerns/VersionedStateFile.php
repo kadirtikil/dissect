@@ -120,23 +120,48 @@ trait VersionedStateFile
      * Write-then-rename: an interrupted write leaves the previous file intact
      * rather than a truncated one nothing can parse.
      *
+     * The temporary file gets a name of its own on every call. A fixed one
+     * (`layout.json.tmp`) is shared by two saves that overlap — a drag and a
+     * view edit a few milliseconds apart — and the first rename can then move
+     * a file the second is still halfway through writing. It lives beside the
+     * target rather than in the system temp directory, because rename() is
+     * only atomic within one filesystem.
+     *
+     * Every step is checked. A full disk or a read-only checkout used to
+     * surface as a PHP warning — a 500 with nothing in it about which file —
+     * and a short write would have been renamed over the good file.
+     *
      * @param  array<string, mixed>  $payload
+     *
+     * @throws StateFileException when the file could not be written.
      */
     protected function writeAtomically(array $payload): void
     {
         $directory = dirname($this->path);
 
-        if (! is_dir($directory)) {
-            mkdir($directory, 0755, true);
+        // Re-checked after a failed mkdir: another request may have created it
+        // in between, which is not a failure.
+        if (! is_dir($directory) && ! @mkdir($directory, 0755, true) && ! is_dir($directory)) {
+            throw StateFileException::unwritable($this->path, 'the directory could not be created');
         }
 
         $encoded = json_encode(
             $payload,
             JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR
-        );
+        ).PHP_EOL;
 
-        $temp = $this->path.'.tmp';
-        file_put_contents($temp, $encoded.PHP_EOL);
-        rename($temp, $this->path);
+        $temp = $this->path.'.'.bin2hex(random_bytes(6)).'.tmp';
+
+        if (@file_put_contents($temp, $encoded) !== strlen($encoded)) {
+            @unlink($temp);
+
+            throw StateFileException::unwritable($this->path, 'the new contents could not be written in full');
+        }
+
+        if (! @rename($temp, $this->path)) {
+            @unlink($temp);
+
+            throw StateFileException::unwritable($this->path, 'the new contents could not replace the old');
+        }
     }
 }
