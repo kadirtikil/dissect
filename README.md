@@ -3,7 +3,8 @@
 Visualise your Eloquent models and their relationships as an interactive graph.
 
 Point it at your models directory and open a page: every model becomes a node
-with its columns, every relation becomes an edge. Drag nodes into an
+with its columns, every relation becomes an edge from the column that links it
+(`posts.author_id`) to the one it points at (`authors.id`). Drag nodes into an
 arrangement that makes sense, and the layout is saved to a file you can commit
 so your team sees the same picture.
 

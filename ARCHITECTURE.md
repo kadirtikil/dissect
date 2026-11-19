@@ -606,6 +606,7 @@ pages/registry.ts       every page there is — the one file a new surface is ad
 lib/toolbar.ts          where a page hangs its own header controls
 lib/layout.ts           the grid: pure function of node index
 lib/relations.ts        relation type → family → colour
+lib/relationHandles.ts  which handle each end of an edge attaches to: key row, "+N more", or the card
 lib/httpMethods.ts      verb → colour, on the same ramp
 lib/routeFilters.ts     pure predicates + facet counts (the unit-tested part)
 lib/jobFilters.ts       the same shape again: queue bucketing, facets, grouping
@@ -729,7 +730,12 @@ selection as a new view or add it to the open one.
   "edges": [{
     "source": "App\\Models\\User", "target": "App\\Models\\Team",
     "name": "teams",                  // the relation method
-    "type": "BelongsToMany"
+    "type": "BelongsToMany",
+    "keys": {                         // the columns that link the two
+      "source": "id",                 // on the declaring model; posts.author_id for a belongs-to
+      "target": "id",                 // on the related model; null at a MorphTo's far end
+      "via": "team_user"              // pivot or through table, else null
+    }
   }]
 }
 ```
@@ -1024,6 +1030,7 @@ are running. `tests/StateVersioningTest.php` pins all of it.
 | **Routes local-only by default** | It exposes the full schema and writes a file. The gate is `APP_ENV`, not install-time: the provider is auto-discovered and boots wherever the package is installed, so `middleware` is the control that holds when the environment check does not |
 | **A newer state file is never overwritten** | Both authored files are rewritten in full and sanitised on read, so saving over a format this version does not understand is silent data loss. Refusing has to ship *before* the format changes to be worth anything |
 | **Relations folded into 4 families** | Eloquent has ~11 relation types; a categorical palette cannot carry that many. Polymorphic is also dashed, so family is never colour-alone |
+| **Edges run between key columns, not cards** | "Post relates to Author" leaves out what you need to write the join: which column. An edge leaves from `posts.author_id` and arrives at `authors.id`. Only key rows get a handle, so the dots double as a marker of which columns link anywhere. A key a collapsed card hides attaches to its "+N more" row rather than to the card, so the edge still lands near the attribute it is about |
 | **Edge labels hidden until hover** | 75 labels at fit-view zoom is noise, not information. The provider canvas overrides it: a tree is capped small, and a label is the only thing telling a contextual override from the default beside it |
 | **Views hold membership, not positions** | One position per model means switching views never rearranges the board, and `layout.json` keeps a single writer |
 | **Expanded nodes float rather than re-flow** | The grid is a pure function of node index; growing a card in place would move every model below it out from under the cursor |
@@ -1091,6 +1098,7 @@ Config (`config/dissect.php`): `enabled`, `path`, `middleware`,
 | Change how a view is chosen or created | `resources/js/components/graph/ViewMenu.vue` |
 | Change what an expanded card shows | `resources/js/components/graph/ModelNode.vue` |
 | Change relation colours/families | `resources/js/lib/relations.ts` |
+| Change which columns a relation is drawn between | `relationKeys()` in `src/SchemaExporter.php`, `resources/js/lib/relationHandles.ts` |
 | Support another way of declaring request rules | `src/Routes/RequestAnalyzer.php` |
 | Support another response type | `src/Routes/ResponseAnalyzer.php` |
 | Change how a rule string is read | `src/Routes/RuleNormalizer.php` (no Illuminate imports) |
