@@ -177,6 +177,7 @@ DissectServiceProvider    wiring; registers routes only when enabled
   │     ├── DependencyResolver  bound concretes → their constructors, breadth-first, capped
   │     ├── TreeBuilder         nodes and edges keyed by id while a tree is read
   │     └── RouteFingerprint    its own instance, over providers.watch_paths
+  ├── Support\CodeOwnership   app / vendor / framework, for routes and provider trees alike
   ├── QueueSnapshot           what is on the queue *right now* — never cached
   │     ├── QueueReaderFactory  driver → a reader, or the reason there isn't one
   │     │     ├── DatabaseQueueReader  three predicates over the jobs table
@@ -1034,6 +1035,7 @@ are running. `tests/StateVersioningTest.php` pins all of it.
 | **Queueables are found by interface, not by folder** | A job, a queued listener, a mailable and a notification all implement `ShouldQueue` and all reach the same worker. A mailable kept outside `app/Mail` is still a mailable, and a `kind` read from the directory would be a lie |
 | **A job's class is read from its own `namespace` line** | Model discovery infers the namespace from one configured path. Jobs scan four, in an application free to put any of them anywhere — four settings to get wrong, when the answer is written at the top of every file |
 | **The dispatch scanner matches two node shapes, not an API list** | There are a dozen ways to queue something and there will be more. Looking for a static `dispatch*()` or a `new`, and keeping it only when the class is one discovery found, is `ModelLinker`'s rule: match what exists rather than guess from the call |
+| **Whose code it is comes from the file and Composer, not the namespace** | A namespace check would have to guess the application's prefix, and modular apps use several. Under vendor/ is vendor, except a package Composer installed from a `path` repository: that is the application's own module, symlinked or copied |
 | **`queue_source` is on the wire** | A job using `Queueable` cannot declare `public $queue`, so the queue usually comes from the constructor or the dispatch site. Where the answer came from changes how much it can be trusted, and two sites disagreeing is reported as `mixed` rather than resolved |
 | **Route ids and paths have one spelling each** | The jobs↔routes join is a string comparison. `RouteExporter::id()` is public and `ProjectPath` is shared for exactly that reason — two definitions that merely agree today is a cross-link that breaks silently |
 | **The job list is grouped by queue, not by kind** | The queue is the unit a *worker* is configured in, so it is the one with an operational answer. Grouping by kind would sort the list by what the classes are rather than by where they run |
@@ -1093,6 +1095,7 @@ Config (`config/dissect.php`): `enabled`, `path`, `middleware`,
 | Support another response type | `src/Routes/ResponseAnalyzer.php` |
 | Change how a rule string is read | `src/Routes/RuleNormalizer.php` (no Illuminate imports) |
 | Change how a name resolves to a node id (jobs only) | `src/Routes/ModelLinker.php` |
+| Change what counts as the application's code | `src/Support/CodeOwnership.php` |
 | Change what counts as a route change | `src/Routes/RouteFingerprint.php`, `routes.watch_paths` |
 | Change how the endpoint list is filtered or grouped | `resources/js/lib/routeFilters.ts` |
 | Change how the job list is filtered or grouped | `resources/js/lib/jobFilters.ts` |
