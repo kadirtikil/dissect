@@ -5,6 +5,7 @@ namespace KdrDev\Dissect;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\ModelInspector;
 use Illuminate\Support\Str;
+use KdrDev\Dissect\Support\ClassFile;
 use ReflectionClass;
 use SplFileInfo;
 use Symfony\Component\Finder\Finder;
@@ -23,12 +24,17 @@ use Throwable;
  */
 class SchemaExporter
 {
+    /**
+     * @param  array<int, string>  $modelsPaths  Directories holding models, relative to
+     *                                           the application or absolute. A `*` stands
+     *                                           for one directory name, so one entry can
+     *                                           cover every domain's Models folder.
+     */
     public function __construct(
         protected ModelInspector $inspector,
         protected ColumnNormalizer $columns,
         protected MigrationState $migrations,
-        protected string $modelsPath = 'app/Models',
-        protected ?string $modelsNamespace = null,
+        protected array $modelsPaths = ['app/Models'],
     ) {}
 
     /**
@@ -121,27 +127,31 @@ class SchemaExporter
         return substr(sha1($latest.':'.$count.':'.$this->migrations->signal()), 0, 16);
     }
 
-    /** @return array<int, class-string<Model>> */
+    /**
+     * Every model under the configured directories.
+     *
+     * The class name is read from the file's own declaration rather than
+     * worked out from where it sits. With several directories — one per
+     * domain — there is no single namespace to append a path to, and the file
+     * already says what it is.
+     *
+     * @return array<int, class-string<Model>>
+     */
     public function discoverModels(): array
     {
-        $directory = $this->modelsDirectory();
-        $namespace = $this->modelsNamespace();
         $models = [];
 
         foreach ($this->modelFiles() as $file) {
-            // Resolved relative to the configured directory rather than
-            // app_path(), so models can live anywhere — a Domain folder, a
-            // package, or the workbench app used to develop this package.
-            $class = $namespace.Str::of($file->getPathname())
-                ->after($directory.DIRECTORY_SEPARATOR)
-                ->replace([DIRECTORY_SEPARATOR, '.php'], ['\\', '']);
+            $class = ClassFile::classIn($file->getPathname());
 
-            if ($this->isModel($class)) {
-                $models[] = $class;
+            // Overlapping directories (`app/Models` and `app/Models/Billing`)
+            // find the same file twice; it is still one model.
+            if ($class !== null && ! isset($models[$class]) && $this->isModel($class)) {
+                $models[$class] = true;
             }
         }
 
-        return $models;
+        return array_keys($models);
     }
 
     /**
@@ -191,39 +201,46 @@ class SchemaExporter
     /** @return iterable<SplFileInfo> */
     protected function modelFiles(): iterable
     {
-        $directory = $this->modelsDirectory();
+        $directories = $this->modelsDirectories();
 
-        if (! is_dir($directory)) {
+        if ($directories === []) {
             return [];
         }
 
-        return (new Finder)->in($directory)->files()->name('*.php');
-    }
-
-    /** Absolute paths are used as-is; anything else is relative to the app root. */
-    protected function modelsDirectory(): string
-    {
-        return str_starts_with($this->modelsPath, DIRECTORY_SEPARATOR)
-            ? rtrim($this->modelsPath, DIRECTORY_SEPARATOR)
-            : rtrim(base_path($this->modelsPath), DIRECTORY_SEPARATOR);
+        return (new Finder)->in($directories)->files()->name('*.php');
     }
 
     /**
-     * Namespace the discovered files live under.
+     * The configured directories that exist, with any `*` expanded.
      *
-     * Defaults to the convention: `app/Models` under the application namespace
-     * gives `App\Models\`. Anything unconventional (or outside app/) has to say
-     * so explicitly, since there is no reliable way to infer it.
+     * A path that matches nothing is skipped rather than an error: a domain
+     * without models yet, or a pattern written ahead of the folders it is for,
+     * is an ordinary state for an application to be in.
+     *
+     * @return array<int, string>
      */
-    protected function modelsNamespace(): string
+    protected function modelsDirectories(): array
     {
-        if ($this->modelsNamespace !== null) {
-            return rtrim($this->modelsNamespace, '\\').'\\';
+        $directories = [];
+
+        foreach ($this->modelsPaths as $path) {
+            // Absolute paths are used as-is; anything else is relative to the
+            // app root, so models can live anywhere — a Domain folder, a
+            // package, or the workbench app used to develop this package.
+            $path = str_starts_with($path, DIRECTORY_SEPARATOR)
+                ? rtrim($path, DIRECTORY_SEPARATOR)
+                : rtrim(base_path($path), DIRECTORY_SEPARATOR);
+
+            $matches = str_contains($path, '*') ? (glob($path, GLOB_ONLYDIR) ?: []) : [$path];
+
+            foreach ($matches as $directory) {
+                if (is_dir($directory)) {
+                    $directories[realpath($directory) ?: $directory] = true;
+                }
+            }
         }
 
-        $relative = trim(str_replace(app_path(), '', $this->modelsDirectory()), DIRECTORY_SEPARATOR);
-
-        return app()->getNamespace().str_replace(DIRECTORY_SEPARATOR, '\\', $relative).'\\';
+        return array_keys($directories);
     }
 
     protected function tableFor(string $class): string

@@ -61,8 +61,7 @@ class DissectServiceProvider extends ServiceProvider
             $app->make(ModelInspector::class),
             $app->make(ColumnNormalizer::class),
             $app->make(MigrationState::class),
-            (string) config('dissect.models_path', 'app/Models'),
-            config('dissect.models_namespace'),
+            $this->modelsPaths(),
         ));
 
         $this->app->singleton(RouteCollector::class, fn (Application $app) => new RouteCollector(
@@ -260,6 +259,26 @@ class DissectServiceProvider extends ServiceProvider
             ...(array) config("dissect.{$surface}.watch_paths", $watch),
             ...(array) config("dissect.{$surface}.paths", $scan),
         ]));
+    }
+
+    /**
+     * Where models live: `models.paths` when it lists anything, otherwise the
+     * single `models_path` every earlier version read.
+     *
+     * The fallback is what keeps a published config working. It has
+     * `models_path` and no `models` section, and merging in the package
+     * defaults must not swap its directory for `app/Models`.
+     *
+     * @return array<int, string>
+     */
+    protected function modelsPaths(): array
+    {
+        $paths = array_values(array_filter(
+            (array) config('dissect.models.paths', []),
+            fn ($path) => is_string($path) && $path !== '',
+        ));
+
+        return $paths !== [] ? $paths : [(string) config('dissect.models_path', 'app/Models')];
     }
 
     protected function shouldRegisterRoutes(): bool
