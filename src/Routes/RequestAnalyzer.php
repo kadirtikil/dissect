@@ -149,12 +149,28 @@ class RequestAnalyzer
 
             $class = $type->getName();
 
-            if (class_exists($class) && is_subclass_of($class, FormRequest::class)) {
+            if ($this->isFormRequest($class)) {
                 return $class;
             }
         }
 
         return null;
+    }
+
+    /**
+     * Whether a parameter's type is a FormRequest.
+     *
+     * Asking autoloads the class, which throws for a file that does not parse.
+     * One broken type hint is no reason to stop looking at the parameters after
+     * it, so it answers "no" and the loop moves on.
+     */
+    protected function isFormRequest(string $class): bool
+    {
+        try {
+            return class_exists($class) && is_subclass_of($class, FormRequest::class);
+        } catch (Throwable) {
+            return false;
+        }
     }
 
     /** The action's body as syntax, whether it is a method or a closure. */

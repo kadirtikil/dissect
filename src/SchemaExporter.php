@@ -133,20 +133,35 @@ class SchemaExporter
                 ->after($directory.DIRECTORY_SEPARATOR)
                 ->replace([DIRECTORY_SEPARATOR, '.php'], ['\\', '']);
 
-            if (! class_exists($class)) {
-                continue;
+            if ($this->isModel($class)) {
+                $models[] = $class;
             }
-
-            $reflection = new ReflectionClass($class);
-
-            if ($reflection->isAbstract() || ! $reflection->isSubclassOf(Model::class)) {
-                continue;
-            }
-
-            $models[] = $class;
         }
 
         return $models;
+    }
+
+    /**
+     * Concrete, loadable, and an Eloquent model.
+     *
+     * Loading is the step that can throw: class_exists() includes the file, so
+     * a half-saved model raises a ParseError and one extending a class that is
+     * gone raises an Error. Either costs that model its node, never the graph —
+     * an editor autosave mid-keystroke is a normal state for this tool.
+     */
+    protected function isModel(string $class): bool
+    {
+        try {
+            if (! class_exists($class)) {
+                return false;
+            }
+
+            $reflection = new ReflectionClass($class);
+        } catch (Throwable) {
+            return false;
+        }
+
+        return ! $reflection->isAbstract() && $reflection->isSubclassOf(Model::class);
     }
 
     /**
