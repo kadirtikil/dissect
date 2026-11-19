@@ -137,6 +137,46 @@ class QueueTest extends TestCase
     }
 
     #[Test]
+    public function a_failed_query_does_not_put_its_bindings_on_the_page(): void
+    {
+        $failures = [
+            // Laravel 10+, the shape QueryException writes today.
+            'Illuminate\Database\QueryException: SQLSTATE[23000]: Integrity constraint violation: 19 UNIQUE constraint failed: users.email '
+            ."(Connection: sqlite, Database: /app/db.sqlite, SQL: insert into \"users\" (\"email\", \"token\") values (jane@example.com, s3cret)) in /app/vendor/laravel/framework/src/Illuminate/Database/Connection.php:838\n#0 …",
+            // Laravel 9 and earlier.
+            'Illuminate\Database\QueryException: SQLSTATE[HY000]: General error (SQL: update users set token = s3cret where email = jane@example.com)',
+            // MySQL repeats the value in its own message.
+            "Illuminate\\Database\\QueryException: SQLSTATE[23000]: Integrity constraint violation: 1062 Duplicate entry 'jane@example.com' for key 'users_email_unique' (Connection: mysql, SQL: insert into users (email) values (jane@example.com))",
+        ];
+
+        foreach ($failures as $i => $exception) {
+            DB::table('failed_jobs')->insert([
+                'uuid' => (string) Str::uuid(),
+                'connection' => 'database',
+                'queue' => 'default',
+                'payload' => $this->payload('Workbench\App\Jobs\PublishPost'),
+                'exception' => $exception,
+                'failed_at' => now()->subMinutes(3 - $i),
+            ]);
+        }
+
+        $lines = array_column($this->snapshot()['past']['failed']['rows'], 'exception');
+
+        $this->assertCount(3, $lines);
+
+        foreach ($lines as $line) {
+            $this->assertStringNotContainsString('jane@example.com', $line);
+            $this->assertStringNotContainsString('s3cret', $line);
+            $this->assertStringContainsString('SQLSTATE', $line, 'the reason itself stays');
+        }
+
+        $this->assertContains(
+            'Illuminate\Database\QueryException: SQLSTATE[23000]: Integrity constraint violation: 19 UNIQUE constraint failed: users.email (SQL removed)',
+            $lines,
+        );
+    }
+
+    #[Test]
     public function it_reads_what_failed(): void
     {
         DB::table('failed_jobs')->insert([

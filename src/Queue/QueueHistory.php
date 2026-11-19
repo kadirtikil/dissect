@@ -139,10 +139,17 @@ class QueueHistory
     }
 
     /**
-     * The first line of a stack trace, which is the exception and its message.
+     * The first line of a stack trace, which is the exception and its message,
+     * with any SQL taken out.
      *
-     * The rest is a hundred frames of vendor code: it belongs in the log, not
-     * in a list somebody is scanning for what broke.
+     * A failed job's exception is stored as written, and for a QueryException
+     * that means the statement **with its bindings substituted in** — the
+     * email that hit a unique index, the token that did not match. The
+     * statement is cut from where Laravel appends it (`(Connection: …, SQL:`
+     * on 10+, `(SQL:` before that) to the end of the line. MySQL also repeats
+     * the offending value in its own duplicate-key message, so that is
+     * masked too. What is left still says which constraint failed, which is
+     * the part worth reading here.
      */
     protected function summarise(?string $exception): ?string
     {
@@ -152,7 +159,13 @@ class QueueHistory
 
         $first = strtok($exception, "\n");
 
-        return $first === false ? null : trim($first);
+        if ($first === false) {
+            return null;
+        }
+
+        $line = (string) preg_replace('/\s*\((?:Connection: [^\n]*?, )?SQL: .*$/', ' (SQL removed)', trim($first));
+
+        return (string) preg_replace("/Duplicate entry '.*?' for key/", "Duplicate entry '…' for key", $line);
     }
 
     /**
