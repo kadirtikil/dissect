@@ -1067,7 +1067,7 @@ $this->app->bind(ColumnNormalizer::class, MyColumnNormalizer::class);
 ```
 
 Config (`config/dissect.php`): `enabled`, `path`, `middleware`,
-`models_path`, `models_namespace`, `layout_path`, `views_path`,
+`models_path`, `models.paths`, `layout_path`, `views_path`,
 `routes.watch_paths`, `jobs.paths`, `jobs.watch_paths`, `providers.paths`,
 `providers.max_depth`, `providers.max_nodes`, `providers.watch_paths`,
 `queue.rows`, `queue.poll_interval`.
