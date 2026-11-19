@@ -2,6 +2,7 @@
 
 namespace KdrDev\Dissect\Tests\Feature;
 
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use KdrDev\Dissect\Tests\TestCase;
 use PHPUnit\Framework\Attributes\Test;
 
@@ -11,6 +12,8 @@ use PHPUnit\Framework\Attributes\Test;
  */
 class NoDomainsTest extends TestCase
 {
+    use RefreshDatabase;
+
     #[Test]
     public function a_plain_app_has_no_domains(): void
     {
@@ -23,5 +26,27 @@ class NoDomainsTest extends TestCase
         $this->assertSame([], $payload['findings']);
         $this->assertSame([], $payload['problems']);
         $this->assertContains('Workbench\\App\\Models\\Post', $payload['unassigned']);
+    }
+
+    #[Test]
+    public function no_row_of_a_plain_app_has_a_domain(): void
+    {
+        $surfaces = [
+            'schema.json' => 'nodes',
+            'routes.json' => 'routes',
+            'jobs.json' => 'jobs',
+            'providers.json' => 'providers',
+        ];
+
+        foreach ($surfaces as $surface => $key) {
+            $rows = $this->getJson('/dissect/'.$surface)->assertOk()->json($key);
+
+            $this->assertNotEmpty($rows, $surface);
+
+            foreach ($rows as $row) {
+                $this->assertArrayHasKey('context', $row, $surface);
+                $this->assertNull($row['context'], $surface);
+            }
+        }
     }
 }

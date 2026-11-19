@@ -66,6 +66,7 @@ class DissectServiceProvider extends ServiceProvider
             $app->make(ColumnNormalizer::class),
             $app->make(MigrationState::class),
             $this->modelsPaths(),
+            $app->make(ContextResolver::class),
         ));
 
         $this->app->singleton(DomainFile::class, fn () => new DomainFile(
@@ -154,6 +155,7 @@ class DissectServiceProvider extends ServiceProvider
             $app->make(ResponseAnalyzer::class),
             $app->make(RouteFingerprint::class),
             $app->make(DocumentAnalyzer::class),
+            $app->make(ContextResolver::class),
         ));
 
         $this->app->singleton(JobDiscovery::class, fn () => new JobDiscovery(
@@ -186,6 +188,7 @@ class DissectServiceProvider extends ServiceProvider
             // mechanism, different question, so it must not be the same
             // instance.
             new RouteFingerprint($this->watched('jobs', ['app', 'routes'], ['app/Jobs'])),
+            $app->make(ContextResolver::class),
         ));
 
         $this->app->singleton(ProviderReader::class, fn () => new ProviderReader(
@@ -210,6 +213,7 @@ class DissectServiceProvider extends ServiceProvider
             // half: same mechanism, its own directories.
             new RouteFingerprint($this->watched('providers', ['app'], ['app/Providers'])),
             $app->make(CodeOwnership::class),
+            $app->make(ContextResolver::class),
         ));
 
         $this->app->singleton(PayloadDecoder::class, fn () => new PayloadDecoder);
