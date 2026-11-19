@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted } from 'vue'
 import { storeToRefs } from 'pinia'
+import { useNow } from '@vueuse/core'
 import QueueSection from '@/components/queue/QueueSection.vue'
 import { PAGE_ACTIONS, PAGE_CONTEXT } from '@/lib/toolbar'
 import { useQueueStore } from '@/stores/queue'
@@ -35,7 +36,16 @@ onUnmounted(() => stop?.())
 /** Totals across every queue, which is the headline the page opens with. */
 const depth = computed(() => totals.value.waiting + totals.value.reserved)
 
-const readAt = computed(() => relative(snapshot.value?.read_at ?? null))
+/**
+ * The age of the reading on screen, kept current.
+ *
+ * Computed from `read_at` alone it only re-evaluated when a new snapshot
+ * landed — so while polls were failing it said "just now" indefinitely, which
+ * is the one moment the age matters.
+ */
+const now = useNow({ interval: 1000 })
+
+const readAt = computed(() => relative(snapshot.value?.read_at ?? null, now.value.getTime()))
 </script>
 
 <template>
@@ -75,6 +85,17 @@ const readAt = computed(() => relative(snapshot.value?.read_at ?? null))
         :title="absolute(snapshot?.read_at ?? null) ?? ''"
       >
         {{ reading ? 'reading…' : `read ${readAt}` }}
+      </span>
+
+      <!-- The last good reading stays up when a poll fails, so the page has to
+           say that the one on screen is no longer the latest. -->
+      <span
+        v-if="loaded && error"
+        class="font-mono text-[10px] text-destructive"
+        role="status"
+        :title="error"
+      >
+        last read failed
       </span>
     </Teleport>
 

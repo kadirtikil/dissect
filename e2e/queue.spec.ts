@@ -125,3 +125,23 @@ test('never shows a reading for the connection it just switched away from', asyn
   await expect.poll(() => staleAnswered).toBe(true)
   await expect(page.getByRole('heading', { name: 'redis', exact: true })).toBeVisible()
 })
+
+test('ages the reading on screen and says when a poll fails', async ({ page }) => {
+  await page.clock.install({ time: new Date('2026-08-31T12:00:00Z') })
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Queue', exact: true }).click()
+  await expect(page.getByText('read just now')).toBeVisible()
+
+  // The server goes away. The last good reading stays up — and must stop
+  // looking fresh.
+  await page.route('**/queue.json*', (route) => route.fulfill({ status: 500, body: 'down' }))
+  await page.clock.runFor(5_000)
+  await page.clock.runFor(60_000)
+
+  // Read once, not retried: a retrying assertion can be satisfied by a later
+  // re-render, and the bug was that nothing re-rendered on its own.
+  // eslint-disable-next-line playwright/prefer-web-first-assertions
+  expect(await page.getByText(/^read /).textContent()).toBe('read 1m ago')
+  await expect(page.getByText('last read failed')).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'database', exact: true })).toBeVisible()
+})
