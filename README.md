@@ -102,6 +102,10 @@ The rest are config-file only:
 - **`providers.watch_paths`** — defaults to `['app']`. The change signal for the provider trees. Wider than `providers.paths` on purpose: a tree changes when a constructor anywhere down it does.
 - **`queue.rows`** — defaults to `50`. How many jobs each section of the live queue lists. The counts are always exact: a queue 40,000 deep reports 40,000 and shows you the first page.
 - **`queue.poll_interval`** — defaults to `5000` (ms). How often the queue tab re-reads while it is open.
+- **`domains.enabled`** — defaults to `true` (`DISSECT_DOMAINS`). `false` turns domain detection off entirely. See [Domains](#-domains).
+- **`domains.file`** — defaults to `base_path('.dissect/domains.json')`. Domains written down by hand.
+- **`domains.root`** — defaults to `base_path()`. Where the folder layouts are looked for.
+- **`domains.paths`** — defaults to `['app', 'src', 'Modules', 'app-modules', 'packages']`. Where classes are looked for when listing every domain's members. Each domain's own folders are always included.
 
 ### 📁 Models outside `app/Models`
 
@@ -215,6 +219,61 @@ switch to whenever you like.
 - ➕ Tick a model in the list to add it to the open view, untick it to take it back out. Changes save as you go.
 - 🧭 A model keeps the same position in every view, so switching hides models rather than rearranging the board.
 - 🤝 The file is plain JSON and meant to be committed, so your team gets the same views you do. Which one *you* have open is remembered per browser, not in the file.
+
+## 🧭 Domains
+
+If your app is split into domains (bounded contexts), dissect works out which
+domain each class belongs to. Most apps need no configuration, because the
+domains are read from the folder layout you already use:
+
+| Layout | Each domain is |
+| --- | --- |
+| [nwidart/laravel-modules](https://github.com/nWidart/laravel-modules) | `Modules/{Name}` |
+| [InterNACHI/modular](https://github.com/InterNACHI/modular) | `app-modules/{name}` |
+| Spatie's *Laravel Beyond CRUD* | `app/Domain/{Name}`, `src/Domain/{Name}` (or `Domains`) |
+| Local packages | `packages/{name}` or `packages/{vendor}/{name}`, a folder with a `composer.json` |
+| Hexagonal | `src/{Name}` or `app/{Name}` with at least two of `Domain/`, `Application/`, `Infrastructure/` |
+| Layer-first sub-folders | `app/Models/{Name}` plus the same name under another layer, e.g. `app/Http/Controllers/{Name}` |
+
+An app that follows none of these has no domains, and dissect looks exactly as
+it did before.
+
+For anything the folders don't express, write the domains down in
+`.dissect/domains.json`. Commit it, like the layout and the views:
+
+```json
+{
+    "version": 1,
+    "domains": [
+        { "name": "Identity", "paths": ["app/Models/User.php", "app/Http/Controllers/Auth"] }
+    ]
+}
+```
+
+Paths are relative to the app root, a `*` stands for one directory name, and a
+path may name a single file. Add `"conventions": false` to ignore the folder
+layouts and use only the file.
+
+A single class in the wrong folder can say where it belongs with an attribute:
+
+```php
+#[Domain('Identity')]
+class User extends Authenticatable {}
+```
+
+You declare the `Domain` attribute class yourself, in any namespace. dissect
+matches it by its short name, so nothing from this dev dependency ends up in
+production code. dissect reads the attribute from the file and never loads the
+class.
+
+**Who wins:** the attribute, then `domains.json`, then the folder layout. A
+class none of them claims is listed as **unassigned**, never guessed. An
+attribute that disagrees with its folder, or names a domain nothing else
+defines, is reported as a finding, because an override that has gone stale
+should be noticed rather than believed.
+
+`/dissect/domains.json` lists every domain, how it was found, the classes in
+it, the unassigned classes and the findings.
 
 ## 🛣️ Routes
 
