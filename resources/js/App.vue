@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import AppSidebar from '@/components/AppSidebar.vue'
 import GraphCanvas from '@/components/graph/GraphCanvas.vue'
+import PageLoadError from '@/components/PageLoadError.vue'
 import { storeToRefs } from 'pinia'
 import { computed, defineAsyncComponent, markRaw, ref, watch } from 'vue'
 import { pages } from '@/pages/registry'
@@ -24,7 +25,12 @@ const { current: page } = storeToRefs(nav)
 const lazyPages = new Map(
   pages
     .filter((entry) => !entry.persistent && entry.component)
-    .map((entry) => [entry.id, markRaw(defineAsyncComponent(entry.component!))]),
+    .map((entry) => [
+      entry.id,
+      // An error component rather than nothing: a chunk that fails to load is
+      // otherwise an empty page with the reason only in the console.
+      markRaw(defineAsyncComponent({ loader: entry.component!, errorComponent: PageLoadError })),
+    ]),
 )
 
 const CurrentPage = computed(() => lazyPages.get(page.value))

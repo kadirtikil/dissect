@@ -183,3 +183,15 @@ test('remembers which surface was open across a reload', async ({ page }) => {
 
   await page.getByRole('button', { name: 'Models', exact: true }).click()
 })
+
+test('says so, and offers a reload, when a page fails to load', async ({ page }) => {
+  // What a browser sees after the package was updated under an open tab: the
+  // page's chunk is gone.
+  await page.route('**/pages/RoutesPanel.vue*', (route) => route.abort())
+
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Routes', exact: true }).click()
+
+  await expect(page.getByRole('alert')).toContainText('This page could not be loaded.')
+  await expect(page.getByRole('button', { name: 'Reload' })).toBeVisible()
+})
