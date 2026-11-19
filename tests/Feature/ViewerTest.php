@@ -118,6 +118,20 @@ class ViewerTest extends TestCase
     }
 
     #[Test]
+    public function a_malformed_layout_is_cleaned_rather_than_failing_the_request(): void
+    {
+        // Both used to be 500s: invalid UTF-8 throws in json_encode(), and an
+        // out-of-range float is a cast warning Laravel promotes to an error.
+        $this->post('/dissect/layout', [
+            'positions' => [
+                "Po\xffst" => ['x' => 1, 'y' => 1],
+                'Comment' => ['x' => 1e300, 'y' => 1],
+                'Tag' => ['x' => 5, 'y' => 6],
+            ],
+        ])->assertOk()->assertJson(['ok' => true, 'saved' => 1]);
+    }
+
+    #[Test]
     public function it_reports_a_layout_written_by_a_newer_version_instead_of_replacing_it(): void
     {
         // The upgrade hazard, end to end: a developer running an older dissect

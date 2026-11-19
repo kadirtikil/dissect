@@ -20,6 +20,19 @@ class LayoutRepository
     /** Format of the file this version reads and writes. See VersionedStateFile. */
     public const VERSION = 1;
 
+    /**
+     * Far more models than the graph draws usefully, and few enough that a
+     * request cannot turn the file into something the page chokes on.
+     */
+    protected const MAX_POSITIONS = 10000;
+
+    /**
+     * The canvas is not this big. Past it a coordinate is a bug or junk, and
+     * past PHP_INT_MAX the int cast is a warning — which Laravel turns into a
+     * 500 — and a garbage value.
+     */
+    protected const MAX_COORDINATE = 1000000;
+
     public function __construct(protected string $path) {}
 
     /** @return array{version: int, positions: array<string, array{x: int, y: int}>} */
@@ -53,8 +66,14 @@ class LayoutRepository
     }
 
     /**
-     * Only finite numeric coordinates survive, so neither a malformed file nor
-     * a malformed request can put junk into the payload the page consumes.
+     * Only model ids and finite, bounded coordinates survive, so neither a
+     * malformed file nor a malformed request can put junk into the payload
+     * the page consumes.
+     *
+     * Ids are held to the same rule as ViewRepository's model ids: nodes are
+     * keyed by class basename, so anything else is not a node. That also keeps
+     * invalid UTF-8 out, which json_encode() would otherwise throw on — a 500
+     * from a request that was merely malformed.
      *
      * @param  mixed  $positions
      * @return array<string, array{x: int, y: int}>
@@ -68,7 +87,7 @@ class LayoutRepository
         $clean = [];
 
         foreach ($positions as $id => $position) {
-            if (! is_string($id) || ! is_array($position)) {
+            if (! is_string($id) || ! preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/', $id) || ! is_array($position)) {
                 continue;
             }
 
@@ -83,7 +102,15 @@ class LayoutRepository
                 continue;
             }
 
+            if (abs((float) $x) > self::MAX_COORDINATE || abs((float) $y) > self::MAX_COORDINATE) {
+                continue;
+            }
+
             $clean[$id] = ['x' => (int) round((float) $x), 'y' => (int) round((float) $y)];
+
+            if (count($clean) >= self::MAX_POSITIONS) {
+                break;
+            }
         }
 
         return $clean;
