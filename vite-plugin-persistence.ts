@@ -86,6 +86,19 @@ function jsonPersistence<T>(
           return res.end('Only POST is supported')
         }
 
+        // `server.cors` is on so the package's Blade view can load modules from
+        // this server, and that also lets any page in the same browser POST
+        // here — a text/plain body needs no preflight. A browser always names
+        // the page a cross-origin POST comes from, so one naming another host
+        // is turned away. No Origin at all is a script or curl, which could
+        // write the file directly anyway.
+        if (!sameOrigin(req.headers.origin, req.headers.host)) {
+          res.statusCode = 403
+          return res.end(
+            JSON.stringify({ ok: false, message: 'cross-origin writes are not accepted' }),
+          )
+        }
+
         try {
           const raw = await readBody(req)
           const payload = sanitise(JSON.parse(raw))
@@ -99,6 +112,16 @@ function jsonPersistence<T>(
           res.setHeader('content-type', 'application/json')
           res.end(JSON.stringify({ ok: true }))
         } catch (error) {
+          if (error instanceof TooLarge) {
+            // Answer, then hang up rather than read the rest: the body could
+            // be endless.
+            res.statusCode = 413
+            res.setHeader('connection', 'close')
+            return res.end(JSON.stringify({ ok: false, message: error.message }), () =>
+              req.destroy(),
+            )
+          }
+
           server.config.logger.error(
             `[${name}] failed to save: ${error instanceof Error ? error.message : String(error)}`,
           )
@@ -110,18 +133,55 @@ function jsonPersistence<T>(
   }
 }
 
+/** The most a save may be: one small object per model leaves plenty of room. */
+const MAX_BODY_BYTES = 1_000_000
+
+class TooLarge extends Error {
+  constructor() {
+    super(`payload larger than ${MAX_BODY_BYTES} bytes`)
+  }
+}
+
 function readBody(req: NodeJS.ReadableStream): Promise<string> {
   return new Promise((resolve, reject) => {
-    let body = ''
-    req.on('data', (chunk) => {
-      body += chunk
-      // The payload is one small object per model; anything larger is a bug
-      // or an attempt to fill the disk.
-      if (body.length > 1_000_000) reject(new Error('payload too large'))
-    })
-    req.on('end', () => resolve(body))
+    const chunks: Buffer[] = []
+    let size = 0
+
+    const onData = (chunk: Buffer) => {
+      size += chunk.length
+
+      // Anything larger is a bug or an attempt to fill the disk. Stop
+      // listening, so nothing more is kept, and let the caller hang up.
+      if (size > MAX_BODY_BYTES) {
+        req.off('data', onData)
+        reject(new TooLarge())
+        return
+      }
+
+      chunks.push(chunk)
+    }
+
+    req.on('data', onData)
+    req.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')))
     req.on('error', reject)
   })
+}
+
+/**
+ * Whether a request's Origin, if it sent one, is the server it was sent to.
+ *
+ * Exported for the tests, which call it directly.
+ */
+export function sameOrigin(origin: string | undefined, host: string | undefined): boolean {
+  if (origin === undefined) return true
+  if (!host) return false
+
+  try {
+    return new URL(origin).host === host
+  } catch {
+    // "null", from a sandboxed frame or a file:// page, is not this server.
+    return false
+  }
 }
 
 /**
@@ -174,7 +234,10 @@ function sanitiseViews(input: unknown): ViewsPayload {
       .replace(/^-|-$/g, '')
       .slice(0, 64)
     // eslint-disable-next-line no-control-regex
-    const label = name.replace(/[\x00-\x1f\x7f]/g, '').trim().slice(0, 64)
+    const label = name
+      .replace(/[\x00-\x1f\x7f]/g, '')
+      .trim()
+      .slice(0, 64)
     const members = [
       ...new Set(models.filter((m): m is string => typeof m === 'string' && /^\w+$/.test(m))),
     ].slice(0, 500)
