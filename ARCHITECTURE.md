@@ -974,7 +974,7 @@ makes it stick.
 | Newer than `VERSION` | Readable, **never writable**. `put()` throws `StateFileException`; the controller answers 409 and the page reports "not saved" |
 | Older than `VERSION` | Copied to `<path>.v<n>.bak` before the first migrating write. Never overwritten — the first copy is the one taken before any new-format write |
 | Equal | Ordinary write, no copy |
-| Unparseable | Copied to `<path>.corrupt.bak`, then replaced |
+| Unparseable | Copied to `<path>.corrupt.bak`, then replaced. A later, different corrupt file goes to `.corrupt.2.bak` and on; an identical one is not copied twice |
 | Missing or nonsense | Treated as format 1, so a typo cannot lock somebody out of their own file |
 
 Writes go to a uniquely named temporary file beside the target and are renamed

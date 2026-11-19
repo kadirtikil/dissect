@@ -79,7 +79,7 @@ trait VersionedStateFile
         // preserve in the payload — but a file somebody was midway through
         // editing by hand is worth more than the milliseconds a copy costs.
         if ($decoded === null) {
-            $this->backup('corrupt');
+            $this->backupCorrupt();
 
             return;
         }
@@ -109,6 +109,38 @@ trait VersionedStateFile
 
         if (is_file($backup)) {
             return;
+        }
+
+        if (! @copy($this->path, $backup)) {
+            throw StateFileException::backupFailed($this->path, $backup);
+        }
+    }
+
+    /**
+     * Copies an unparseable file aside before it is replaced.
+     *
+     * Unlike a format backup, every distinct one is kept. The first corrupt
+     * file and the fifth are different hand edits, each somebody's work, and
+     * `backup()`'s never-overwrite rule would have kept the first and silently
+     * replaced the fifth with a fresh layout. So the name is numbered past
+     * whatever exists — `.corrupt.bak`, then `.corrupt.2.bak` and on — and a
+     * file identical to one already copied is not copied again, which is what
+     * a retried save of the same broken file would otherwise do.
+     */
+    protected function backupCorrupt(): void
+    {
+        $hash = hash_file('sha256', $this->path);
+
+        for ($n = 1; ; $n++) {
+            $backup = $this->path.($n === 1 ? '.corrupt.bak' : '.corrupt.'.$n.'.bak');
+
+            if (! is_file($backup)) {
+                break;
+            }
+
+            if (hash_file('sha256', $backup) === $hash) {
+                return;
+            }
         }
 
         if (! @copy($this->path, $backup)) {
