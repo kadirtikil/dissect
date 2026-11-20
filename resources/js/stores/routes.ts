@@ -39,6 +39,9 @@ export const useRoutesStore = defineStore('routes', () => {
    */
   const stacks = ref<string[]>([])
 
+  /** Domain keys, as the domain chips give them. */
+  const contexts = ref<string[]>([])
+
   const selectedId = ref<string | null>(null)
 
   const loaded = computed(() => status.value === 'ready')
@@ -57,6 +60,7 @@ export const useRoutesStore = defineStore('routes', () => {
     methods: methods.value,
     groups: groups.value,
     stacks: stacks.value,
+    contexts: contexts.value,
   }))
 
   const visible = computed(() => filterRoutes(routes.value, filters.value))
@@ -97,6 +101,12 @@ export const useRoutesStore = defineStore('routes', () => {
       : [...groups.value, group]
   }
 
+  function toggleContext(context: string) {
+    contexts.value = contexts.value.includes(context)
+      ? contexts.value.filter((c) => c !== context)
+      : [...contexts.value, context]
+  }
+
   /**
    * Arriving from somewhere that named one endpoint — a job's list of what
    * dispatches it.
@@ -114,6 +124,7 @@ export const useRoutesStore = defineStore('routes', () => {
     methods.value = []
     groups.value = []
     stacks.value = []
+    contexts.value = []
   }
 
   function endpoint(): string {
@@ -184,6 +195,7 @@ export const useRoutesStore = defineStore('routes', () => {
     methods,
     groups,
     stacks,
+    contexts,
     selectedId,
     filters,
     visible,
@@ -195,6 +207,7 @@ export const useRoutesStore = defineStore('routes', () => {
     toggleMethod,
     toggleGroup,
     showStack,
+    toggleContext,
     focusEndpoint,
     clearFilters,
     load,

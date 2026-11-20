@@ -20,6 +20,38 @@ export function domainColor(name: string, all: readonly string[]): string {
   return `oklch(0.6 0.15 ${Math.round((index * 137.5) % 360)})`
 }
 
+/**
+ * The facet key for a row with no domain.
+ *
+ * An empty string, because no domain can be called that: domains.json and the
+ * attribute both refuse a blank name.
+ */
+export const UNASSIGNED = ''
+
+/** A row's `context` as a facet key. */
+export function contextKey(context: string | null | undefined): string {
+  return context ?? UNASSIGNED
+}
+
+/** Empty means every domain; otherwise a row matches if it is in one of them. */
+export function matchesContexts(context: string | null | undefined, selected: readonly string[]) {
+  return selected.length === 0 || selected.includes(contextKey(context))
+}
+
+/**
+ * The order colours are handed out in: the domains the page was given, then
+ * any others seen since, sorted.
+ *
+ * Every page builds its palette from the same list first, so Billing is the
+ * same colour on the graph, the route list and the domain list, whichever of
+ * them happens to have rows in it.
+ */
+export function domainPalette(known: readonly string[], seen: Iterable<string>): string[] {
+  const extra = [...new Set(seen)].filter((name) => name !== UNASSIGNED && !known.includes(name))
+
+  return [...known, ...extra.sort((a, b) => a.localeCompare(b))]
+}
+
 const SOURCES: Record<string, string> = {
   config: 'domains.json',
   attribute: '#[Domain] attribute',

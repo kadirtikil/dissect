@@ -2,7 +2,7 @@ import { defineStore } from 'pinia'
 import { computed, ref, shallowRef } from 'vue'
 import type { Provider, ProvidersFile } from '@/types/providers'
 import { bootstrap } from '@/lib/bootstrap'
-import { filterProviders, type ProviderFilterState } from '@/lib/providerFilters'
+import { contextCounts, filterProviders, type ProviderFilterState } from '@/lib/providerFilters'
 
 type Status = 'idle' | 'loading' | 'ready' | 'error'
 
@@ -25,6 +25,9 @@ export const useProviderStore = defineStore('provider-store', () => {
 
   const search = ref('')
 
+  /** Domain keys, as the domain chips give them. */
+  const contexts = ref<string[]>([])
+
   const selectedId = ref<string | null>(null)
 
   /**
@@ -38,9 +41,14 @@ export const useProviderStore = defineStore('provider-store', () => {
 
   const loaded = computed(() => status.value === 'ready')
 
-  const filters = computed<ProviderFilterState>(() => ({ search: search.value }))
+  const filters = computed<ProviderFilterState>(() => ({
+    search: search.value,
+    contexts: contexts.value,
+  }))
 
   const visible = computed(() => filterProviders(providers.value, filters.value))
+
+  const facets = computed(() => ({ contexts: contextCounts(providers.value, filters.value) }))
 
   /**
    * Looked up among the visible providers, as the job list does: a tree on the
@@ -65,8 +73,15 @@ export const useProviderStore = defineStore('provider-store', () => {
     expanded.value = next
   }
 
+  function toggleContext(context: string) {
+    contexts.value = contexts.value.includes(context)
+      ? contexts.value.filter((c) => c !== context)
+      : [...contexts.value, context]
+  }
+
   function clearFilters() {
     search.value = ''
+    contexts.value = []
   }
 
   function endpoint(): string {
@@ -138,14 +153,17 @@ export const useProviderStore = defineStore('provider-store', () => {
     loaded,
     fingerprint,
     search,
+    contexts,
     selectedId,
     expanded,
     filters,
     visible,
+    facets,
     selected,
     stats,
     select,
     toggleExpanded,
+    toggleContext,
     clearFilters,
     load,
     refresh,

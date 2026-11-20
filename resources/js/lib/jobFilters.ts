@@ -1,4 +1,5 @@
 import type { QueueJob } from '@/types/jobs'
+import { contextKey, matchesContexts } from '@/lib/domains'
 
 /**
  * Narrowing the job list.
@@ -32,6 +33,8 @@ export interface JobFilterState {
   models: string[] | null
   /** Only jobs no dispatch site was found for. */
   undispatchedOnly: boolean
+  /** Empty means every domain. Keys come from `contextKey`. */
+  contexts: string[]
 }
 
 export const EMPTY_FILTERS: JobFilterState = {
@@ -40,6 +43,7 @@ export const EMPTY_FILTERS: JobFilterState = {
   queues: [],
   models: null,
   undispatchedOnly: false,
+  contexts: [],
 }
 
 /**
@@ -94,7 +98,8 @@ export function matchesJob(job: QueueJob, state: JobFilterState): boolean {
     matchesKinds(job, state.kinds) &&
     matchesQueues(job, state.queues) &&
     matchesModels(job, state.models) &&
-    (!state.undispatchedOnly || isUndispatched(job))
+    (!state.undispatchedOnly || isUndispatched(job)) &&
+    matchesContexts(job.context, state.contexts)
   )
 }
 
@@ -112,40 +117,47 @@ export function filterJobs(jobs: QueueJob[], state: JobFilterState): QueueJob[] 
 export function facetCounts(
   jobs: QueueJob[],
   state: JobFilterState,
-): { kinds: Record<string, number>; queues: Record<string, number>; undispatched: number } {
+): {
+  kinds: Record<string, number>
+  queues: Record<string, number>
+  contexts: Record<string, number>
+  undispatched: number
+} {
   const kinds: Record<string, number> = {}
   const queues: Record<string, number> = {}
+  const contexts: Record<string, number> = {}
   let undispatched = 0
 
   for (const job of jobs) {
-    const base =
-      matchesSearch(job, state.search) &&
-      matchesModels(job, state.models) &&
-      (!state.undispatchedOnly || isUndispatched(job))
+    if (!matchesSearch(job, state.search) || !matchesModels(job, state.models)) continue
 
-    if (base && matchesQueues(job, state.queues)) {
+    const kind = matchesKinds(job, state.kinds)
+    const queue = matchesQueues(job, state.queues)
+    const context = matchesContexts(job.context, state.contexts)
+    const dispatch = !state.undispatchedOnly || isUndispatched(job)
+
+    if (queue && context && dispatch) {
       kinds[job.kind] = (kinds[job.kind] ?? 0) + 1
     }
 
-    if (base && matchesKinds(job, state.kinds)) {
+    if (kind && context && dispatch) {
       const key = queueKey(job)
       queues[key] = (queues[key] ?? 0) + 1
     }
 
+    if (kind && queue && dispatch) {
+      const key = contextKey(job.context)
+      contexts[key] = (contexts[key] ?? 0) + 1
+    }
+
     // The undispatched count answers "is this worth looking at", so it ignores
     // its own toggle and counts within everything else that is selected.
-    if (
-      matchesSearch(job, state.search) &&
-      matchesModels(job, state.models) &&
-      matchesKinds(job, state.kinds) &&
-      matchesQueues(job, state.queues) &&
-      isUndispatched(job)
-    ) {
+    if (kind && queue && context && isUndispatched(job)) {
       undispatched++
     }
   }
 
-  return { kinds, queues, undispatched }
+  return { kinds, queues, contexts, undispatched }
 }
 
 export interface JobGrouping {
