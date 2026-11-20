@@ -281,6 +281,12 @@ Every model, route, job and provider is also tagged with its domain, so the
 other pages can show it. A route belongs to its controller's domain, and a
 closure route to the domain of the file it is written in.
 
+The **Routes**, **Jobs** and **Provider-Trees** lists get a row of domain chips
+under their other filters, one per domain with rows in that list, plus
+**unassigned** for the rest. Each domain has the same colour on every page. A
+provider is in the domain its own class is in. An app with no domains sees no
+chips.
+
 ## 🛣️ Routes
 
 The **Routes** tab is the other half of the same question. The graph says what

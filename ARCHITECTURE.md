@@ -603,23 +603,25 @@ main.ts                 mounts App; no router (see "Decisions")
     │   ├── ModelNode   one model: name, table, relation count, columns
     │   └── GraphLegend relation families
     ├── RoutesPanel     list ▏ detail
-    │   ├── RouteFilters   search + facet chips with counts
+    │   ├── RouteFilters   search + facet chips with counts, then DomainFacet
     │   ├── RouteList      grouped by controller (full class name), collapsible
     │   └── RouteDetail    verbs, middleware, params, request, response
     │       └── FieldTree  a flat path list rendered as a tree
     ├── ProviderTreePanel  list ▏ canvas
-    │   ├── ProviderFilters   search, with a visible/total count
+    │   ├── ProviderFilters   search, with a visible/total count; DomainFacet
     │   ├── ProviderList      name, partial and deferred markers
     │   └── ProviderTree      its own Vue Flow instance, laid out by providerLayout
     │       └── ProviderNode  kind, origin, confidence, badges; opens to the doc block
     ├── JobsPanel       list ▏ detail
-    │   ├── JobFilters     search + kind/queue chips, and the undispatched count
+    │   ├── JobFilters     search + kind/queue chips, DomainFacet, the undispatched count
     │   ├── JobList        grouped by queue, collapsible
     │   └── JobDetail      queue, retries, payload, middleware, dispatchers, carries
     ├── QueuePanel      depth, then the three tenses; polls while it is open
     │   └── QueueSection   one tense as a table, or why it could not be read
     └── DomainsPanel    every domain, findings, unassigned; or what would count as one
         └── DomainCard     name, how it was found, folders, classes by namespace
+
+components/domains/DomainFacet.vue   the domain chips every list shares
 
 stores/schema.ts        load → normalise → order → place → filter to the view
 stores/layout.ts        saved positions, debounce, prune, persist
@@ -628,7 +630,7 @@ stores/routes.ts        lazy load, filter state, selection
 stores/jobs.ts          the same, for the queue surface
 stores/provider.ts      lazy load, search, selection, which cards are open
 stores/queue.ts         the odd one: polled runtime state, nothing to cache
-stores/domains.ts       lazy load of the domain list; polled like the other surfaces
+stores/domains.ts       lazy load of the domain list; polled like the other surfaces; the colour order
 stores/navigation.ts    which page is open: fragment, then storage, then default
 pages/registry.ts       every page there is — the one file a new surface is added to
 lib/toolbar.ts          where a page hangs its own header controls
@@ -643,7 +645,7 @@ lib/providerFilters.ts  search across a provider and every class in its tree
 lib/providerLayout.ts   tiers from the server's depth; order by parents' height
 lib/providerKinds.ts    node/edge kind → colour; confidence → dash
 lib/elapsed.ts          "2m ago" / "in 4h" — a queue is read in relative time
-lib/domains.ts          domain → colour (the ramp, then spread hues); how one was found, in words
+lib/domains.ts          domain → colour (the ramp, then spread hues); the colour order; facet keys; how one was found, in words
 lib/bootstrap.ts        the host seam
 ```
 
@@ -978,7 +980,19 @@ by domain without fetching `domains.json`. It is called `context` rather than
 `domain` because a route's `domain` is already its host.
 
 A route takes its controller's domain, or for a closure, the domain of the file
-the closure is written in. A plain app's rows are all `null`. Each payload is
+the closure is written in. A plain app's rows are all `null`.
+
+The route, job and provider lists filter on it with `DomainFacet`: one chip
+per domain with rows in that list, and an **unassigned** chip (facet key `''`,
+a name no domain can have) for the rows in none. Counts follow the rule the
+other facets already have: a facet's own selection is left out of its counts.
+
+Colours come from `domainPalette()`, which starts from the domain names the
+page is inlined with (`window.__DISSECT__.domains`, from `DomainMap::names()`:
+only the folder and `domains.json` domains, so a few directory listings) and
+appends any other name seen since, sorted. Every page builds it the same way,
+so a domain keeps its colour across pages without any of them fetching
+`domains.json`. Each payload is
 cached against its own signal, none of which watches `.dissect/domains.json`,
 so that file's modification time is part of the cache stamp.
 
@@ -1145,6 +1159,7 @@ are running. `tests/StateVersioningTest.php` pins all of it.
 | **Domains come from folders first** | A folder cannot drift from where a file lives; a per-class marker on every class would. The attribute is kept as the exception for the odd class in the wrong place, and is checked against its folder so a stale one is reported |
 | **An unassigned class is never guessed into a domain** | A guess shown with the same weight as a fact is the "confidently wrong" this package refuses elsewhere. Suggesting domains is a separate, later feature that says it is a suggestion |
 | **`#[Domain]` is matched by short name and read from tokens** | The app owns the attribute class, so no dev dependency leaks into production code. Reading tokens means listing every class never loads one |
+| **Domain colours follow a list the page is given** | Ordering by the names a list happens to have rows in would give Billing one colour on the routes and another on the jobs. The names cost a few directory listings, so they are inlined rather than fetched |
 | **A plain app gets no domains** | Detection only matches layouts that mean "domains". A starter kit's `Auth` folders under controllers and requests are not one, which is why the layer-first rule requires `app/Models/{Name}` |
 | **Highlight is not selection** | Canvas selection is a gesture that feeds view membership; opening an endpoint must not quietly change what a new view would contain |
 
@@ -1220,6 +1235,7 @@ Config (`config/dissect.php`): `enabled`, `path`, `middleware`,
 | Change provider node/edge colours or dashes | `resources/js/lib/providerKinds.ts` |
 | Change what a provider card shows | `resources/js/components/provider-tree/tree/ProviderNode.vue` |
 | Change what the domain list shows | `resources/js/pages/DomainsPanel.vue`, `components/domains/DomainCard.vue` |
+| Change the domain chips on the lists | `resources/js/components/domains/DomainFacet.vue`, and `contexts` in each of `lib/{route,job,provider}Filters.ts` |
 | Change domain colours or how a source is worded | `resources/js/lib/domains.ts` |
 | Change the theme | `resources/js/assets/main.css` (tokens), `vue-flow-theme.css` (canvas) |
 | Change the page shell | `resources/views/app.blade.php` |
