@@ -35,6 +35,9 @@
             jobsUrl: @json(route('dissect.jobs')),
             providersUrl: @json(route('dissect.providers')),
             domainsUrl: @json(route('dissect.domains')),
+            {{-- Only the names, which cost a few directory listings: enough
+                 for every page to give a domain the same colour. --}}
+            domains: @json($domains),
             {{-- Runtime state rather than a description of code, so this one is
                  polled rather than fetched once. --}}
             queueUrl: @json(route('dissect.queue')),

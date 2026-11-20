@@ -120,6 +120,22 @@ final class DomainMap
     }
 
     /**
+     * Every domain the folders and domains.json name, sorted.
+     *
+     * Cheap, because no class is read: it is what the page is handed up front
+     * so every surface colours a domain the same way. Domains only an
+     * attribute names are found by {@see export()} and come after these.
+     *
+     * @return array<int, string>
+     */
+    public function names(): array
+    {
+        return $this->resolver->enabled()
+            ? array_map('strval', array_keys($this->resolver->contexts()))
+            : [];
+    }
+
+    /**
      * Cheap change signal: the newest file under the walked folders, how many
      * there are, and when domains.json last changed.
      */
