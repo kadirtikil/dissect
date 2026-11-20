@@ -43,6 +43,12 @@ export interface Bootstrap {
    */
   domainsUrl?: string
   /**
+   * Every domain the folders and domains.json name, sorted. Only the names:
+   * they cost a few directory listings, and they are what keeps a domain the
+   * same colour on every page.
+   */
+  domains?: string[]
+  /**
    * Endpoint returning what is on the queue right now.
    *
    * The one payload here that is not derived from source, so unlike the two

@@ -8,7 +8,7 @@ import { baseName } from '@/lib/classNames'
 import { useDomainsStore } from '@/stores/domains'
 
 const store = useDomainsStore()
-const { status, error, file, names, stats } = storeToRefs(store)
+const { status, error, file, palette, stats } = storeToRefs(store)
 
 const showUnassigned = ref(false)
 
@@ -95,7 +95,7 @@ onMounted(() => store.load())
             v-for="domain in file.domains"
             :key="domain.name"
             :domain="domain"
-            :names="names"
+            :names="palette"
           />
         </div>
 
