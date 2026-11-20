@@ -102,7 +102,13 @@ describe('filterRoutes', () => {
     // The endpoint list is not scoped by anything chosen elsewhere. Every
     // filter it has is on screen, so a route can never go missing because of a
     // selection made on the graph.
-    expect(Object.keys(EMPTY_FILTERS).sort()).toEqual(['groups', 'methods', 'search', 'stacks'])
+    expect(Object.keys(EMPTY_FILTERS).sort()).toEqual([
+      'contexts',
+      'groups',
+      'methods',
+      'search',
+      'stacks',
+    ])
     expect(filterRoutes(ROUTES, EMPTY_FILTERS)).toHaveLength(ROUTES.length)
   })
 
@@ -227,5 +233,30 @@ describe('groupRoutes', () => {
 
     expect(groups).toHaveLength(1)
     expect(groups[0]!.label).toBe('ThingController')
+  })
+})
+
+describe('the domain facet', () => {
+  const SPLIT: ApiRoute[] = [
+    route({ id: 'GET:invoices', context: 'Billing' }),
+    route({ id: 'POST:invoices', methods: ['POST'], context: 'Billing' }),
+    route({ id: 'GET:quotes', context: 'Sales' }),
+    route({ id: 'GET:up', context: null }),
+  ]
+
+  it('narrows to the selected domains, or to the routes in none', () => {
+    const ids = (contexts: string[]) =>
+      filterRoutes(SPLIT, { ...EMPTY_FILTERS, contexts }).map((r) => r.id)
+
+    expect(ids(['Billing'])).toEqual(['GET:invoices', 'POST:invoices'])
+    expect(ids(['Sales', ''])).toEqual(['GET:quotes', 'GET:up'])
+  })
+
+  it('counts each domain within the other filters but not its own', () => {
+    const counts = facetCounts(SPLIT, { ...EMPTY_FILTERS, methods: ['GET'], contexts: ['Sales'] })
+
+    expect(counts.contexts).toEqual({ Billing: 1, Sales: 1, '': 1 })
+    // And every other facet honours the domain selection.
+    expect(counts.methods).toEqual({ GET: 1 })
   })
 })
