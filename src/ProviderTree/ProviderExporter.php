@@ -3,6 +3,7 @@
 namespace KdrDev\Dissect\ProviderTree;
 
 use Illuminate\Support\Str;
+use KdrDev\Dissect\Architecture\ContextResolver;
 use KdrDev\Dissect\Routes\RouteFingerprint;
 use KdrDev\Dissect\Support\CodeOwnership;
 use Throwable;
@@ -23,6 +24,7 @@ class ProviderExporter
         protected DependencyResolver $resolver,
         protected RouteFingerprint $fingerprint,
         protected CodeOwnership $owners = new CodeOwnership,
+        protected ?ContextResolver $contexts = null,
     ) {}
 
     /**
@@ -92,11 +94,19 @@ class ProviderExporter
 
         // The list needs a name and a file without digging the root out of
         // the node array, so they are hoisted beside the tree.
+        // Every class in the tree says which domain it is in, so the canvas
+        // can show a binding that reaches across one.
+        $description['nodes'] = array_map(
+            fn (array $node) => $node + ['context' => $this->contexts?->forClass($node['class'] ?? null)],
+            $description['nodes'] ?? [],
+        );
+
         return [
             'id' => $class,
             'class' => $class,
             'name' => class_basename($class),
             'file' => $file,
+            'context' => $this->contexts?->forClass($class),
             ...$description,
         ];
     }

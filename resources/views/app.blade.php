@@ -34,6 +34,7 @@
             routesUrl: @json(route('dissect.routes')),
             jobsUrl: @json(route('dissect.jobs')),
             providersUrl: @json(route('dissect.providers')),
+            domainsUrl: @json(route('dissect.domains')),
             {{-- Runtime state rather than a description of code, so this one is
                  polled rather than fetched once. --}}
             queueUrl: @json(route('dissect.queue')),

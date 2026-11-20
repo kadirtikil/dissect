@@ -3,7 +3,10 @@
 namespace KdrDev\Dissect\Routes;
 
 use Illuminate\Routing\Route;
+use KdrDev\Dissect\Architecture\ContextResolver;
 use KdrDev\Dissect\JsonApi\DocumentAnalyzer;
+use ReflectionFunction;
+use ReflectionFunctionAbstract;
 use Throwable;
 
 /**
@@ -26,6 +29,7 @@ class RouteExporter
         protected ResponseAnalyzer $responses,
         protected RouteFingerprint $fingerprint,
         protected DocumentAnalyzer $documents,
+        protected ?ContextResolver $contexts = null,
     ) {}
 
     /**
@@ -96,16 +100,40 @@ class RouteExporter
         $response = $this->attempt(fn () => $this->documents->response($route)
             ?? $this->responses->analyse($reflection));
 
+        $action = $this->attempt(fn () => $this->actions->describe($route))
+            ?? ['type' => 'unknown', 'class' => null, 'method' => null, 'label' => $route->getActionName()];
+
         return [
             'id' => self::id($described['methods'], $described['uri'], $described['domain']),
             ...$described,
             'group' => $this->attempt(fn () => $this->actions->group($route)) ?? 'other',
-            'action' => $this->attempt(fn () => $this->actions->describe($route))
-                ?? ['type' => 'unknown', 'class' => null, 'method' => null, 'label' => $route->getActionName()],
+            'action' => $action,
+            'context' => $this->attempt(fn () => $this->context($action, $reflection)),
             'parameters' => $this->attempt(fn () => $this->collector->parameters($route)) ?? [],
             'request' => $request,
             'response' => $response,
         ];
+    }
+
+    /**
+     * The domain the route's code belongs to: its controller's, or for a
+     * closure, the file it was written in (a module's own routes file).
+     *
+     * @param  array{class: ?string}  $action
+     */
+    protected function context(array $action, ?ReflectionFunctionAbstract $reflection): ?string
+    {
+        if ($this->contexts === null) {
+            return null;
+        }
+
+        if ($action['class'] !== null) {
+            return $this->contexts->forClass($action['class']);
+        }
+
+        $file = $reflection instanceof ReflectionFunction ? $reflection->getFileName() : false;
+
+        return $file === false ? null : $this->contexts->forFile($file);
     }
 
     /**

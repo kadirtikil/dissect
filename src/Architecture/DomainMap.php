@@ -137,6 +137,15 @@ final class DomainMap
     }
 
     /**
+     * When domains.json last changed, for surfaces that carry a domain per row
+     * and are cached on signals that never look at that file.
+     */
+    public function fileSignal(): int
+    {
+        return $this->file->signal();
+    }
+
+    /**
      * Every class declared under the walked folders, by its resolved path.
      *
      * @param  array<string, Context>  $contexts

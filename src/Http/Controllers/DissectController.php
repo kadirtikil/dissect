@@ -357,7 +357,8 @@ class DissectController
      * `composer update` that reshapes a payload, or a corrected
      * `DISSECT_MODELS_NAMESPACE`, leaves every file it stats untouched — and
      * the export from before would be served for the rest of the hour. The
-     * stamp covers both.
+     * stamp covers both, and domains.json, which puts a domain on every row
+     * of every surface without being a file any of their signals watch.
      */
     protected function cacheKey(string $surface, string $fingerprint): string
     {
@@ -370,6 +371,7 @@ class DissectController
         return $this->stamp ??= substr(sha1(json_encode([
             $this->packageVersion(),
             config('dissect'),
+            $this->domains->fileSignal(),
         ], JSON_PARTIAL_OUTPUT_ON_ERROR) ?: ''), 0, 12);
     }
 

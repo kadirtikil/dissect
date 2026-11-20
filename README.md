@@ -272,8 +272,14 @@ attribute that disagrees with its folder, or names a domain nothing else
 defines, is reported as a finding, because an override that has gone stale
 should be noticed rather than believed.
 
-`/dissect/domains.json` lists every domain, how it was found, the classes in
-it, the unassigned classes and the findings.
+The **Domains** page lists every domain, how it was found, its folders and its
+classes, followed by any findings and the unassigned classes. An app with no
+domains gets an empty state that lists the layouts that would count. The same
+data is served at `/dissect/domains.json`.
+
+Every model, route, job and provider is also tagged with its domain, so the
+other pages can show it. A route belongs to its controller's domain, and a
+closure route to the domain of the file it is written in.
 
 ## 🛣️ Routes
 

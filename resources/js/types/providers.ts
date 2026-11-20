@@ -56,6 +56,12 @@ export interface ProviderNode {
   file: string | null
   /** First line of the class doc block. */
   summary: string | null
+  /**
+   * The domain (bounded context) this belongs to, or null. Called `context`
+   * because routes already use `domain` for the host. Optional because a host
+   * may be running a version of the package from before it was emitted.
+   */
+  context?: string | null
 }
 
 export interface ProviderEdge {
@@ -86,6 +92,12 @@ export interface Provider {
   partial: boolean
   /** A depth or node cap cut the walk short. */
   truncated: boolean
+  /**
+   * The domain (bounded context) this belongs to, or null. Called `context`
+   * because routes already use `domain` for the host. Optional because a host
+   * may be running a version of the package from before it was emitted.
+   */
+  context?: string | null
 }
 
 export interface ProvidersFile {
