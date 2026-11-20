@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { storeToRefs } from 'pinia'
 import { Layers, X } from '@lucide/vue'
+import DomainFacet from '@/components/domains/DomainFacet.vue'
 import { useJobsStore } from '@/stores/jobs'
 import { useViewsStore } from '@/stores/views'
 import { useSchemaStore } from '@/stores/schema'
@@ -11,8 +12,17 @@ import { DEFAULT_QUEUE, MIXED_QUEUE } from '@/lib/jobFilters'
 const store = useJobsStore()
 const views = useViewsStore()
 const schema = useSchemaStore()
-const { search, kinds, queues, modelFilter, scopeToView, undispatchedOnly, facets, stats } =
-  storeToRefs(store)
+const {
+  search,
+  kinds,
+  queues,
+  contexts,
+  modelFilter,
+  scopeToView,
+  undispatchedOnly,
+  facets,
+  stats,
+} = storeToRefs(store)
 const { active } = storeToRefs(views)
 
 /**
@@ -42,6 +52,7 @@ const filtered = computed(
     kinds.value.length > 0 ||
     queues.value.length > 0 ||
     undispatchedOnly.value ||
+    contexts.value.length > 0 ||
     modelFilter.value !== null,
 )
 </script>
@@ -114,6 +125,8 @@ const filtered = computed(
         <span class="ml-1 opacity-60 tabular-nums">{{ facets.queues[queue] }}</span>
       </button>
     </div>
+
+    <DomainFacet :counts="facets.contexts" :selected="contexts" @toggle="store.toggleContext" />
 
     <div
       v-if="facets.undispatched || active || modelFilter"
