@@ -52,6 +52,20 @@ export function domainPalette(known: readonly string[], seen: Iterable<string>):
   return [...known, ...extra.sort((a, b) => a.localeCompare(b))]
 }
 
+/**
+ * The domain a relation crosses into, or null when it stays inside one.
+ *
+ * Only a relation between two models that are both in a domain, and not the
+ * same one, crosses. A model in no domain says nothing about where a boundary
+ * is, so a relation to one is never called a crossing.
+ */
+export function crossesInto(
+  from: string | null | undefined,
+  to: string | null | undefined,
+): string | null {
+  return from && to && from !== to ? to : null
+}
+
 const SOURCES: Record<string, string> = {
   config: 'domains.json',
   attribute: '#[Domain] attribute',
