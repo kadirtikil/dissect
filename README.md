@@ -685,6 +685,7 @@ php artisan dissect:export classes --format=md            # which class uses whi
 php artisan dissect:export boundaries --format=md         # where a domain breaks its rule
 php artisan dissect:export jobs --format=md               # a digest to read
 php artisan dissect:export schema --format=mermaid        # the models as an ER diagram
+php artisan dissect:export routes --format=openapi        # the API as an OpenAPI 3.1 document
 php artisan dissect:export --format=md --output=docs/app.md
 php artisan dissect:check                                 # exit 1 if a domain breaks its rule
 php artisan dissect:snapshot                              # write down what the app looks like now
@@ -702,6 +703,8 @@ php artisan dissect:diff                                  # what changed since t
   most docs sites render as-is. Keys are marked `PK`, `FK` and `UK`, and a
   relation and its inverse are one line named by both ends (`invoices /
   customer`). It's for the schema only.
+- **`openapi`** describes the API routes as an OpenAPI 3.1 document. See
+  [OpenAPI](#-openapi) below. It's for the routes only.
 
 ```
 - `POST api/documents` documents.store → DocumentController@store · api
@@ -709,6 +712,40 @@ php artisan dissect:diff                                  # what changed since t
   - request (form-request StoreDocumentRequest): title* string; document_type_id* integer; tags[].name* string
   - response 201 (resource DocumentResource): id; title
 ```
+
+### 📜 OpenAPI
+
+```bash
+php artisan dissect:export routes --format=openapi --output=openapi.json
+```
+
+This writes your API as an OpenAPI 3.1 document, read from the same routes,
+form requests and API resources the Routes page shows. Nothing is annotated by
+hand, so it can't drift from the code. Commit it and a pull request that
+changes an endpoint shows the change. Or hand it to Swagger UI, Redoc,
+Postman, or a client generator.
+
+![The workbench's API, exported and opened in Redoc: posts.store with its request body read from StorePostRequest](https://raw.githubusercontent.com/kadirtikil/dissect/pr-assets/openapi/redoc.png)
+
+| From the code | In the document |
+| --- | --- |
+| Each verb of an `api` route | An operation, with the route name as its summary and `operationId`. |
+| `{post}`, `{post:slug}`, `where('id', '[0-9]+')` | A path parameter, with the constraint as a pattern. |
+| `{category?}` | Two paths, with it and without: OpenAPI has no optional path parameter. |
+| A form request or `$request->validate()` | The body (or the query string, for a GET), each field with its type, bounds, `in:` values and `nullable`, and its rules as written. A form request becomes a component. A `file` field makes the body `multipart/form-data`. |
+| An API resource | A component, wrapped in `data` the way Laravel wraps it (or not, after `withoutWrapping()`). A collection is a list under `data`. |
+| `auth:sanctum`, `auth`, `auth.basic` | A security scheme per guard, of the kind its driver takes, plus a `401`. |
+| Validation | A `422` in Laravel's `{message, errors}` shape. |
+| JSON:API (`laravel-json-api`) | `application/vnd.api+json` documents, and `204` where there's no body. |
+
+What the code doesn't say, the document doesn't say either. A resource field's
+type isn't in the code (`'title' => $this->title`), so it has none, rather than
+a guessed one a client would trust. When dissect only inferred a shape, the
+operation's description says so. When it couldn't work out a response, the
+operation has a `default` response that says that instead.
+
+Its title, version, description, servers, and which route stacks it covers
+(`api` by default) are under `openapi` in `config/dissect.php`.
 
 The command works whether or not the page is enabled. It only reads your code,
 and an Artisan command can't be reached from the web, so it doesn't need the
@@ -954,6 +991,11 @@ The rest live in `config/dissect.php`:
 - **`layout_path`**: default `base_path('.dissect/layout.json')`.
 - **`views_path`**: default `base_path('.dissect/views.json')`.
 - **`snapshot_path`**: default `base_path('.dissect/snapshot.json')`, where `dissect:snapshot` writes.
+- **`watch_path`**: default `storage_path('dissect/watch.json')`, where watching keeps its snapshot.
+- **`openapi`**: what `--format=openapi` puts around the operations. `title`
+  (default: the app's name), `version` (default `1.0.0`), `description`,
+  `servers` (URLs or OpenAPI server objects; none by default), and `stacks`
+  (default `['api']`: `web` routes answer with pages).
 
 </details>
 
@@ -1125,7 +1167,6 @@ format.
 
 - 🧭 **Domain map.** Domains as nodes and the dependencies between them as
   edges. In progress.
-- 📜 **OpenAPI export** from the route shapes dissect already reads.
 - ✅ **Contract compliance**: checking that endpoints return what they promise.
 
 ## 🛠️ Contributing

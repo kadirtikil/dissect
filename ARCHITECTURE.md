@@ -210,11 +210,14 @@ DissectServiceProvider    wiring; registers routes only when enabled
   ├── Support\CodeOwnership   app / vendor / framework, for routes and provider trees alike
   ├── Support\Surfaces        every payload by name, for callers that are not the page
   ├── Support\PayloadCache    one fingerprint-keyed cache for the page, the console and MCP
-  ├── Console\ExportCommand   dissect:export — a surface as json, md or mermaid
+  ├── Console\ExportCommand   dissect:export — a surface as json, md, mermaid or openapi
   ├── Console\CheckCommand    dissect:check — exit 1 on a violation or a broken rules file;
   │                           --hook: a Claude Code PostToolUse hook, exit 2 to tell the agent
   │     ├── Digest\Markdown     a payload as one line per thing, per item reusable
   │     ├── Digest\Mermaid      the schema as an erDiagram, inverses folded
+  │     ├── OpenApi\Generator   the routes payload + config/dissect.php + config/auth.php → a document
+  │     ├── OpenApi\Document    the API routes as OpenAPI 3.1: paths, bodies, responses, security, components
+  │     ├── OpenApi\Schemas     request and response fields as JSON Schema, folded back into a tree by path
   │     └── Support\ClassNames  short class names, the rule classNames.ts uses
   ├── Console\SnapshotCommand dissect:snapshot — write .dissect/snapshot.json, atomically
   │     └── Changes\Snapshot    every model, route, job and provider, reduced to what code moves
@@ -1432,6 +1435,9 @@ are running. `tests/StateVersioningTest.php` pins all of it.
 | **The page shows the server's report as it is** | Severity and wording come from `Changes\Report`, so the page only groups, colours and filters. Judging a change again in TypeScript would be the second engine the one-engine decision rules out |
 | **The page can start watching, not snapshot** | Watching is one person's, in `storage/`, and starting it from where you're looking is the point. The committed snapshot is the team's, so it's taken in the terminal and reviewed in a PR |
 | **`dissect_changes` cannot start watching** | Every MCP tool is read-only. An agent that could move its own baseline could make its changes disappear from the report |
+| **OpenAPI is a format of the routes, built from the payload** | `dissect:export routes --format=openapi`, like `mermaid` for the schema. Built from the routes payload rather than from the router, so the document, the page and an agent never disagree about an endpoint |
+| **An OpenAPI field says only what the code says** | A resource's `'title' => $this->title` has no type in the code, so the schema has none (`{}`). A guessed `string` would be trusted by every client generated from it. The rules a request field was read from go in its description as written |
+| **An optional path parameter is two paths** | OpenAPI requires every path parameter. `feed/{category?}` is `/feed` and `/feed/{category}`, the shorter one's `operationId` saying what it leaves out |
 | **`dissect:diff` exits 0 unless `--fail-on` is given** | A diff is a report. Whether a breaking change is allowed is the team's call, made in CI with `--fail-on` |
 | **Highlight is not selection** | Canvas selection is a gesture that feeds view membership; opening an endpoint must not quietly change what a new view would contain |
 
@@ -1520,6 +1526,9 @@ Config (`config/dissect.php`): `enabled`, `path`, `middleware`,
 | Change how bad a change is judged | a rule in `Severity::rules()` (`src/Changes/Severity.php`) |
 | Change how a change is worded | `src/Changes/Wording.php` |
 | Change where baselines live, or which one is preferred | `src/Changes/Baselines.php` (`NAMES` is the order of preference) |
+| Change what an OpenAPI document says about an operation | `src/OpenApi/Document.php` (paths, parameters, bodies, responses, security) |
+| Change how a rule or a field becomes JSON Schema | `src/OpenApi/Schemas.php` |
+| Change the OpenAPI settings or where they come from | `openapi` in `config/dissect.php`, `src/OpenApi/Generator.php` |
 | Change what dissect:diff prints, or when it fails | `src/Console/DiffCommand.php`; Markdown in `Markdown::changes()` |
 | Change what the Changes page shows | `resources/js/pages/ChangesPanel.vue`, `components/changes/ChangeItem.vue`, `lib/changes.ts` |
 | Add a surface to `dissect:export` | `NAMES` and `export()` in `src/Support/Surfaces.php`, then a method in `src/Digest/Markdown.php` |
