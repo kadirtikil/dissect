@@ -17,11 +17,15 @@ use JsonException;
  *         "conventions": true,
  *         "domains": [
  *             { "name": "Identity", "paths": ["app/Models/User.php", "app/Http/Controllers/Auth"] }
- *         ]
+ *         ],
+ *         "rules": {
+ *             "Sales": { "may_use": ["Billing"], "must_not_use": ["Illuminate\\Http"] }
+ *         }
  *     }
  *
  * Paths are relative to the application root, or absolute, and `*` stands for
- * one directory name. A path may name a single file.
+ * one directory name. A path may name a single file. Rules may name any
+ * domain, however it was found: {@see BoundaryRule}.
  *
  * Read only. A file that cannot be used is reported, never fatal: the rest of
  * the page still works and the problem says what to fix.
@@ -32,6 +36,9 @@ final class DomainFile
 
     /** @var array<int, Context> */
     protected array $contexts = [];
+
+    /** @var array<string, BoundaryRule> */
+    protected array $rules = [];
 
     /** @var array<int, string> */
     protected array $problems = [];
@@ -51,6 +58,19 @@ final class DomainFile
         $this->load();
 
         return $this->contexts;
+    }
+
+    /**
+     * Each domain's boundary rule, by domain name. A domain with none is
+     * never checked.
+     *
+     * @return array<string, BoundaryRule>
+     */
+    public function rules(): array
+    {
+        $this->load();
+
+        return $this->rules;
     }
 
     /**
@@ -145,6 +165,70 @@ final class DomainFile
 
         ksort($byName);
         $this->contexts = array_values($byName);
+
+        if (array_key_exists('rules', $data)) {
+            $this->readRules($data['rules']);
+        }
+    }
+
+    /**
+     * A rule that cannot be read is left out and said so: a typo must not
+     * quietly turn a check off.
+     */
+    protected function readRules(mixed $rules): void
+    {
+        if (! is_array($rules) || ($rules !== [] && array_is_list($rules))) {
+            $this->problems[] = '"rules" must be an object keyed by domain name.';
+
+            return;
+        }
+
+        foreach ($rules as $domain => $rule) {
+            $domain = trim((string) $domain);
+
+            if (! is_array($rule) || ($rule !== [] && array_is_list($rule))) {
+                $this->problems[] = "rules.{$domain} must be an object with may_use and/or must_not_use.";
+
+                continue;
+            }
+
+            foreach (array_diff(array_keys($rule), ['may_use', 'must_not_use']) as $key) {
+                $this->problems[] = "rules.{$domain}: unknown key \"{$key}\"; a rule has may_use and must_not_use.";
+            }
+
+            $mayUse = array_key_exists('may_use', $rule) ? $this->names($rule['may_use'], "rules.{$domain}.may_use") : null;
+            $mustNotUse = array_key_exists('must_not_use', $rule)
+                ? array_map(fn (string $name) => ltrim($name, '\\'), $this->names($rule['must_not_use'], "rules.{$domain}.must_not_use") ?? [])
+                : [];
+
+            $this->rules[$domain] = new BoundaryRule($domain, $mayUse, array_values(array_unique($mustNotUse)));
+        }
+
+        ksort($this->rules);
+    }
+
+    /**
+     * A list of names, or null (with a problem) when it is not one. Null
+     * leaves `may_use` unrestricted, which is what the rule said before it
+     * was mistyped, rather than forbidding every domain on a typo.
+     *
+     * @return array<int, string>|null
+     */
+    protected function names(mixed $names, string $where): ?array
+    {
+        if (! is_array($names) || ! array_is_list($names)) {
+            $this->problems[] = "{$where} must be a list of names.";
+
+            return null;
+        }
+
+        $valid = array_filter($names, fn (mixed $name) => is_string($name) && trim($name) !== '');
+
+        if (count($valid) !== count($names)) {
+            $this->problems[] = "{$where}: every entry must be a non-empty string.";
+        }
+
+        return array_values(array_unique(array_map(trim(...), $valid)));
     }
 
     protected function context(mixed $domain, int $index): ?Context
