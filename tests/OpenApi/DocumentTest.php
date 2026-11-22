@@ -241,6 +241,42 @@ class DocumentTest extends TestCase
     }
 
     #[Test]
+    public function auth_middleware_says_who_may_call_it(): void
+    {
+        $document = Document::of([
+            $this->route('GET:api/me', ['middleware' => ['api', 'auth:sanctum']]),
+            $this->route('GET:api/either', ['middleware' => ['api', 'auth:sanctum,api']]),
+            $this->route('GET:api/session', ['middleware' => ['api', 'auth']]),
+            $this->route('GET:api/basic', ['middleware' => ['api', 'auth.basic']]),
+            $this->route('GET:api/class', ['middleware' => ['api', 'Illuminate\\Auth\\Middleware\\Authenticate:sanctum']]),
+            $this->route('GET:api/open'),
+        ], ['guards' => ['web' => 'session', 'sanctum' => 'sanctum', 'api' => 'token'], 'default_guard' => 'web', 'session_cookie' => 'app_session']);
+
+        $paths = $document['paths'];
+
+        $this->assertSame([['sanctum' => []]], $paths['/api/me']['get']['security']);
+        $this->assertSame(['$ref' => '#/components/responses/Unauthenticated'], $paths['/api/me']['get']['responses']['401']);
+        $this->assertSame([['sanctum' => []], ['api' => []]], $paths['/api/either']['get']['security']);
+        $this->assertSame([['web' => []]], $paths['/api/session']['get']['security']);
+        $this->assertSame([['basic' => []]], $paths['/api/basic']['get']['security']);
+        $this->assertSame([['sanctum' => []]], $paths['/api/class']['get']['security']);
+        $this->assertArrayNotHasKey('security', $paths['/api/open']['get']);
+        $this->assertArrayNotHasKey('401', $paths['/api/open']['get']['responses']);
+
+        $schemes = $document['components']['securitySchemes'];
+        $this->assertSame(['api', 'basic', 'sanctum', 'web'], array_keys($schemes));
+        $this->assertSame(['type' => 'apiKey', 'in' => 'cookie', 'name' => 'app_session'], array_intersect_key($schemes['web'], ['type' => 0, 'in' => 0, 'name' => 0]));
+        $this->assertSame('bearer', $schemes['sanctum']['scheme']);
+        $this->assertSame('basic', $schemes['basic']['scheme']);
+        $this->assertArrayHasKey('Unauthenticated', $document['components']['responses']);
+
+        // Scopes are a list, empty or not; a field called "security" is still a schema.
+        $this->assertStringContainsString('"sanctum": []', Document::encode($document));
+        $field = Document::of([$this->route('GET:api/x', ['response' => ['source' => 'json', 'class' => null, 'status' => null, 'confidence' => 'certain', 'fields' => [['path' => 'security', 'kind' => 'scalar', 'conditional' => false]]]])]);
+        $this->assertStringContainsString('"security": {}', Document::encode($field));
+    }
+
+    #[Test]
     public function two_resources_with_one_short_name_get_two_components(): void
     {
         $document = Document::of([

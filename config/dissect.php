@@ -288,4 +288,25 @@ return [
 
     'watch_path' => storage_path('dissect/watch.json'),
 
+    /*
+    |--------------------------------------------------------------------------
+    | OpenAPI
+    |--------------------------------------------------------------------------
+    |
+    | What `php artisan dissect:export routes --format=openapi` puts around the
+    | operations it reads from the code. `title` defaults to the app's name.
+    | `servers` are URLs (or OpenAPI server objects); left empty, the document
+    | says `/`, wherever it is served from. `stacks` are the route
+    | stacks described: `api` alone, since `web` routes answer with pages.
+    |
+    */
+
+    'openapi' => [
+        'title' => null,
+        'version' => '1.0.0',
+        'description' => null,
+        'servers' => [],
+        'stacks' => ['api'],
+    ],
+
 ];

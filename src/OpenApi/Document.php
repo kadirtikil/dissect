@@ -43,9 +43,19 @@ final class Document
 
     protected bool $validates = false;
 
+    /** @var array<string, array<string, mixed>> Each security scheme in use, by name. */
+    protected array $securitySchemes = [];
+
+    /** @var array<string, string> Each auth guard, keyed to its driver. */
+    protected array $guards = [];
+
+    protected string $defaultGuard = 'web';
+
+    protected string $sessionCookie = 'laravel_session';
+
     /**
      * @param  array<int, array<string, mixed>>  $routes  The routes payload's `routes`.
-     * @param  array{title?: string, version?: string, description?: string|null, servers?: array<int, string|array<string, mixed>>, stacks?: array<int, string>}  $options
+     * @param  array{title?: string, version?: string, description?: string|null, servers?: array<int, string|array<string, mixed>>, stacks?: array<int, string>, guards?: array<string, string>, default_guard?: string, session_cookie?: string}  $options
      * @return array<string, mixed>
      */
     public static function of(array $routes, array $options = []): array
@@ -61,6 +71,10 @@ final class Document
     protected function build(array $routes, array $options): array
     {
         $stacks = $options['stacks'] ?? ['api'];
+        $this->guards = $options['guards'] ?? [];
+        $this->defaultGuard = $options['default_guard'] ?? 'web';
+        $this->sessionCookie = $options['session_cookie'] ?? 'laravel_session';
+
         $routes = array_values(array_filter($routes, fn (array $route) => in_array($route['stack'] ?? null, $stacks, true) && ! self::ours($route)));
 
         $this->name($routes);
@@ -105,8 +119,17 @@ final class Document
             $components['schemas'] = $this->schemas;
         }
 
+        if ($this->securitySchemes !== []) {
+            $components['responses']['Unauthenticated'] = self::unauthenticated();
+        }
+
         if ($this->validates) {
-            $components['responses'] = ['ValidationError' => self::validationError()];
+            $components['responses']['ValidationError'] = self::validationError();
+        }
+
+        if ($this->securitySchemes !== []) {
+            ksort($this->securitySchemes);
+            $components['securitySchemes'] = $this->securitySchemes;
         }
 
         if ($components !== []) {
@@ -131,8 +154,8 @@ final class Document
      * Every empty map as an object, so it is written `{}`.
      *
      * PHP has one empty array for both, and json_encode writes it `[]`. An
-     * empty schema (a field whose type nothing says) must be `{}`, and a
-     * document has no empty list.
+     * empty schema (a field whose type nothing says) must be `{}`; the one
+     * empty list a document has is a security requirement's scopes.
      */
     protected static function objects(mixed $value): mixed
     {
@@ -145,7 +168,12 @@ final class Document
         }
 
         foreach ($value as $key => $child) {
-            $value[$key] = self::objects($child);
+            // An operation's security: a list of requirements, each naming
+            // schemes with their scopes, which are lists and stay lists. A
+            // field called "security" is a schema, never a list.
+            $value[$key] = $key === 'security' && is_array($child) && $child !== [] && array_is_list($child)
+                ? $child
+                : self::objects($child);
         }
 
         return $value;
@@ -270,6 +298,13 @@ final class Document
         }
 
         $operation['responses'] = $this->responses($route, $fields !== []);
+
+        $security = $this->security($route['middleware'] ?? []);
+
+        if ($security !== []) {
+            $operation['security'] = $security;
+            $operation['responses']['401'] = ['$ref' => '#/components/responses/Unauthenticated'];
+        }
 
         return $operation;
     }
@@ -540,6 +575,56 @@ final class Document
         return ['$ref' => '#/components/schemas/'.$name];
     }
 
+    /**
+     * Who may call the route, read off its auth middleware: `auth`,
+     * `auth:sanctum,api` (either will do) or `auth.basic`. Each guard is a
+     * security scheme named after it, of the kind its driver takes.
+     *
+     * @param  array<int, string>  $middleware
+     * @return array<int, array<string, array<int, string>>>
+     */
+    protected function security(array $middleware): array
+    {
+        $requirements = [];
+
+        foreach ($middleware as $entry) {
+            [$name, $arguments] = array_pad(explode(':', (string) $entry, 2), 2, null);
+            $name = ClassNames::base($name);
+
+            if ($name === 'auth.basic' || $name === 'AuthenticateWithBasicAuth') {
+                $this->securitySchemes['basic'] ??= ['type' => 'http', 'scheme' => 'basic', 'description' => 'HTTP basic authentication.'];
+                $requirements[] = ['basic' => []];
+
+                continue;
+            }
+
+            if ($name !== 'auth' && $name !== 'Authenticate') {
+                continue;
+            }
+
+            $guards = $arguments === null || $arguments === '' ? [$this->defaultGuard] : array_map('trim', explode(',', $arguments));
+
+            foreach ($guards as $guard) {
+                $scheme = (string) preg_replace('/[^A-Za-z0-9._-]/', '-', $guard);
+                $this->securitySchemes[$scheme] ??= $this->scheme($guard);
+                $requirements[] = [$scheme => []];
+            }
+        }
+
+        return $requirements;
+    }
+
+    /** @return array<string, mixed> */
+    protected function scheme(string $guard): array
+    {
+        return match ($this->guards[$guard] ?? null) {
+            'session' => ['type' => 'apiKey', 'in' => 'cookie', 'name' => $this->sessionCookie, 'description' => "The session cookie of a signed-in user (the {$guard} guard)."],
+            'sanctum' => ['type' => 'http', 'scheme' => 'bearer', 'description' => "A Sanctum token (the {$guard} guard). A first-party SPA can send its session cookie instead."],
+            'passport' => ['type' => 'http', 'scheme' => 'bearer', 'description' => "A Passport access token (the {$guard} guard)."],
+            default => ['type' => 'http', 'scheme' => 'bearer', 'description' => "A bearer token for the {$guard} guard."],
+        };
+    }
+
     /** The key Laravel wraps a resource in, or null when it does not. */
     public static function wrapOf(?string $class): ?string
     {
@@ -554,6 +639,19 @@ final class Document
     protected static function ours(array $route): bool
     {
         return str_starts_with((string) ($route['action']['class'] ?? ''), 'KdrDev\\Dissect\\');
+    }
+
+    /** @return array<string, mixed> */
+    protected static function unauthenticated(): array
+    {
+        return [
+            'description' => 'Not signed in, or the credentials were not accepted.',
+            'content' => ['application/json' => ['schema' => [
+                'type' => 'object',
+                'properties' => ['message' => ['type' => 'string']],
+                'required' => ['message'],
+            ]]],
+        ];
     }
 
     /**
