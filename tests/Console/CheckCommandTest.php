@@ -8,7 +8,13 @@ use KdrDev\Dissect\Architecture\DomainFile;
 use KdrDev\Dissect\Architecture\DomainMap;
 use KdrDev\Dissect\Architecture\SourceFiles;
 use KdrDev\Dissect\Tests\Concerns\UsesDomainFixture;
+use KdrDev\Dissect\Console\CheckCommand;
 use KdrDev\Dissect\Tests\TestCase;
+use Symfony\Component\Console\Input\ArrayInput;
+use Symfony\Component\Console\Output\BufferedOutput;
+use Symfony\Component\Console\Output\ConsoleOutputInterface;
+use Symfony\Component\Console\Output\ConsoleSectionOutput;
+use Symfony\Component\Console\Output\OutputInterface;
 use PHPUnit\Framework\Attributes\Test;
 
 /**
@@ -215,5 +221,116 @@ class CheckCommandTest extends TestCase
 
         $this->assertSame(2, $code);
         $this->assertStringContainsString('Pick one of: text, json, github.', $out);
+    }
+
+    /**
+     * Runs the command the way Claude Code runs a hook: the event on stdin,
+     * stdout and stderr apart.
+     *
+     * @return array{int, string, string}  Exit code, stdout, stderr.
+     */
+    protected function hook(array|string $event): array
+    {
+        $stdin = fopen('php://memory', 'r+');
+        fwrite($stdin, is_string($event) ? $event : json_encode($event));
+        rewind($stdin);
+
+        $input = new ArrayInput(['--hook' => true]);
+        $input->setStream($stdin);
+
+        $output = new class extends BufferedOutput implements ConsoleOutputInterface
+        {
+            public OutputInterface $stderr;
+
+            public function getErrorOutput(): OutputInterface
+            {
+                return $this->stderr;
+            }
+
+            public function setErrorOutput(OutputInterface $error): void
+            {
+                $this->stderr = $error;
+            }
+
+            public function section(): ConsoleSectionOutput
+            {
+                throw new \LogicException('No sections here.');
+            }
+        };
+        $output->setErrorOutput($stderr = new BufferedOutput);
+
+        $command = $this->app->make(CheckCommand::class);
+        $command->setLaravel($this->app);
+        $code = $command->run($input, $output);
+
+        return [$code, $output->fetch(), $stderr->fetch()];
+    }
+
+    /** @return array<string, mixed> */
+    protected function edit(string $path): array
+    {
+        return [
+            'hook_event_name' => 'PostToolUse',
+            'tool_name' => 'Edit',
+            'tool_input' => ['file_path' => $path, 'old_string' => 'a', 'new_string' => 'b'],
+            'cwd' => $this->domainFixture(),
+        ];
+    }
+
+    #[Test]
+    public function the_hook_tells_the_agent_what_its_edit_broke_on_stderr(): void
+    {
+        [$code, $stdout, $stderr] = $this->hook($this->edit($this->domainFixture().'/app/Domain/Sales/Models/Customer.php'));
+
+        // 2 is what makes Claude Code show stderr to the agent.
+        $this->assertSame(2, $code);
+        $this->assertSame('', $stdout);
+        $this->assertSame(<<<'TXT'
+            dissect: this breaks a boundary rule in .dissect/domains.json:
+            - `app/Domain/Sales/Models/Customer.php:19` Sales may not use Billing: Customer → Invoice (relation, line 19).
+
+            The rule:
+            - **Sales** may use no other domain
+
+            Change the code so it keeps to the rule. The rule says where this team wants the boundary; only change .dissect/domains.json if you were asked to move it.
+
+            TXT, $stderr);
+    }
+
+    #[Test]
+    public function the_hook_is_silent_when_the_edit_keeps_to_the_rules(): void
+    {
+        $this->assertSame([0, '', ''], $this->hook($this->edit($this->domainFixture().'/app/Domain/Sales/Models/Quote.php')));
+    }
+
+    #[Test]
+    public function the_hook_ignores_what_it_cannot_judge(): void
+    {
+        // Another file type, a file outside the app, an event with no file,
+        // and something that is not an event at all.
+        $this->assertSame([0, '', ''], $this->hook($this->edit($this->domainFixture().'/README.md')));
+        $this->assertSame([0, '', ''], $this->hook($this->edit('/somewhere/else/Customer.php')));
+        $this->assertSame([0, '', ''], $this->hook(['hook_event_name' => 'PostToolUse', 'tool_name' => 'Bash', 'tool_input' => ['command' => 'ls']]));
+        $this->assertSame([0, '', ''], $this->hook('not json'));
+    }
+
+    #[Test]
+    public function the_hook_checks_the_whole_app_when_the_rules_are_edited(): void
+    {
+        [$code, , $stderr] = $this->hook($this->edit($this->domainFixture().'/.dissect/domains.json'));
+
+        $this->assertSame(2, $code);
+        $this->assertStringContainsString('Customer.php:19', $stderr);
+    }
+
+    #[Test]
+    public function the_hook_reports_a_broken_rules_file_whatever_was_edited(): void
+    {
+        $this->domainsJson(['rules' => ['Sales' => ['may_uses' => []]]]);
+
+        [$code, , $stderr] = $this->hook($this->edit($this->domainFixture().'/app/Domain/Sales/Models/Quote.php'));
+
+        $this->assertSame(2, $code);
+        $this->assertStringContainsString("domains.json has a problem, so its boundary rules are not all checked:\n- rules.Sales: unknown key \"may_uses\"", $stderr);
     }
 }

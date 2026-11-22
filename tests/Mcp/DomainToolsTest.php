@@ -4,6 +4,7 @@ namespace KdrDev\Dissect\Tests\Mcp;
 
 use KdrDev\Dissect\Mcp\DissectServer;
 use KdrDev\Dissect\Mcp\Payloads;
+use KdrDev\Dissect\Mcp\Tools\Check;
 use KdrDev\Dissect\Mcp\Tools\ClassReferences;
 use KdrDev\Dissect\Mcp\Tools\Domain;
 use KdrDev\Dissect\Mcp\Tools\Model;
@@ -81,5 +82,25 @@ class DomainToolsTest extends TestCase
         DissectServer::tool(ClassReferences::class)
             ->assertOk()
             ->assertSee(['# Classes', '## Between domains', '- Billing → Sales: 1 (relation 1)']);
+    }
+
+    #[Test]
+    public function check_lists_what_breaks_a_rule_and_the_rule(): void
+    {
+        DissectServer::tool(Check::class)
+            ->assertOk()
+            ->assertSee([
+                '- `app/Domain/Sales/Models/Customer.php:19` Sales may not use Billing: Customer → Invoice (relation, line 19).',
+                '- **Sales** may use no other domain',
+            ]);
+    }
+
+    #[Test]
+    public function check_narrows_to_the_files_given(): void
+    {
+        DissectServer::tool(Check::class, ['files' => ['app/Domain/Sales/Models/Quote.php']])
+            ->assertOk()
+            ->assertSee('dissect: no boundary rule is broken.')
+            ->assertDontSee('Customer.php');
     }
 }

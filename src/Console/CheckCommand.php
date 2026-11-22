@@ -7,7 +7,9 @@ use KdrDev\Dissect\Architecture\ContextResolver;
 use KdrDev\Dissect\Architecture\DomainFile;
 use KdrDev\Dissect\Architecture\SourceFiles;
 use KdrDev\Dissect\Support\Surfaces;
+use KdrDev\Dissect\Digest\Markdown;
 use Symfony\Component\Console\Formatter\OutputFormatter;
+use Symfony\Component\Console\Input\StreamableInputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 use Throwable;
 
@@ -23,13 +25,32 @@ class CheckCommand extends Command
 {
     protected $signature = 'dissect:check
         {--files=* : Only report what these files break: relative to the app root, or absolute. Repeat it, or separate with commas}
-        {--format=text : text, json for a script, or github for annotations on a pull request}';
+        {--format=text : text, json for a script, or github for annotations on a pull request}
+        {--hook : Run as a Claude Code PostToolUse hook: read the edited file from stdin, stay quiet unless it breaks a rule}';
 
     protected $description = 'Fail when a domain breaks the boundary rule in .dissect/domains.json';
 
-    public function handle(Surfaces $surfaces, DomainFile $file, SourceFiles $sources, ContextResolver $resolver): int
+    /** Exit code that makes Claude Code show stderr to the agent after an edit. */
+    public const HOOK_FEEDBACK = 2;
+
+    public function handle(Surfaces $surfaces, DomainFile $file, SourceFiles $sources, ContextResolver $resolver, Markdown $markdown): int
     {
         $format = (string) $this->option('format');
+        $hook = (bool) $this->option('hook');
+        $rulesFile = (string) config('dissect.domains.file', base_path('.dissect/domains.json'));
+        $given = $this->given();
+
+        if ($hook) {
+            $edited = $this->edited();
+
+            // Not a file edit, or not PHP: nothing this can say about it.
+            if ($edited === null || ! $this->checks($edited, $rulesFile)) {
+                return self::SUCCESS;
+            }
+
+            // An edit to the rules themselves is checked against the whole app.
+            $given = $this->same($edited, $rulesFile) ? [] : [$edited];
+        }
 
         if (! in_array($format, ['text', 'json', 'github'], true)) {
             $this->components->error("dissect:check cannot write \"{$format}\". Pick one of: text, json, github.");
@@ -40,6 +61,8 @@ class CheckCommand extends Command
         try {
             $payload = $surfaces->export('boundaries');
         } catch (Throwable $e) {
+            // A hook that cannot run must not stop the agent: exit 1 shows
+            // the user what went wrong and leaves the edit alone.
             $this->components->error("Could not check the boundaries: {$e->getMessage()}");
 
             return self::FAILURE;
@@ -51,7 +74,7 @@ class CheckCommand extends Command
         // The whole app is still read: whether Customer may name Invoice
         // depends on which domain Invoice is in, wherever it lives. Only what
         // is reported narrows, so a hook hears about the file it just wrote.
-        $only = $this->only($sources, $resolver->root());
+        $only = $given === null ? null : $this->only($given, $sources, $resolver->root());
 
         if ($only !== null) {
             $violations = array_values(array_filter($violations, fn (array $v) => isset($only[$v['file']])));
@@ -60,12 +83,26 @@ class CheckCommand extends Command
 
         $passed = $problems === [] && $violations === [];
 
+        if ($hook) {
+            if ($passed) {
+                return self::SUCCESS;
+            }
+
+            $this->output->getErrorStyle()->write($markdown->check([
+                'passed' => $passed,
+                'rules' => $payload['rules'],
+                'violations' => $violations,
+                'problems' => $problems,
+                'unchecked' => $payload['unchecked'],
+            ]), false, OutputInterface::OUTPUT_RAW);
+
+            return self::HOOK_FEEDBACK;
+        }
+
         if ($format === 'json') {
             $this->json($payload, $problems, $violations, $passed);
         } elseif ($format === 'github') {
-            $rulesFile = $sources->relative((string) config('dissect.domains.file', base_path('.dissect/domains.json')));
-
-            $this->github($payload, $problems, $violations, $rulesFile);
+            $this->github($payload, $problems, $violations, $sources->relative($rulesFile));
             $this->summary($payload, $problems, $violations);
         } else {
             $this->report($payload, $problems, $violations);
@@ -177,13 +214,17 @@ class CheckCommand extends Command
     }
 
     /**
-     * The files asked about, as the payload names them (relative to the app
-     * root, forward slashes), or null for every file.
+     * The paths given with --files, split on commas; null when the option
+     * was not given at all, so an empty `--files=` asks about no file.
      *
-     * @return array<string, true>|null
+     * @return array<int, string>|null
      */
-    protected function only(SourceFiles $sources, string $root): ?array
+    protected function given(): ?array
     {
+        if ($this->option('files') === []) {
+            return null;
+        }
+
         $given = [];
 
         foreach ((array) $this->option('files') as $option) {
@@ -194,6 +235,18 @@ class CheckCommand extends Command
             }
         }
 
+        return $given;
+    }
+
+    /**
+     * The given files as the payload names them: relative to the app root,
+     * forward slashes.
+     *
+     * @param  array<int, string>  $given
+     * @return array<string, true>|null  Null when every file is wanted.
+     */
+    protected function only(array $given, SourceFiles $sources, string $root): ?array
+    {
         if ($given === [] && $this->option('files') === []) {
             return null;
         }
@@ -208,6 +261,32 @@ class CheckCommand extends Command
         }
 
         return $only;
+    }
+
+    /**
+     * The file a Claude Code hook says was just edited, from the event on
+     * stdin, or null when there is none. Write and Edit both send an absolute
+     * `tool_input.file_path`.
+     */
+    protected function edited(): ?string
+    {
+        $stream = $this->input instanceof StreamableInputInterface ? $this->input->getStream() : null;
+        $stream ??= fopen('php://stdin', 'r');
+        $event = $stream === false ? null : json_decode((string) stream_get_contents($stream), true);
+        $path = is_array($event) ? ($event['tool_input']['file_path'] ?? null) : null;
+
+        return is_string($path) && $path !== '' ? $path : null;
+    }
+
+    /** A PHP file, or the rules file itself. */
+    protected function checks(string $edited, string $rulesFile): bool
+    {
+        return str_ends_with(strtolower($edited), '.php') || $this->same($edited, $rulesFile);
+    }
+
+    protected function same(string $a, string $b): bool
+    {
+        return (realpath($a) ?: $a) === (realpath($b) ?: $b);
     }
 
     protected function rules(int $count): string

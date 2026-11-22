@@ -388,8 +388,53 @@ checked, and doesn't fail on its own.
 - run: php artisan dissect:check --format=github
 ```
 
-> 🚧 **Coming next:** a Claude Code hook that runs `dissect:check --files` on
-> every file an agent edits, and violations on the Domains page.
+#### Catching an agent as it edits
+
+`dissect:check --hook` runs as a Claude Code
+[hook](https://code.claude.com/docs/en/hooks). After every Edit or Write it
+checks the file that was just changed. When the edit breaks a rule, it tells
+the agent at once, with the file, the line and the rule. Add this to
+`.claude/settings.json` and commit it:
+
+```json
+{
+    "hooks": {
+        "PostToolUse": [
+            {
+                "matcher": "Edit|MultiEdit|Write",
+                "hooks": [{ "type": "command", "command": "php artisan dissect:check --hook" }]
+            }
+        ]
+    }
+}
+```
+
+What the agent sees after an edit that breaks a rule:
+
+```
+dissect: this breaks a boundary rule in .dissect/domains.json:
+- `app/Domain/Sales/Models/Customer.php:19` Sales may not use Billing: Customer → Invoice (relation, line 19).
+
+The rule:
+- **Sales** may use no other domain
+
+Change the code so it keeps to the rule. The rule says where this team wants the boundary;
+only change .dissect/domains.json if you were asked to move it.
+```
+
+- It stays silent when the edit keeps to the rules, and for any file that
+  isn't PHP. An agent only hears from it when there's something to fix.
+- Editing `.dissect/domains.json` itself checks the whole app, and a rules file
+  that can't be read is reported whatever was edited.
+- If the check can't run at all (the app doesn't boot, say), you see the error
+  and the agent carries on. A broken tool never blocks an edit.
+- The command is relative to the session's directory, so it checks the
+  checkout the agent is working in, a git worktree included.
+
+The [MCP server](#-for-agents-mcp) has the same check as `dissect_check`, for
+an agent to ask before it edits rather than be told after.
+
+> 🚧 **Coming next:** violations on the Domains page.
 
 > 🚧 **Coming next: the domain map.** A graph with one node per domain and the
 > dependencies between domains as edges, so you can see the shape of the whole
@@ -700,6 +745,7 @@ clients read too:
 | `dissect_provider` | What a provider binds, what that resolves to, and what those classes need. |
 | `dissect_domain` | The domains, or every class in one. |
 | `dissect_class` | What a class uses and what uses it, by kind and line, with crossings between domains marked. |
+| `dissect_check` | Whether the code keeps to the boundary rules, for the files given or the whole app, with every violation and the rule it breaks. |
 
 Every tool is read-only and answers in the same Markdown as
 `dissect:export --format=md`. Called with no name, a tool lists everything in
