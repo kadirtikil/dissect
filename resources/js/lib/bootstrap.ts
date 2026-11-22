@@ -61,6 +61,11 @@ export interface Bootstrap {
   /** Where to POST to start watching, and DELETE to stop. */
   watchUrl?: string
   /**
+   * The API as an OpenAPI document, for the Routes page to offer as a file.
+   * Only the package can build one, so the standalone dev server has none.
+   */
+  openapiUrl?: string
+  /**
    * Every domain the folders and domains.json name, sorted. Only the names:
    * they cost a few directory listings, and they are what keeps a domain the
    * same colour on every page.

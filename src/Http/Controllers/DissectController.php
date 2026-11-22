@@ -15,6 +15,8 @@ use KdrDev\Dissect\Changes\UnreadableSnapshot;
 use KdrDev\Dissect\Exceptions\StateFileException;
 use KdrDev\Dissect\Jobs\JobExporter;
 use KdrDev\Dissect\LayoutRepository;
+use KdrDev\Dissect\OpenApi\Document;
+use KdrDev\Dissect\OpenApi\Generator;
 use KdrDev\Dissect\ProviderTree\ProviderExporter;
 use KdrDev\Dissect\Queue\QueueSnapshot;
 use KdrDev\Dissect\Routes\RouteExporter;
@@ -155,6 +157,21 @@ class DissectController
         return response()
             ->json($this->routes() + ['fingerprint' => $this->routeFingerprint()])
             ->header('Cache-Control', 'no-store');
+    }
+
+    /**
+     * The API as an OpenAPI 3.1 document: the file `dissect:export routes
+     * --format=openapi` writes, byte for byte, for the Routes page to offer.
+     *
+     * Served inline rather than as an attachment, so a viewer can fetch it by
+     * URL too; the page's link carries `download` for a browser to save it.
+     */
+    public function openapiJson(Generator $openapi): Response
+    {
+        return response(Document::encode($openapi->document()), 200, [
+            'Content-Type' => 'application/json',
+            'Cache-Control' => 'no-store',
+        ]);
     }
 
     /**

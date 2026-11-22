@@ -630,7 +630,7 @@ main.ts                 mounts App; no router (see "Decisions")
     │   ├── ViewMenu    saved views: switch, edit membership, create, delete; domain views, copy
     │   ├── ModelNode   one model: name, table, domain, relation count, columns
     │   └── GraphLegend relation families; crossings into another domain
-    ├── RoutesPanel     list ▏ detail
+    ├── RoutesPanel     list ▏ detail; OpenAPI in the header saves /openapi.json
     │   ├── RouteFilters   search + facet chips with counts, then DomainFacet
     │   ├── RouteList      grouped by controller (full class name), collapsible
     │   └── RouteDetail    verbs, middleware, params, request, response
@@ -1162,6 +1162,14 @@ that matched. One reference breaking both rules is two violations. `problems`
 here are rules naming a domain nothing defines; what is wrong with the file
 itself is in `domains.json`'s `problems`. `unchecked` lists files that did not
 parse. The fingerprint is the source walk's signal plus the rules file's.
+
+### `openapi.json` (generated — never cached, never written)
+
+The API routes as an OpenAPI 3.1 document, built by `OpenApi\Generator`
+from the routes payload. Byte for byte what `dissect:export routes
+--format=openapi` writes, so a committed file and one saved from the page
+never differ. Served inline; the Routes page's link carries `download`.
+See the README's OpenAPI section for what each part of the code becomes.
 
 ### `changes.json` (generated — never cached, never written)
 

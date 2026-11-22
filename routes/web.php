@@ -12,6 +12,7 @@ Route::get('/queue.json', [DissectController::class, 'queueJson'])->name('dissec
 Route::get('/domains.json', [DissectController::class, 'domainsJson'])->name('dissect.domains');
 Route::get('/classes.json', [DissectController::class, 'classesJson'])->name('dissect.classes');
 Route::get('/boundaries.json', [DissectController::class, 'boundariesJson'])->name('dissect.boundaries');
+Route::get('/openapi.json', [DissectController::class, 'openapiJson'])->name('dissect.openapi');
 Route::get('/changes.json', [DissectController::class, 'changesJson'])->name('dissect.changes');
 Route::post('/changes/watch', [DissectController::class, 'startWatching'])->name('dissect.changes.watch');
 Route::delete('/changes/watch', [DissectController::class, 'stopWatching'])->name('dissect.changes.unwatch');

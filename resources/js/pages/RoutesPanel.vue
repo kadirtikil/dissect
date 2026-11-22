@@ -1,10 +1,13 @@
 <script setup lang="ts">
 import { onMounted } from 'vue'
 import { storeToRefs } from 'pinia'
+import { FileDown } from '@lucide/vue'
+import { Button } from '@/components/ui/button'
 import RouteFilters from '@/components/routes/RouteFilters.vue'
 import RouteList from '@/components/routes/RouteList.vue'
 import RouteDetail from '@/components/routes/RouteDetail.vue'
-import { PAGE_CONTEXT } from '@/lib/toolbar'
+import { PAGE_ACTIONS, PAGE_CONTEXT } from '@/lib/toolbar'
+import { bootstrap } from '@/lib/bootstrap'
 import { useRoutesStore } from '@/stores/routes'
 
 const store = useRoutesStore()
@@ -14,6 +17,9 @@ const { status, error, stats } = storeToRefs(store)
 // and load() is a no-op once the list is in hand, so switching surfaces back
 // and forth costs nothing.
 onMounted(() => store.load())
+
+// Only the package can build the document; the standalone dev server has none.
+const openapiUrl = bootstrap().openapiUrl
 </script>
 
 <template>
@@ -26,6 +32,25 @@ onMounted(() => store.load())
         </template>
         <template v-else>HTTP surface</template>
       </span>
+    </Teleport>
+
+    <Teleport defer :to="PAGE_ACTIONS">
+      <!-- The same file `dissect:export routes --format=openapi` writes, for
+           somebody who would rather click than open a terminal. -->
+      <Button
+        v-if="openapiUrl"
+        as="a"
+        :href="openapiUrl"
+        download="openapi.json"
+        variant="ghost"
+        size="sm"
+        class="font-mono text-xs"
+        title="The API routes as an OpenAPI 3.1 document"
+        data-testid="openapi-download"
+      >
+        <FileDown class="size-3.5" />
+        OpenAPI
+      </Button>
     </Teleport>
 
     <div
