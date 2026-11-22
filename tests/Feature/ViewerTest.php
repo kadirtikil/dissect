@@ -24,6 +24,17 @@ class ViewerTest extends TestCase
     }
 
     #[Test]
+    public function the_page_is_told_where_the_class_index_is_without_being_given_it(): void
+    {
+        // Only the URL: building the index parses every source file, so the
+        // page fetches it when the Domains page asks.
+        $this->get('/dissect')
+            ->assertOk()
+            ->assertSee('classesUrl: '.json_encode(route('dissect.classes')), escape: false)
+            ->assertDontSee('"classes":[', escape: false);
+    }
+
+    #[Test]
     public function it_exports_models_and_their_relations(): void
     {
         $schema = $this->get('/dissect/schema.json')->assertOk()->json();
