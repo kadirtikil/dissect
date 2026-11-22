@@ -14,7 +14,7 @@ import { familyFor } from '@/lib/relations'
 import { NODE_HANDLE, handleFor, keyColumns } from '@/lib/relationHandles'
 import { layoutGraph } from '@/lib/layout'
 import { useLayoutStore } from '@/stores/layout'
-import { useViewsStore } from '@/stores/views'
+import { DOMAIN_VIEW_PREFIX, useViewsStore } from '@/stores/views'
 import { useRoutesStore } from '@/stores/routes'
 import { useJobsStore } from '@/stores/jobs'
 import { useProviderStore } from '@/stores/provider'
@@ -135,6 +135,27 @@ export const useSchemaStore = defineStore('schema', () => {
   function contextColor(name: string): string {
     return domainColor(name, palette.value)
   }
+
+  // One read-only view per domain with a model in it, in colour order. Read
+  // from the graph rather than domains.json, so it costs nothing and follows
+  // every live update. Models outside the scan have no domain.
+  useViewsStore().deriveDomainViews(() => {
+    const byDomain = new Map<string, string[]>()
+
+    for (const node of nodes.value) {
+      const context = node.data?.context
+      if (context) byDomain.set(context, [...(byDomain.get(context) ?? []), node.id])
+    }
+
+    return palette.value
+      .filter((name) => byDomain.has(name))
+      .map((name) => ({
+        id: DOMAIN_VIEW_PREFIX + name,
+        name,
+        models: byDomain.get(name)!,
+        domain: name,
+      }))
+  })
 
   const externalModels = computed(() =>
     nodes.value.filter((n) => n.data?.external).map((n) => n.id),

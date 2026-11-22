@@ -15,6 +15,21 @@ const DEV_ENDPOINT = '/__views'
 const ACTIVE_KEY = 'dissect:active-view'
 
 /**
+ * How a domain's view is addressed. A saved view's id is a slug of letters,
+ * digits and dashes, so nothing saved can ever be mistaken for one.
+ */
+export const DOMAIN_VIEW_PREFIX = 'domain:'
+
+/**
+ * A view as the canvas shows it: one somebody saved, or one a domain gives.
+ *
+ * A domain's view is derived, never stored: its members are whatever models
+ * the domain has right now, so it cannot drift from the folders. It is read
+ * only, and copied into a saved view to be edited.
+ */
+export type ShownView = GraphView & { domain?: string }
+
+/**
  * Saved views — named subsets of the graph, so a schema too big to read at once
  * can be looked at one bounded context at a time.
  *
@@ -38,7 +53,26 @@ export const useViewsStore = defineStore('views', () => {
   /** Ids currently selected on the canvas — what a new view is built from. */
   const selection = shallowRef<string[]>([])
 
-  const active = computed(() => views.value.find((v) => v.id === activeId.value) ?? null)
+  /**
+   * One view per domain with a model in it, handed over by the graph.
+   *
+   * Registered by the schema store rather than read from it, because that
+   * store already reads this one. A function, so the views follow every live
+   * update and every change to the colour order without being copied.
+   */
+  const domainSource = shallowRef<() => ShownView[]>(() => [])
+  const domainViews = computed(() => domainSource.value())
+
+  function deriveDomainViews(source: () => ShownView[]) {
+    domainSource.value = source
+  }
+
+  const active = computed<ShownView | null>(
+    () =>
+      views.value.find((v) => v.id === activeId.value) ??
+      domainViews.value.find((v) => v.id === activeId.value) ??
+      null,
+  )
 
   /**
    * Membership of the active view as a set, or null for "show everything".
@@ -126,7 +160,8 @@ export const useViewsStore = defineStore('views', () => {
    */
   async function toggleMember(id: string): Promise<boolean> {
     const current = active.value
-    if (!current) return false
+    // A domain's members are whatever its folders hold; see copyToView().
+    if (!current || current.domain) return false
 
     const isMember = current.models.includes(id)
     if (isMember && current.models.length === 1) return false
@@ -139,6 +174,19 @@ export const useViewsStore = defineStore('views', () => {
     return true
   }
 
+  /**
+   * Saves the open domain view as an ordinary view and opens that instead,
+   * so its membership can be edited. Null when no domain view is open.
+   */
+  async function copyToView(): Promise<GraphView | null> {
+    const current = active.value
+    if (!current?.domain) return null
+
+    draft.value = new Set(current.models)
+
+    return create(current.name)
+  }
+
   async function remove(id: string) {
     views.value = views.value.filter((v) => v.id !== id)
     if (activeId.value === id) setActive(null)
@@ -148,7 +196,12 @@ export const useViewsStore = defineStore('views', () => {
   function setActive(id: string | null) {
     // A view that no longer exists must not leave the graph filtered to
     // nothing with no way of telling why.
-    activeId.value = id && views.value.some((v) => v.id === id) ? id : null
+    //
+    // A domain's view is let through unchecked: views load before the graph
+    // they are derived from, and one whose domain has since gone simply
+    // resolves to no view, which shows the whole graph.
+    activeId.value =
+      id && (id.startsWith(DOMAIN_VIEW_PREFIX) || views.value.some((v) => v.id === id)) ? id : null
 
     try {
       if (activeId.value) localStorage.setItem(ACTIVE_KEY, activeId.value)
@@ -220,6 +273,7 @@ export const useViewsStore = defineStore('views', () => {
 
   return {
     views,
+    domainViews,
     loaded,
     saving,
     saveError,
@@ -231,6 +285,8 @@ export const useViewsStore = defineStore('views', () => {
     load,
     create,
     toggleMember,
+    copyToView,
+    deriveDomainViews,
     seedDraft,
     toggleDraft,
     clearDraft,
