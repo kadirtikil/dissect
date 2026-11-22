@@ -208,6 +208,10 @@ DissectServiceProvider    wiring; registers routes only when enabled
   │     ├── Digest\Markdown     a payload as one line per thing, per item reusable
   │     ├── Digest\Mermaid      the schema as an erDiagram, inverses folded
   │     └── Support\ClassNames  short class names, the rule classNames.ts uses
+  ├── Mcp\DissectServer       mcp:start dissect — read-only tools, one entry at a time
+  │     ├── Mcp\Payloads        each call's payloads from a fresh dissect:export
+  │     ├── Mcp\Lookup          an entry by any name, exact before partial
+  │     └── Mcp\Tools\*         search, model, route, job, provider, domain
   ├── QueueSnapshot           what is on the queue *right now* — never cached
   │     ├── QueueReaderFactory  driver → a reader, or the reason there isn't one
   │     │     ├── DatabaseQueueReader  three predicates over the jobs table
@@ -1190,6 +1194,9 @@ are running. `tests/StateVersioningTest.php` pins all of it.
 | **The export goes through `Surfaces`, not the controller** | The same exporter, the same cache and the same payload as the endpoint. A second path to the data would be a second set of answers that agree only until one of them changes |
 | **The Markdown digest adds nothing the payload does not say** | It is read by people and agents who will not check it against the JSON. A confidence the payload carries is printed, a cut list says how much was cut, and a relation with no known keys is shown without them rather than with a guessed pair |
 | **Mermaid is for the schema only** | Routes and jobs are lists, and a provider tree is already a tree on the page. An ER diagram is the one shape a README cannot draw any other way |
+| **MCP tools read through a fresh `dissect:export`, not in process** | The server lives as long as the agent's session, and PHP cannot unload a class. A model reflected once would keep its old relations after every edit. A process per call costs a boot, and the exporters' fingerprint caches make the rest cheap |
+| **One tool per kind of entry, Markdown out, names in** | An agent asks about the model it is editing, not the app. Returning the JSON payload would spend its context on fields it did not ask for; the digest is the same reading at a tenth the size |
+| **dissect registers laravel/mcp's provider itself** | Without it, `Mcp::local()` lands in a throwaway registrar and tools never see their arguments. Discovery usually registers it; an app that turned discovery off should not get a server that half works |
 | **Highlight is not selection** | Canvas selection is a gesture that feeds view membership; opening an endpoint must not quietly change what a new view would contain |
 
 ---
@@ -1272,6 +1279,9 @@ Config (`config/dissect.php`): `enabled`, `path`, `middleware`,
 | Add an export format | `formats()` and the `match` in `src/Console/ExportCommand.php` |
 | Change what the Markdown digest says | `src/Digest/Markdown.php` — one method per surface and one per item |
 | Change the Mermaid diagram | `src/Digest/Mermaid.php` — `CARDINALITY` for line ends, `relations()` for folding |
+| Add an MCP tool | a class in `src/Mcp/Tools/` extending `DissectTool` (with `#[IsReadOnly]`, which is not inherited), listed in `DissectServer::$tools` |
+| Change how a tool finds an entry by name | the `Lookup::find()` call in that tool, `src/Mcp/Lookup.php` for the rule |
+| Change how MCP reads payloads | `src/Mcp/Payloads.php`, bound in `DissectServiceProvider::register()` |
 | Change the theme | `resources/js/assets/main.css` (tokens), `vue-flow-theme.css` (canvas) |
 | Change the page shell | `resources/views/app.blade.php` |
 
