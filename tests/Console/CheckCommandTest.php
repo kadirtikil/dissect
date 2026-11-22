@@ -131,4 +131,38 @@ class CheckCommandTest extends TestCase
         $this->assertSame(0, $code);
         $this->assertStringContainsString('switched off', $out);
     }
+
+    #[Test]
+    public function files_narrows_what_is_reported_to_the_files_given(): void
+    {
+        // Customer breaks Sales's rule; Quote, in the same domain, does not.
+        [$code, $out] = $this->check(['--files' => ['app/Domain/Sales/Models/Quote.php']]);
+
+        $this->assertSame(0, $code);
+        $this->assertStringContainsString('No violations of 2 rules in the files given.', $out);
+
+        [$code, $out] = $this->check(['--files' => ['app/Domain/Sales/Models/Quote.php,app/Domain/Sales/Models/Customer.php']]);
+
+        $this->assertSame(1, $code);
+        $this->assertStringContainsString('Customer.php:19', $out);
+    }
+
+    #[Test]
+    public function files_may_be_absolute_or_wander_through_dots(): void
+    {
+        $customer = $this->domainFixture().'/app/Domain/Sales/Models/Customer.php';
+
+        $this->assertSame(1, $this->check(['--files' => [$customer]])[0]);
+        $this->assertSame(1, $this->check(['--files' => ['./app/Domain/Sales/../Sales/Models/Customer.php']])[0]);
+        // A file outside the app, or one just deleted, is simply not a violation.
+        $this->assertSame(0, $this->check(['--files' => ['/tmp/elsewhere.php', 'app/Gone.php']])[0]);
+    }
+
+    #[Test]
+    public function files_still_fails_on_a_broken_domains_json(): void
+    {
+        $this->domainsJson(['rules' => ['Sales' => ['may_uses' => []]]]);
+
+        $this->assertSame(1, $this->check(['--files' => ['app/Domain/Sales/Models/Quote.php']])[0]);
+    }
 }
