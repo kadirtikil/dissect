@@ -2,6 +2,7 @@
 
 namespace KdrDev\Dissect\Jobs;
 
+use KdrDev\Dissect\Architecture\ContextResolver;
 use KdrDev\Dissect\Routes\RouteFingerprint;
 use Throwable;
 
@@ -26,6 +27,7 @@ class JobExporter
         protected DispatchScanner $scanner,
         protected RouteMap $routes,
         protected RouteFingerprint $fingerprint,
+        protected ?ContextResolver $contexts = null,
     ) {}
 
     /**
@@ -100,6 +102,7 @@ class JobExporter
             ...$this->queue($job, $sites),
             'dispatched_by' => $sites,
             'models' => $this->models($job['payload']),
+            'context' => $this->contexts?->forClass($class),
         ];
     }
 

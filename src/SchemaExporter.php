@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Relations\HasOneOrManyThrough;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Str;
+use KdrDev\Dissect\Architecture\ContextResolver;
 use KdrDev\Dissect\Support\ClassFile;
 use ReflectionClass;
 use SplFileInfo;
@@ -41,6 +42,7 @@ class SchemaExporter
         protected ColumnNormalizer $columns,
         protected MigrationState $migrations,
         protected array $modelsPaths = ['app/Models'],
+        protected ?ContextResolver $contexts = null,
     ) {}
 
     /**
@@ -72,6 +74,7 @@ class SchemaExporter
                     'class' => $class,
                     'table' => $this->tableFor($class),
                     'columns' => [],
+                    'context' => $this->contexts?->forClass($class),
                 ];
 
                 continue;
@@ -85,6 +88,10 @@ class SchemaExporter
                 // The connection is passed through so columns are read with the
                 // normalizer for that model's driver, not the default one.
                 'columns' => $this->columns->normalize($info['attributes'], $info['database']),
+                // The domain the model belongs to, or null. Named `context`
+                // on every payload because routes already use `domain` for
+                // the host.
+                'context' => $this->contexts?->forClass($class),
             ];
 
             foreach ($this->normaliseRelations($class, $info['relations']) as $relation) {
