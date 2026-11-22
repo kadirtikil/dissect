@@ -1216,7 +1216,8 @@ What is left out is anything that moves without the code moving:
 `generated_at`, absolute paths (provider nodes, dispatch sites), a closure's
 `label` (its line), a dispatch's line, `confidence`, and display-only fields
 such as a column's `label`. So the same code gives the same bytes, wherever
-it is read.
+it is read. dissect's own routes are left out too: they exist only where the
+page is switched on, so CI would read each one as a route removed.
 
 An empty map inside an item is left out, because `[]` cannot say whether it
 was a map or a list, and readers treat a missing map as an empty one. A part
