@@ -33,6 +33,7 @@ class ViewerTest extends TestCase
             ->assertSee('classesUrl: '.json_encode(route('dissect.classes')), escape: false)
             ->assertSee('boundariesUrl: '.json_encode(route('dissect.boundaries')), escape: false)
             ->assertSee('changesUrl: '.json_encode(route('dissect.changes')), escape: false)
+            ->assertSee('openapiUrl: '.json_encode(route('dissect.openapi')), escape: false)
             ->assertSee('watchUrl: '.json_encode(route('dissect.changes.watch')), escape: false)
             ->assertDontSee('"classes":[', escape: false);
     }

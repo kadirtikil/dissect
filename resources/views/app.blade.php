@@ -38,6 +38,7 @@
             classesUrl: @json(route('dissect.classes')),
             boundariesUrl: @json(route('dissect.boundaries')),
             changesUrl: @json(route('dissect.changes')),
+            openapiUrl: @json(route('dissect.openapi')),
             watchUrl: @json(route('dissect.changes.watch')),
             {{-- Only the names, which cost a few directory listings: enough
                  for every page to give a domain the same colour. --}}
