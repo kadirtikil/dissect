@@ -274,4 +274,18 @@ return [
 
     'snapshot_path' => base_path('.dissect/snapshot.json'),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Watch file
+    |--------------------------------------------------------------------------
+    |
+    | A snapshot taken when someone starts watching, from the page or with
+    | `dissect:snapshot --watch`: "what changed since I sat down", or since an
+    | agent was let loose. Kept in storage/ because it is one person's session,
+    | not something the team agreed on.
+    |
+    */
+
+    'watch_path' => storage_path('dissect/watch.json'),
+
 ];

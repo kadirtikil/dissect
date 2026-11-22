@@ -3,6 +3,7 @@
 namespace KdrDev\Dissect\Console;
 
 use Illuminate\Console\Command;
+use KdrDev\Dissect\Changes\Baselines;
 use KdrDev\Dissect\Changes\Report;
 use KdrDev\Dissect\Changes\Snapshot;
 use KdrDev\Dissect\Changes\UnreadableSnapshot;
@@ -21,7 +22,7 @@ use Throwable;
 class DiffCommand extends Command
 {
     protected $signature = 'dissect:diff
-        {--against= : The snapshot to compare with, instead of the one in config/dissect.php}
+        {--against=snapshot : snapshot (the committed one), watch (since watching started), or a snapshot file}
         {--format=text : text, json for a script, or md for a pull request comment or a prompt}
         {--fail-on= : Exit 1 on a change this bad or worse: breaking, risky, or any}';
 
@@ -29,7 +30,7 @@ class DiffCommand extends Command
 
     protected const COLORS = ['breaking' => 'red', 'risky' => 'yellow', 'additive' => 'green'];
 
-    public function handle(Snapshot $snapshot, Markdown $markdown): int
+    public function handle(Snapshot $snapshot, Markdown $markdown, Baselines $baselines): int
     {
         $format = (string) $this->option('format');
         $failOn = $this->option('fail-on');
@@ -46,11 +47,12 @@ class DiffCommand extends Command
             return self::INVALID;
         }
 
-        $path = $this->path();
-        $shown = $this->shown($path);
+        $path = $this->path($baselines);
+        $shown = $baselines->shown($path);
 
         try {
-            $before = Snapshot::read($path, $shown);
+            $against = (string) $this->option('against');
+            $before = Baselines::has($against) ? $baselines->read($against) : Snapshot::read($path, $shown);
         } catch (UnreadableSnapshot $e) {
             $this->components->error($e->getMessage());
 
@@ -122,22 +124,14 @@ class DiffCommand extends Command
         $this->output->writeln("  <fg={$color}>".str_pad($severity, 9).'</>'.OutputFormatter::escape($text));
     }
 
-    protected function path(): string
+    protected function path(Baselines $baselines): string
     {
-        $against = $this->option('against');
+        $against = (string) $this->option('against');
 
-        if (is_string($against) && $against !== '') {
-            return str_starts_with($against, DIRECTORY_SEPARATOR) ? $against : getcwd().DIRECTORY_SEPARATOR.$against;
+        if (Baselines::has($against)) {
+            return $baselines->path($against);
         }
 
-        return (string) config('dissect.snapshot_path', base_path('.dissect/snapshot.json'));
-    }
-
-    /** Relative to the app when it is inside it, as a reader would type it. */
-    protected function shown(string $path): string
-    {
-        $base = rtrim(base_path(), DIRECTORY_SEPARATOR).DIRECTORY_SEPARATOR;
-
-        return str_starts_with($path, $base) ? substr($path, strlen($base)) : $path;
+        return str_starts_with($against, DIRECTORY_SEPARATOR) ? $against : getcwd().DIRECTORY_SEPARATOR.$against;
     }
 }
