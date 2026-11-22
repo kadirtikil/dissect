@@ -797,6 +797,27 @@ Or let breaking changes through only on purpose:
 A snapshot in another format (written by a different dissect version) is
 refused rather than compared: every item would look changed. Take a new one.
 
+#### Watching
+
+The committed snapshot answers "what changed since the team last agreed on
+it". Watching answers "what changed since I sat down", or since you let an
+agent loose:
+
+```bash
+php artisan dissect:snapshot --watch       # start watching
+php artisan dissect:diff --against=watch   # what changed since
+```
+
+It's a snapshot in `storage/dissect/watch.json` (`watch_path`), never committed,
+so it's yours and not the team's. Starting again restarts the clock.
+
+An agent with the [MCP server](#-for-agents-mcp) can ask `dissect_changes`
+before it finishes. It compares against watching if you started to, and the
+committed snapshot otherwise. The server's instructions ask the agent to tell
+you about anything breaking. The tool only reads, so it can't start watching
+itself. With nothing to compare against, it says so and tells the agent who
+can.
+
 ---
 
 ## 🤖 For agents (MCP)
@@ -841,6 +862,7 @@ clients read too:
 | `dissect_domain` | The domains, or every class in one. |
 | `dissect_class` | What a class uses and what uses it, by kind and line, with crossings between domains marked. |
 | `dissect_check` | Whether the code keeps to the boundary rules, for the files given or the whole app, with every violation and the rule it breaks. |
+| `dissect_changes` | What changed in models, routes, jobs and bindings since the user started watching, or since the committed snapshot, each marked breaking, risky or additive. |
 
 Every tool is read-only and answers in the same Markdown as
 `dissect:export --format=md`. Called with no name, a tool lists everything in
