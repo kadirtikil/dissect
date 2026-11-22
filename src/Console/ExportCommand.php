@@ -4,6 +4,7 @@ namespace KdrDev\Dissect\Console;
 
 use Illuminate\Console\Command;
 use Illuminate\Filesystem\Filesystem;
+use KdrDev\Dissect\Digest\Markdown;
 use KdrDev\Dissect\Support\Surfaces;
 use Symfony\Component\Console\Output\OutputInterface;
 use Throwable;
@@ -12,18 +13,19 @@ use Throwable;
  * `php artisan dissect:export`: what the page shows, without the page.
  *
  * For a terminal, a script or an agent. JSON is the same payload the page
- * reads, so anything built on one works on the other.
+ * reads, so anything built on one works on the other. Markdown is a digest of
+ * it: one line per thing, short enough to read or to paste into a prompt.
  */
 class ExportCommand extends Command
 {
     protected $signature = 'dissect:export
         {surface=all : schema, routes, jobs, providers, domains, or all}
-        {--format=json : json}
+        {--format=json : json, or md for a digest to read}
         {--output= : Write to this file instead of the terminal}';
 
     protected $description = 'Export the models, routes, jobs, providers or domains dissect reads';
 
-    public function handle(Surfaces $surfaces, Filesystem $files): int
+    public function handle(Surfaces $surfaces, Filesystem $files, Markdown $markdown): int
     {
         $surface = (string) $this->argument('surface');
         $format = (string) $this->option('format');
@@ -54,7 +56,9 @@ class ExportCommand extends Command
             return self::FAILURE;
         }
 
-        $text = $this->render($payloads, $surface === 'all');
+        $text = $format === 'md'
+            ? implode("\n", array_map($markdown->render(...), array_keys($payloads), $payloads))
+            : $this->json($surface === 'all' ? $payloads : reset($payloads));
 
         $output = $this->option('output');
 
@@ -76,16 +80,12 @@ class ExportCommand extends Command
     /** @return array<int, string> */
     protected function formats(): array
     {
-        return ['json'];
+        return ['json', 'md'];
     }
 
-    /**
-     * @param  array<string, array<string, mixed>>  $payloads
-     */
-    protected function render(array $payloads, bool $all): string
+    /** @param  array<string, mixed>  $data */
+    protected function json(array $data): string
     {
-        $data = $all ? $payloads : reset($payloads);
-
         return json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR)."\n";
     }
 }

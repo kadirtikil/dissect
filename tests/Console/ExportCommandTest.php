@@ -35,6 +35,28 @@ class ExportCommandTest extends TestCase
     }
 
     #[Test]
+    public function md_is_a_digest_of_the_same_payload(): void
+    {
+        $this->assertSame(0, Artisan::call('dissect:export', ['surface' => 'schema', '--format' => 'md']));
+        $digest = Artisan::output();
+
+        $this->assertStringStartsWith("# Models\n", $digest);
+        $this->assertStringContainsString("## Post `posts`\n`Workbench\\App\\Models\\Post`", $digest);
+        $this->assertStringNotContainsString('{', $digest);
+    }
+
+    #[Test]
+    public function md_for_all_is_every_digest_in_turn(): void
+    {
+        $this->assertSame(0, Artisan::call('dissect:export', ['--format' => 'md']));
+        $digest = Artisan::output();
+
+        $headings = array_values(array_filter(explode("\n", $digest), fn (string $line) => str_starts_with($line, '# ')));
+
+        $this->assertSame(['# Models', '# Routes', '# Jobs', '# Service providers', '# Domains'], $headings);
+    }
+
+    #[Test]
     public function it_writes_to_a_file_when_asked(): void
     {
         $path = sys_get_temp_dir().'/dissect-export-'.uniqid().'/nested/jobs.json';
