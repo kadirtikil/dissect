@@ -211,14 +211,15 @@ DissectServiceProvider    wiring; registers routes only when enabled
   ├── Support\Surfaces        every payload by name, for callers that are not the page
   ├── Support\PayloadCache    one fingerprint-keyed cache for the page, the console and MCP
   ├── Console\ExportCommand   dissect:export — a surface as json, md or mermaid
-  ├── Console\CheckCommand    dissect:check — exit 1 on a violation or a broken rules file
+  ├── Console\CheckCommand    dissect:check — exit 1 on a violation or a broken rules file;
+  │                           --hook: a Claude Code PostToolUse hook, exit 2 to tell the agent
   │     ├── Digest\Markdown     a payload as one line per thing, per item reusable
   │     ├── Digest\Mermaid      the schema as an erDiagram, inverses folded
   │     └── Support\ClassNames  short class names, the rule classNames.ts uses
   ├── Mcp\DissectServer       mcp:start dissect — read-only tools, one entry at a time
   │     ├── Mcp\Payloads        each call's payloads from a fresh dissect:export
   │     ├── Mcp\Lookup          an entry by any name, exact before partial
-  │     └── Mcp\Tools\*         search, model, route, job, provider, domain
+  │     └── Mcp\Tools\*         search, model, route, job, provider, domain, class, check
   ├── QueueSnapshot           what is on the queue *right now* — never cached
   │     ├── QueueReaderFactory  driver → a reader, or the reason there isn't one
   │     │     ├── DatabaseQueueReader  three predicates over the jobs table
@@ -1284,6 +1285,9 @@ are running. `tests/StateVersioningTest.php` pins all of it.
 | **Laravel-aware kinds win over syntax kinds** | `dispatch(new SendInvoice)` is a `new` to a parser and a dispatch to anyone reading it. A rule like "Sales may dispatch Billing's jobs but not build its models" needs the difference, and a name counted twice would inflate every number built on it |
 | **A domain without a rule is not checked** | Rules are how a team says a boundary exists. Checking every domain against an implicit "use nothing" would make the first run all noise, and an app adopting rules one domain at a time needs the others left alone |
 | **`dissect:check --files` still reads the whole app** | Whether `Customer` may name `Invoice` depends on which domain `Invoice` is in, wherever it lives. Only the report narrows. The payload cache means a second check before the next edit costs nothing |
+| **The hook says nothing unless there is something to fix** | Every word on stderr after an edit is in the agent's context for the rest of the session. A passing check, a Markdown file, an event with no file: all silent, exit 0 |
+| **A hook that cannot run exits 1, not 2** | 2 tells the agent its edit is wrong. An app that does not boot is not the agent's edit's fault; 1 shows the user the error and lets the agent carry on |
+| **The hook is `php artisan`, relative, not `${CLAUDE_PROJECT_DIR}/artisan`** | `CLAUDE_PROJECT_DIR` stays on the main checkout when a session works in a git worktree, so it would check the wrong copy of the code |
 | **`dissect:check` fails on a broken rules file** | A file that does not parse has no rules, and "no rules" passes. Without this, the easiest way to turn a guardrail off would be a missing comma |
 | **A rule that cannot be read is reported, and is never stricter than it was** | A typo in a guardrail is worse than no guardrail: it looks like a check. `may_uses` is a problem in words, and an unreadable `may_use` means "unrestricted", not "nothing" |
 | **Only app-to-app references go on the wire** | Most of every file is framework. Sending it would multiply the payload for a page that only draws the app, and the checks that need it run on the server |
