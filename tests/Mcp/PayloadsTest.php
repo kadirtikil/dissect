@@ -43,6 +43,20 @@ class PayloadsTest extends TestCase
     }
 
     #[Test]
+    public function changes_against_a_baseline_that_is_not_there_say_so_in_words(): void
+    {
+        // The workbench app has no committed snapshot: dissect:diff exits 1
+        // with the reason, which is passed on without the console's ERROR.
+        try {
+            $this->payloads()->changes('snapshot');
+            $this->fail('No snapshot, yet changes were read.');
+        } catch (RuntimeException $e) {
+            $this->assertStringStartsWith('There is no snapshot at ', $e->getMessage());
+            $this->assertStringContainsString('Take one with: php artisan dissect:snapshot', $e->getMessage());
+        }
+    }
+
+    #[Test]
     public function every_surface_is_one_process(): void
     {
         $this->assertSame(['schema', 'routes', 'jobs', 'providers', 'domains', 'classes', 'boundaries'], array_keys($this->payloads()->all()));

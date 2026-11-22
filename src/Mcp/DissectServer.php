@@ -3,6 +3,7 @@
 namespace KdrDev\Dissect\Mcp;
 
 use Composer\InstalledVersions;
+use KdrDev\Dissect\Mcp\Tools\Changes;
 use KdrDev\Dissect\Mcp\Tools\Check;
 use KdrDev\Dissect\Mcp\Tools\ClassReferences;
 use KdrDev\Dissect\Mcp\Tools\Domain;
@@ -28,7 +29,7 @@ use Laravel\Mcp\Server\Attributes\Name;
 #[Instructions(<<<'MD'
     dissect reads this Laravel app's structure from its source: models and relations, HTTP routes with request and response shapes, queued jobs and where they are dispatched, service provider bindings, domains, and which class uses which. Every answer is read fresh, so it reflects the code as it is now.
 
-    Start with dissect_search when you have a name but not its kind. Call dissect_model, dissect_route, dissect_job or dissect_provider without arguments for an index, or with a name for the full entry. Before changing a class, dissect_class says what depends on it. When the app has boundary rules between its domains, dissect_check says whether your changes keep to them; pass the files you changed. Short class names work; when two classes share one, the namespace segments that tell them apart are shown.
+    Start with dissect_search when you have a name but not its kind. Call dissect_model, dissect_route, dissect_job or dissect_provider without arguments for an index, or with a name for the full entry. Before changing a class, dissect_class says what depends on it. When the app has boundary rules between its domains, dissect_check says whether your changes keep to them; pass the files you changed. Before finishing, dissect_changes lists what your changes did to models, routes, jobs and bindings since the user started watching or since the committed snapshot, each marked breaking, risky or additive; mention anything breaking to the user. Short class names work; when two classes share one, the namespace segments that tell them apart are shown.
 
     Lines marked inferred or unknown are dissect's best reading, not a fact; check the source before relying on them. Nothing here runs the app's code.
     MD)]
@@ -43,6 +44,7 @@ class DissectServer extends Server
         Domain::class,
         ClassReferences::class,
         Check::class,
+        Changes::class,
     ];
 
     /** The version installed, so a client's logs say which dissect answered. */
