@@ -57,6 +57,38 @@ final class Snapshot
         ];
     }
 
+    /**
+     * A snapshot written earlier, to compare against.
+     *
+     * One in another format is refused rather than compared: every item
+     * would read as changed, and a real change would be lost among them.
+     *
+     * @return array<string, mixed>
+     *
+     * @throws UnreadableSnapshot
+     */
+    public static function read(string $path, string $shown): array
+    {
+        if (! is_file($path)) {
+            throw new UnreadableSnapshot("There is no snapshot at {$shown}. Take one with: php artisan dissect:snapshot");
+        }
+
+        $snapshot = json_decode((string) @file_get_contents($path), true);
+
+        if (! is_array($snapshot) || ! isset($snapshot['version']) || array_is_list($snapshot)) {
+            throw new UnreadableSnapshot("{$shown} is not a dissect snapshot. Take a new one with: php artisan dissect:snapshot");
+        }
+
+        if ($snapshot['version'] !== self::VERSION) {
+            throw new UnreadableSnapshot(
+                "{$shown} is in snapshot format ".json_encode($snapshot['version']).', and this version of dissect reads format '.self::VERSION
+                .'. Comparing across formats would show everything as changed. Take a new one with: php artisan dissect:snapshot'
+            );
+        }
+
+        return $snapshot;
+    }
+
     /** How many of each part a snapshot holds. @return array<string, int> */
     public static function counts(array $snapshot): array
     {

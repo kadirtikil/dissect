@@ -218,6 +218,11 @@ DissectServiceProvider    wiring; registers routes only when enabled
   │     └── Support\ClassNames  short class names, the rule classNames.ts uses
   ├── Console\SnapshotCommand dissect:snapshot — write .dissect/snapshot.json, atomically
   │     └── Changes\Snapshot    every model, route, job and provider, reduced to what code moves
+  ├── Console\DiffCommand     dissect:diff — what changed since the snapshot: text, json or md
+  │     ├── Changes\Diff        two snapshots → each item new, gone, or changed fact by fact
+  │     ├── Changes\Severity    breaking / risky / additive, for whoever depends on it
+  │     ├── Changes\Wording     a change as one line: "+ column refunded_at (datetime, nullable)"
+  │     └── Changes\Report      the three together, plus a summary; what every reader is given
   ├── Mcp\DissectServer       mcp:start dissect — read-only tools, one entry at a time
   │     ├── Mcp\Payloads        each call's payloads from a fresh dissect:export
   │     ├── Mcp\Lookup          an entry by any name, exact before partial
@@ -1229,7 +1234,29 @@ one line, so the file's diff in a pull request is one line per changed thing.
 
 `version` is bumped whenever a fact is added, removed or reshaped. A snapshot
 with a different version is not a baseline to compare against: it would read
-as every item having changed.
+as every item having changed. `Snapshot::read()` refuses one, and says to take
+a new one.
+
+#### How two snapshots are compared
+
+`Changes\Diff` walks both by part, then by id:
+
+- **An item in one only** is one change, `added` or `removed`, with no facts. A
+  new model is "+ model Refund", not a line per column.
+- **An item in both** is compared fact by fact, each difference with its path:
+  - a named thing new or gone as a whole, under one of `Diff::NAMED`
+    (`columns.refunded_at`);
+  - a plain value that differs (`columns.total.nullable`, false → true);
+  - a value added to or taken from a list (`middleware`, + `auth:sanctum`).
+    Lists are sets: their order is not a change.
+- **A map one side left out** is empty, since a snapshot leaves empty maps out.
+  A model's first relation is "+ relation customer".
+
+`Changes\Severity` judges each fact: new is additive, gone is breaking,
+different is risky, except where its rules say otherwise (a renamed route,
+a newly required field, a hidden column…). An item is as bad as its worst
+fact. `Changes\Wording` turns each one into a line. `Changes\Report` puts them
+together, and the summary counts items, not facts.
 
 ### The `version` field is load-bearing
 
@@ -1351,6 +1378,10 @@ are running. `tests/StateVersioningTest.php` pins all of it.
 | **A snapshot keeps only what code changes move** | It is committed and compared against. A timestamp, an absolute path or a closure's line would make every snapshot differ from the last, and a diff full of those hides the one change that matters |
 | **A snapshot is facts keyed by name, not the payloads** | Payloads are lists in display order. Keyed by id and by name, two snapshots compare item by item without matching anything up, and a column moving in the table is not a change |
 | **`dissect:snapshot` replaces the file in one move** | A half-written baseline would read as everything having been removed |
+| **One diff engine, in PHP** | The terminal, an agent and the page must report the same changes in the same words. A diff written in the browser would have to be written again for the CLI and MCP, and the two would drift |
+| **Severity is about who depends on the change** | "Breaking" means something that worked stops working for a caller: a client, a `route()` call, a queued job. A column type change might be fine, so it is risky, not breaking; a newly required request field is a 422 for every old client, so it is breaking |
+| **The summary counts items, not facts** | "2 breaking" is two things somebody has to look at. A model that lost five columns is one thing to look at |
+| **`dissect:diff` exits 0 unless `--fail-on` is given** | A diff is a report. Whether a breaking change is allowed is the team's call, made in CI with `--fail-on` |
 | **Highlight is not selection** | Canvas selection is a gesture that feeds view membership; opening an endpoint must not quietly change what a new view would contain |
 
 ---
@@ -1435,6 +1466,9 @@ Config (`config/dissect.php`): `enabled`, `path`, `middleware`,
 | Change the domain chips on the lists | `resources/js/components/domains/DomainFacet.vue`, and `contexts` in each of `lib/{route,job,provider}Filters.ts` |
 | Change domain colours or how a source is worded | `resources/js/lib/domains.ts` |
 | Change what a snapshot keeps | `src/Changes/Snapshot.php`, then bump `Snapshot::VERSION` |
+| Change how bad a change is judged | a rule in `Severity::rules()` (`src/Changes/Severity.php`) |
+| Change how a change is worded | `src/Changes/Wording.php` |
+| Change what dissect:diff prints, or when it fails | `src/Console/DiffCommand.php`; Markdown in `Markdown::changes()` |
 | Add a surface to `dissect:export` | `NAMES` and `export()` in `src/Support/Surfaces.php`, then a method in `src/Digest/Markdown.php` |
 | Change how long a payload is cached, or what invalidates it | `src/Support/PayloadCache.php` (the stamp), and each exporter's `fingerprint()` |
 | Add an export format | `formats()` and the `match` in `src/Console/ExportCommand.php` |

@@ -687,6 +687,7 @@ php artisan dissect:export schema --format=mermaid        # the models as an ER 
 php artisan dissect:export --format=md --output=docs/app.md
 php artisan dissect:check                                 # exit 1 if a domain breaks its rule
 php artisan dissect:snapshot                              # write down what the app looks like now
+php artisan dissect:diff                                  # what changed since then
 ```
 
 - **`json`** is exactly the payload the page reads (see the endpoints under
@@ -740,6 +741,61 @@ leaves the file alone. Nothing in it moves unless the code does: there's no
 timestamp, no absolute path, no line a closure happens to start on. Each
 column, field or setting is one line, so the file's diff is one line per
 changed thing. `--output=` writes it somewhere else.
+
+#### What changed since
+
+`dissect:diff` reads the app as it is now and compares it with the snapshot.
+Here it is after an agent added a required `slug` to the post form, made `body`
+required, dropped `excerpt` from `PostResource`, and gave `SendInvoice` a
+retry count and a new constructor argument:
+
+```
+  breaking ~ route GET api/posts
+  breaking     - response field excerpt
+  breaking ~ route POST api/posts
+  breaking     ~ request field body: now required
+  risky        - rule nullable on request field body
+  breaking     + request field slug (string, required)
+  breaking     - response field excerpt
+  …
+  risky    ~ job SendInvoice
+  risky        + argument reminder (bool)
+  risky        ~ tries none → 5
+
+   INFO  6 changes since .dissect/snapshot.json: 5 breaking, 1 risky.
+```
+
+Each change is judged for whoever already depends on the thing changed:
+
+| | Means | For example |
+| --- | --- | --- |
+| **breaking** | Something that worked stops working. | A route, column, relation or binding gone; a request field now required; a response field gone; a route renamed, so `route('old.name')` throws. |
+| **risky** | It may well be fine, but someone should look. | A column's type changed; middleware added or taken off; a rule changed; a job's queue, retries or payload changed. |
+| **additive** | Nothing that worked stops. | Anything new, or a field no longer required. |
+
+- **`--format=md`** writes the same report as Markdown, for a pull request
+  comment or a prompt. `--format=json` is for a script.
+- **`--fail-on=breaking`** exits 1 when there's a breaking change (or `risky`
+  for risky or worse, `any` for any change). Without it, a diff is a report and
+  exits 0.
+- **`--against=`** compares with another snapshot file, for example one taken
+  on `main`.
+
+In CI, keep the committed snapshot honest. A pull request that changes an
+endpoint has to update the snapshot too, so the change shows up in review:
+
+```yaml
+- run: php artisan dissect:diff --fail-on=any
+```
+
+Or let breaking changes through only on purpose:
+
+```yaml
+- run: php artisan dissect:diff --fail-on=breaking --format=md >> "$GITHUB_STEP_SUMMARY"
+```
+
+A snapshot in another format (written by a different dissect version) is
+refused rather than compared: every item would look changed. Take a new one.
 
 ---
 

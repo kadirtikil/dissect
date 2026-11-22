@@ -2,6 +2,7 @@
 
 namespace KdrDev\Dissect\Digest;
 
+use KdrDev\Dissect\Changes\Report;
 use KdrDev\Dissect\Support\ClassNames;
 
 /**
@@ -809,6 +810,44 @@ final class Markdown
     }
 
     /** @param  array<string, mixed>  $rule */
+    /**
+     * What changed since a snapshot, part by part, worst first: for a pull
+     * request comment, or for an agent to read back what it did.
+     *
+     * @param  array{summary: array<string, int>, changes: array<int, array<string, mixed>>}  $report
+     */
+    public function changes(array $report, string $against): string
+    {
+        if ($report['changes'] === []) {
+            return $this->join(["# Changes since {$against}", '', 'Nothing changed.']);
+        }
+
+        $lines = ["# Changes since {$against}", '', Report::summary($report['summary']).'.'];
+        $headings = ['models' => 'Models', 'routes' => 'Routes', 'jobs' => 'Jobs', 'providers' => 'Service providers'];
+        $part = null;
+
+        foreach ($report['changes'] as $change) {
+            if ($change['part'] !== $part) {
+                $part = $change['part'];
+                array_push($lines, '', '## '.($headings[$part] ?? $part), '');
+            }
+
+            $lines[] = '- '.$this->severity($change['severity']).' `'.$change['text'].'`'.($change['name'] !== $change['id'] && $part !== 'routes' ? ' · `'.$change['id'].'`' : '');
+
+            foreach ($change['facts'] as $fact) {
+                $lines[] = '  - '.$this->severity($fact['severity']).' `'.$fact['text'].'`';
+            }
+        }
+
+        return $this->join($lines);
+    }
+
+    /** Breaking stands out; the rest is a word. */
+    protected function severity(string $severity): string
+    {
+        return $severity === 'breaking' ? '**breaking**' : $severity;
+    }
+
     protected function rule(array $rule): string
     {
         $parts = [];
