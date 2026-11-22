@@ -8,6 +8,7 @@ use KdrDev\Dissect\Architecture\DomainFile;
 use KdrDev\Dissect\Architecture\SourceFiles;
 use KdrDev\Dissect\Support\Surfaces;
 use Symfony\Component\Console\Formatter\OutputFormatter;
+use Symfony\Component\Console\Output\OutputInterface;
 use Throwable;
 
 /**
@@ -21,12 +22,21 @@ use Throwable;
 class CheckCommand extends Command
 {
     protected $signature = 'dissect:check
-        {--files=* : Only report what these files break: relative to the app root, or absolute. Repeat it, or separate with commas}';
+        {--files=* : Only report what these files break: relative to the app root, or absolute. Repeat it, or separate with commas}
+        {--format=text : text, json for a script, or github for annotations on a pull request}';
 
     protected $description = 'Fail when a domain breaks the boundary rule in .dissect/domains.json';
 
     public function handle(Surfaces $surfaces, DomainFile $file, SourceFiles $sources, ContextResolver $resolver): int
     {
+        $format = (string) $this->option('format');
+
+        if (! in_array($format, ['text', 'json', 'github'], true)) {
+            $this->components->error("dissect:check cannot write \"{$format}\". Pick one of: text, json, github.");
+
+            return self::INVALID;
+        }
+
         try {
             $payload = $surfaces->export('boundaries');
         } catch (Throwable $e) {
@@ -48,9 +58,20 @@ class CheckCommand extends Command
             $payload['unchecked'] = array_values(array_filter($payload['unchecked'], fn (string $f) => isset($only[$f])));
         }
 
-        $this->report($payload, $problems, $violations);
+        $passed = $problems === [] && $violations === [];
 
-        return $problems === [] && $violations === [] ? self::SUCCESS : self::FAILURE;
+        if ($format === 'json') {
+            $this->json($payload, $problems, $violations, $passed);
+        } elseif ($format === 'github') {
+            $rulesFile = $sources->relative((string) config('dissect.domains.file', base_path('.dissect/domains.json')));
+
+            $this->github($payload, $problems, $violations, $rulesFile);
+            $this->summary($payload, $problems, $violations);
+        } else {
+            $this->report($payload, $problems, $violations);
+        }
+
+        return $passed ? self::SUCCESS : self::FAILURE;
     }
 
     /**
@@ -72,6 +93,18 @@ class CheckCommand extends Command
             $this->entry('red', $violation['file'].':'.($violation['lines'][0] ?? 0), $violation['message']);
         }
 
+        $this->summary($payload, $problems, $violations);
+    }
+
+    /**
+     * One line saying how it went.
+     *
+     * @param  array<string, mixed>  $payload
+     * @param  array<int, string>  $problems
+     * @param  array<int, array<string, mixed>>  $violations
+     */
+    protected function summary(array $payload, array $problems, array $violations): void
+    {
         $rules = count($payload['rules']);
 
         if (! $payload['enabled']) {
@@ -85,6 +118,62 @@ class CheckCommand extends Command
         } else {
             $this->components->info('No violations of '.$this->rules($rules).($this->option('files') !== [] ? ' in the files given' : '').'.');
         }
+    }
+
+    /**
+     * The verdict and everything behind it, for a script.
+     *
+     * @param  array<string, mixed>  $payload
+     * @param  array<int, string>  $problems
+     * @param  array<int, array<string, mixed>>  $violations
+     */
+    protected function json(array $payload, array $problems, array $violations, bool $passed): void
+    {
+        $this->output->write(json_encode([
+            'passed' => $passed,
+            'rules' => $payload['rules'],
+            'violations' => $violations,
+            'problems' => $problems,
+            'unchecked' => $payload['unchecked'],
+        ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR)."\n", false, OutputInterface::OUTPUT_RAW);
+    }
+
+    /**
+     * Workflow commands GitHub Actions turns into annotations on the lines
+     * of the pull request's diff.
+     *
+     * @param  array<string, mixed>  $payload
+     * @param  array<int, string>  $problems
+     * @param  array<int, array<string, mixed>>  $violations
+     */
+    protected function github(array $payload, array $problems, array $violations, string $rulesFile): void
+    {
+        foreach ($problems as $problem) {
+            $this->annotate('error', ['file' => $rulesFile, 'title' => 'dissect: domains.json'], $problem);
+        }
+
+        foreach ($payload['unchecked'] as $file) {
+            $this->annotate('warning', ['file' => $file, 'title' => 'dissect: not checked'], 'This file does not parse, so its boundaries were not checked.');
+        }
+
+        foreach ($violations as $violation) {
+            $this->annotate('error', [
+                'file' => $violation['file'],
+                'line' => (string) ($violation['lines'][0] ?? 1),
+                'title' => 'dissect: '.$violation['domain'].' '.$violation['rule'],
+            ], $violation['message']);
+        }
+    }
+
+    /** @param  array<string, string>  $properties */
+    protected function annotate(string $level, array $properties, string $message): void
+    {
+        $escape = fn (string $value) => str_replace(['%', "\r", "\n"], ['%25', '%0D', '%0A'], $value);
+        $property = fn (string $value) => str_replace([':', ','], ['%3A', '%2C'], $escape($value));
+
+        $pairs = array_map(fn (string $key, string $value) => $key.'='.$property($value), array_keys($properties), $properties);
+
+        $this->output->write('::'.$level.' '.implode(',', $pairs).'::'.$escape($message)."\n", false, OutputInterface::OUTPUT_RAW);
     }
 
     /**

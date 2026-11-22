@@ -165,4 +165,55 @@ class CheckCommandTest extends TestCase
 
         $this->assertSame(1, $this->check(['--files' => ['app/Domain/Sales/Models/Quote.php']])[0]);
     }
+
+    #[Test]
+    public function json_is_the_verdict_and_everything_behind_it(): void
+    {
+        [$code, $out] = $this->check(['--format' => 'json']);
+        $json = json_decode($out, true, flags: JSON_THROW_ON_ERROR);
+
+        $this->assertSame(1, $code);
+        $this->assertFalse($json['passed']);
+        $this->assertSame(['Billing', 'Sales'], array_column($json['rules'], 'domain'));
+        $this->assertSame(['app/Domain/Sales/Models/Customer.php'], array_column($json['violations'], 'file'));
+        $this->assertSame([], $json['problems']);
+
+        $this->domainsJson(['rules' => ['Sales' => ['may_use' => ['Billing']]]]);
+
+        [$code, $out] = $this->check(['--format' => 'json']);
+
+        $this->assertSame(0, $code);
+        $this->assertTrue(json_decode($out, true)['passed']);
+    }
+
+    #[Test]
+    public function github_writes_an_annotation_on_the_line(): void
+    {
+        [$code, $out] = $this->check(['--format' => 'github']);
+
+        $this->assertSame(1, $code);
+        $this->assertStringContainsString(
+            "::error file=app/Domain/Sales/Models/Customer.php,line=19,title=dissect%3A Sales may_use::Sales may not use Billing: Customer → Invoice (relation, line 19).\n",
+            $out,
+        );
+    }
+
+    #[Test]
+    public function github_points_a_rules_problem_at_the_rules_file(): void
+    {
+        $this->domainsJson(['rules' => ['Sales' => ['may_uses' => []]]]);
+
+        [, $out] = $this->check(['--format' => 'github']);
+
+        $this->assertMatchesRegularExpression('/^::error file=[^,]+,title=dissect%3A domains\.json::rules\.Sales: unknown key "may_uses"/m', $out);
+    }
+
+    #[Test]
+    public function an_unknown_format_is_refused_with_the_choices(): void
+    {
+        [$code, $out] = $this->check(['--format' => 'xml']);
+
+        $this->assertSame(2, $code);
+        $this->assertStringContainsString('Pick one of: text, json, github.', $out);
+    }
 }
