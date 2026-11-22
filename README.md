@@ -1,60 +1,91 @@
 # 🩺 dissect
 
-Visualise your Eloquent models and their relationships as an interactive graph.
+**Keep sight of your Laravel application, in the age of agentic development.**
 
-Point it at your models directory and open a page: every model becomes a node
-with its columns, every relation becomes an edge from the column that links it
-(`posts.author_id`) to the one it points at (`authors.id`). Drag nodes into an
-arrangement that makes sense, and the layout is saved to a file you can commit
-so your team sees the same picture.
+dissect is a dev-only page inside your Laravel app that draws what your code
+actually is: your models and how they relate, every endpoint and what it takes
+and returns, every job and what dispatches it, what is on your queue right now,
+what each service provider wires up, and which domain (bounded context) all of
+it belongs to.
 
-- 📦 No build step in your application — the compiled frontend ships with the package.
-- 🔌 No `vendor:publish` required to get running.
-- 🔒 Local-only by default; the viewer exposes your full schema, so it stays off in production unless you switch it on deliberately.
-- 🗂️ Save **views** — named subsets of the graph — so a schema too big to read at once can be read one bounded context at a time.
-- 🔎 Click any card to expand it: every column, with its key, unique, nullable, guarded, hidden and cast flags.
-- 🛣️ Switch to **Routes** for your HTTP surface — every endpoint, what it accepts and what it returns.
-- ⏱️ Switch to **Jobs** for everything that reaches a worker — which queue it lands on, how hard it retries, what it carries, and the endpoint that dispatches it.
-- 📡 Switch to **Queue** for what is on it *right now* — waiting, running, due next, and what failed. Live, polled, and never cached.
-- 🌲 Switch to **Providers** for what each service provider binds and what that pulls in — contract, concrete, and the constructors behind it, read from source and drawn as a tree.
+It reads your source and your framework's own metadata. It never runs your code
+to find out. Everything it shows comes from what is in the repository right
+now, so it stays correct while you, your team or your coding agents keep
+changing things.
+
+![The model graph: every model with its columns, and each relation drawn from the column that links it](https://raw.githubusercontent.com/kadirtikil/dissect/pr-assets/relation-keys/after-graph.png)
+
+## 🤔 What it's for
+
+Laravel apps grow sideways. A model gains a relation, a controller starts
+queueing a job, a provider swaps an implementation, a "Billing" folder slowly
+fills up with things that aren't billing. Each change is small and makes sense
+in its diff. Nobody sees the whole picture, and when an agent writes half the
+code, the picture moves faster than anybody can follow.
+
+dissect gives you that picture with one `composer require`:
+
+- 🧭 **Onboarding.** Open one page and see the schema, the HTTP surface and the
+  background work. No grepping, no out-of-date diagram on a wiki.
+- 🔍 **Reviewing.** Check after a change, yours or an agent's, that the
+  relation points where you meant, the endpoint validates what you expected,
+  and the job lands on the right queue.
+- 🧱 **Architecture.** See which domain every class is in, spot the classes
+  that sit in the wrong folder, and filter every list down to one domain.
+- 🚑 **Debugging.** See what is waiting, running, delayed and failed on your
+  queue, next to the code that put it there.
+
+## ✨ What you get
+
+The sidebar has one page for each question:
+
+| Page | Answers |
+| --- | --- |
+| 🏠 **Overview** | How big is this app? Model, relation and view counts, plus a way into every other page. |
+| 📦 **Models** | What does my data look like? Every Eloquent model with its columns, and each relation drawn between the columns that link it (`posts.author_id` → `authors.id`). |
+| 🛣️ **Routes** | How is it reached? Every endpoint, its middleware, the request it validates and the response it returns. |
+| ⏱️ **Jobs** | What happens in the background? Every job, queued listener, mailable and notification: its queue, retries, payload, and the endpoint that dispatches it. |
+| 📡 **Queue** | What is happening *right now*? Waiting, running, delayed and failed jobs, plus batches. Live and polled. |
+| 🌲 **Provider-Trees** | What is wired to what? Each service provider's bindings, what they resolve to, and the constructors behind them, drawn as a tree. |
+| 🧭 **Domains** | How is this app split up? Every domain, how it was found, its classes, and anything that looks out of place. |
+
+Each page has its own address (`/dissect#/routes`, `/dissect#/domains`, …), so
+you can bookmark one or link a colleague to it.
+
+And the parts that make it easy to live with:
+
+- 📦 **No build step** in your app. The compiled frontend ships with the package.
+- 🔌 **Nothing to publish.** The service provider is auto-discovered.
+- 🔒 **Local-only by default**, behind a `viewDissect` gate everywhere else.
+- 🤝 **Shared state you commit.** Node positions, saved views and hand-written
+  domains live in `.dissect/` in your project, so your whole team sees the same
+  picture.
+- ♻️ **Live updates.** Edit a model, controller, job or provider and the page
+  refreshes on its own, with no file watcher to run.
 
 ## 🚀 Quick start
 
-Not on Packagist, so install it straight from GitHub. From your application's
-root:
+dissect is not on Packagist yet, so install it straight from GitHub. From your
+application's root:
 
 ```sh
 composer config repositories.dissect vcs https://github.com/kadirtikil/dissect.git
 composer require kdr-dev/dissect --dev
 ```
 
-Then visit **`/dissect`** in your local environment. That's it — the service
-provider is auto-discovered, and there is nothing to publish or build. 🎉
+Then open **`/dissect`** in your local environment. That's it. 🎉
 
-> 💡 Composer resolves packages by tag. To track the unreleased tip instead —
-> or if no tag has been pushed yet — ask for the branch:
+> 💡 Composer resolves packages by tag. To track the unreleased tip instead, or
+> if no tag has been pushed yet, ask for the branch:
 > `composer require kdr-dev/dissect:dev-main --dev`.
 >
-> 🔑 SSH works too if you prefer it — swap the URL for
-> `git@github.com:kadirtikil/dissect.git`.
+> 🔑 SSH works too: swap the URL for `git@github.com:kadirtikil/dissect.git`.
 
-## ✅ Requirements
+<details>
+<summary>Adding the repository by hand instead</summary>
 
-- PHP 8.3+
-- Laravel 13.x
-
-Laravel 13 is a hard floor, and deliberately so. Column and relation discovery
-is delegated to the framework's own `ModelInspector` (the class behind
-`artisan model:show`), and the endpoint surface reads
-[laravel-json-api/laravel](https://laraveljsonapi.io) schemas, whose current
-release does not support anything earlier. Supporting one framework version
-well is worth more here than supporting three thinly.
-
-## 📦 Installation
-
-The quick start above uses `composer config`, which writes the repository entry
-for you. To do it by hand instead, add this to your application's
-`composer.json`:
+`composer config` writes the repository entry for you. To do it yourself, add
+this to your application's `composer.json`:
 
 ```json
 {
@@ -64,48 +95,62 @@ for you. To do it by hand instead, add this to your application's
 }
 ```
 
-Then:
+Then run `composer require kdr-dev/dissect --dev`.
 
-```sh
-composer require kdr-dev/dissect --dev
-```
+</details>
 
-Publishing the config file is optional:
+Publishing the config file is optional, since almost everything can be set from
+`.env`:
 
 ```sh
 php artisan vendor:publish --tag=dissect-config
 ```
 
-## ⚙️ Configuration
+### ✅ Requirements
 
-Everything is configurable through environment variables, so the published
-config file is usually unnecessary.
+- PHP 8.3+
+- Laravel 13.x
 
-| Variable | Default | Purpose |
-| --- | --- | --- |
-| `DISSECT_ENABLED` | unset | Unset means "on in `local` only". Set to `true`/`false` to decide explicitly. |
-| `DISSECT_PATH` | `dissect` | URL prefix the viewer is served from. |
-| `DISSECT_MODELS_PATH` | `app/Models` | Directory scanned for models. Relative paths resolve from the base path; absolute paths are used as given. For more than one, see `models.paths`. |
+Laravel 13 is a hard minimum, on purpose. Columns and relations come from the
+framework's own `ModelInspector` (the class behind `artisan model:show`), and
+the endpoint list reads [laravel-json-api](https://laraveljsonapi.io) schemas,
+whose current release supports nothing earlier. Supporting one framework
+version well is worth more here than supporting three thinly.
 
-The rest are config-file only:
+---
 
-- **`middleware`** — defaults to `['web']`. Add your auth middleware here if you enable the viewer outside local. The `viewDissect` gate check is always appended after it; see below.
-- **`models.paths`** — defaults to `[]`, which means "read `models_path`". A list of directories holding models; a `*` stands for one directory name. Each model's class name is read from its own file, so there is no namespace to configure.
-- **`layout_path`** — defaults to `base_path('.dissect/layout.json')`. Deliberately not in `storage/` (gitignored) or `vendor/` (wiped by `composer install`), because the layout is meant to be committed and shared.
-- **`views_path`** — defaults to `base_path('.dissect/views.json')`, for the same reason: "the billing models" is worth agreeing on once and reviewing in a pull request.
-- **`routes.watch_paths`** — defaults to `['app', 'routes']`. Which directories are watched to notice that the endpoint list has gone stale. Narrow it to the directories that actually hold HTTP code if your `app/` is large.
-- **`jobs.paths`** — defaults to `['app/Jobs', 'app/Listeners', 'app/Mail', 'app/Notifications']`. Where queueable classes are looked for. There is no namespace setting to match: each class is read from the `namespace` line in its own file, so an unconventional layout just needs the directory adding.
-- **`jobs.watch_paths`** — defaults to `['app', 'routes']`. Where dispatch sites are looked for, and the change signal for the job list. This is the widest walk the package does — every file is *parsed*, not just stat'd — so narrowing it is worth more here than anywhere else.
-- **`providers.paths`** — defaults to `['app/Providers']`. Where service providers are looked for. Anything in there that is a concrete `ServiceProvider` subclass counts; an abstract base provider or a helper kept beside them does not.
-- **`providers.max_depth`** — defaults to `4`. How many hops from the provider a tree follows constructors before it stops and says so.
-- **`providers.max_nodes`** — defaults to `150`. A hard cap on one tree, for the export cost on a large application rather than for the drawing.
-- **`providers.watch_paths`** — defaults to `['app']`. The change signal for the provider trees. Wider than `providers.paths` on purpose: a tree changes when a constructor anywhere down it does.
-- **`queue.rows`** — defaults to `50`. How many jobs each section of the live queue lists. The counts are always exact: a queue 40,000 deep reports 40,000 and shows you the first page.
-- **`queue.poll_interval`** — defaults to `5000` (ms). How often the queue tab re-reads while it is open.
-- **`domains.enabled`** — defaults to `true` (`DISSECT_DOMAINS`). `false` turns domain detection off entirely. See [Domains](#-domains).
-- **`domains.file`** — defaults to `base_path('.dissect/domains.json')`. Domains written down by hand.
-- **`domains.root`** — defaults to `base_path()`. Where the folder layouts are looked for.
-- **`domains.paths`** — defaults to `['app', 'src', 'Modules', 'app-modules', 'packages']`. Where classes are looked for when listing every domain's members. Each domain's own folders are always included.
+## 📦 Models
+
+The graph is the heart of dissect. Every model in your models directory becomes
+a card with its table and columns. Every relation becomes an edge from the
+column that holds the key to the column it points at, so you read
+`posts.author_id → authors.id`, not just "Post → Author".
+
+- 🎨 **Relation families.** Eloquent's eleven relation types fold into four
+  colours (has, belongs to, many-to-many, polymorphic), and polymorphic edges
+  are dashed too, so colour is never the only signal. A legend is always on
+  screen.
+- 🔎 **Expand a card** to see every column with its key, unique, nullable,
+  guarded, hidden and cast flags. From there, **Jobs** shows every job that
+  carries this model.
+- 👻 **Models outside the scan**, such as a vendor's `DatabaseNotification`,
+  show as dashed "not in scan" placeholders instead of being dropped.
+- ✋ **Drag cards** into an arrangement that makes sense. Positions are saved to
+  `.dissect/layout.json`, which you commit, so the team gets the same layout.
+  **Reset layout** puts everything back on the grid.
+
+### 🗂️ Views
+
+A large schema is easier to read one slice at a time. Pick the models you want
+(shift-drag on the canvas, or tick them in the **View** menu's model list),
+name the selection, and it is saved as a view in `.dissect/views.json`.
+
+- ➕ Tick a model to add it to the open view, untick it to take it out. Changes
+  save as you go.
+- 🧭 A model keeps the same position in every view, so switching views hides
+  models instead of rearranging the board.
+- 🤝 The file is plain JSON and meant to be committed. Which view *you* have
+  open is remembered per browser, not in the file.
 
 ### 📁 Models outside `app/Models`
 
@@ -127,104 +172,24 @@ published config. A `*` stands for one directory name:
 ],
 ```
 
-No namespace is needed: each model's class name is read from its file. Two
-models with the same class name in different domains are two nodes on the
-graph. `DISSECT_MODELS_NAMESPACE` is no longer read.
+No namespace is needed, because each model's class name is read from its own
+file. Two models with the same class name in different namespaces are two
+cards. (`DISSECT_MODELS_NAMESPACE` is no longer read.)
 
-### 🔐 What actually keeps this off your production boxes
-
-Worth being precise, because it is easy to assume more protection than there
-is. The provider is auto-discovered and boots on **every request in every
-environment** where the package is installed. One thing decides whether the
-routes register:
-
-```php
-config('dissect.enabled') === null
-    ? app()->environment('local')   // the default
-    : (bool) config('dissect.enabled');
-```
-
-So the gate is **`APP_ENV`**. Two things have to hold, and dissect controls
-neither of them:
-
-1. Production deploys with `composer install --no-dev`, so a `--dev` install is
-   genuinely absent. This is your deploy command, not something the package can
-   enforce.
-2. `APP_ENV` is not `local` there, and `DISSECT_ENABLED` was not left switched
-   on after somebody debugged something.
-
-Break either — a staging box left at `APP_ENV=local`, a deploy that installs dev
-dependencies — and the routes are live. That is why registering them is not the
-same as letting anybody in.
-
-**Outside `local`, every dissect route asks the `viewDissect` gate**, the way
-Telescope asks `viewTelescope`. No gate defined means a 403. The check is added
-after your `middleware` list, so editing that list cannot remove it. To use the
-viewer on staging, enable it and say who may see it, for example in your
-`AppServiceProvider::boot()`:
-
-```php
-use Illuminate\Support\Facades\Gate;
-
-Gate::define('viewDissect', fn ($user) => in_array($user->email, [
-    'you@example.com',
-]));
-```
-
-Give the closure a nullable user (`fn (?User $user = null) => …`) if the box is
-already behind a VPN or basic auth and guests should get in.
-
-Be clear about what the gate guards. Anyone who passes it sees:
-
-- your full schema, every route, every validation rule and every job;
-- **what is on your queues right now**: which jobs, on which queue, their
-  attempts and timings. The job's own arguments are never decoded or shown;
-- **failed jobs, including the first line of each exception**. dissect cuts SQL
-  out of database errors before showing them, but other exception messages are
-  shown as written, and applications do put user data in those;
-- two POST endpoints that write `.dissect/layout.json` and `.dissect/views.json`
-  into your project root.
-
-### 🧷 Upgrades and your files
-
-`.dissect/layout.json` and `.dissect/views.json` are yours, and they live in
-your project rather than `vendor/`, so `composer update` cannot touch them.
-
-Both files record the format version they were written in, and dissect will not
-rewrite a file written by a **newer** version than the one you are running — it
-reads it, renders what it understands, and refuses the save with a message
-rather than quietly replacing your layout with the subset it recognised. When a
-release changes the format, your file is copied to
-`.dissect/layout.json.v1.bak` before the first migrating write.
-
-Format 2 identifies models by full class name (`App\Models\Invoice`) rather than
-short name, so two `Invoice` models in different namespaces are two nodes. An
-older file is upgraded automatically. A short name two models share stays in a
-view as both models, and loses its position in the layout, since there is no
-telling which of the two was dragged there. An unparseable
-file is copied to `.dissect/layout.json.corrupt.bak` before being replaced
-(`.corrupt.2.bak` and on for later ones, so no broken hand edit is lost).
-
-Nothing here needs an upgrade step from you. It is worth knowing the refusal
-exists, so that "layout not saved" on a machine running an older dissect reads
-as a version mismatch rather than a bug.
-
-## 🗂️ Views
-
-A large schema is easier to read a slice at a time. Pick the models you want —
-shift-drag the canvas, or tick them in the **View** menu's model list — name the
-selection, and it is saved to `.dissect/views.json` as a named view you can
-switch to whenever you like.
-
-- ➕ Tick a model in the list to add it to the open view, untick it to take it back out. Changes save as you go.
-- 🧭 A model keeps the same position in every view, so switching hides models rather than rearranging the board.
-- 🤝 The file is plain JSON and meant to be committed, so your team gets the same views you do. Which one *you* have open is remembered per browser, not in the file.
+---
 
 ## 🧭 Domains
 
 If your app is split into domains (bounded contexts), dissect works out which
-domain each class belongs to. Most apps need no configuration, because the
-domains are read from the folder layout you already use:
+domain every class belongs to and shows the app through that lens. Most apps
+need no configuration at all: domains are read from the folder layout you
+already use.
+
+![The Domains page: each domain with how it was found, its folders and classes, plus findings and unassigned classes](https://raw.githubusercontent.com/kadirtikil/dissect/pr-assets/domains-page/split-app.png)
+
+### How domains are found
+
+dissect recognises these layouts:
 
 | Layout | Each domain is |
 | --- | --- |
@@ -236,9 +201,12 @@ domains are read from the folder layout you already use:
 | Layer-first sub-folders | `app/Models/{Name}` plus the same name under another layer, e.g. `app/Http/Controllers/{Name}` |
 
 An app that follows none of these has no domains, and dissect looks exactly as
-it did before.
+it does without them. A starter kit's `Auth` folders don't count as a domain,
+which is why the layer-first rule needs a matching `app/Models/{Name}`.
 
-For anything the folders don't express, write the domains down in
+### Writing domains down
+
+For anything the folders don't express, list the domains in
 `.dissect/domains.json`. Commit it, like the layout and the views:
 
 ```json
@@ -252,9 +220,12 @@ For anything the folders don't express, write the domains down in
 
 Paths are relative to the app root, a `*` stands for one directory name, and a
 path may name a single file. Add `"conventions": false` to ignore the folder
-layouts and use only the file.
+layouts and use only this file.
 
-A single class in the wrong folder can say where it belongs with an attribute:
+### Moving a single class
+
+A class that sits in the wrong folder can say where it belongs with an
+attribute:
 
 ```php
 #[Domain('Identity')]
@@ -262,36 +233,48 @@ class User extends Authenticatable {}
 ```
 
 You declare the `Domain` attribute class yourself, in any namespace. dissect
-matches it by its short name, so nothing from this dev dependency ends up in
-production code. dissect reads the attribute from the file and never loads the
-class.
+matches it by its short name and reads it from the file without loading the
+class, so nothing from this dev dependency ends up in your production code.
 
-**Who wins:** the attribute, then `domains.json`, then the folder layout. A
-class none of them claims is listed as **unassigned**, never guessed. An
-attribute that disagrees with its folder, or names a domain nothing else
-defines, is reported as a finding, because an override that has gone stale
-should be noticed rather than believed.
+### Who wins
 
-The **Domains** page lists every domain, how it was found, its folders and its
-classes, followed by any findings and the unassigned classes. An app with no
-domains gets an empty state that lists the layouts that would count. The same
-data is served at `/dissect/domains.json`.
+The attribute first, then `domains.json`, then the folder layout. A class none
+of them claims is listed as **unassigned**. It is never guessed into a domain.
 
-Every model, route, job and provider is also tagged with its domain, so the
-other pages can show it. A route belongs to its controller's domain, and a
-closure route to the domain of the file it is written in.
+Two things are reported as **findings** so they get noticed instead of quietly
+believed: an attribute that disagrees with the folder the class sits in, and an
+attribute that names a domain nothing else defines.
 
-The **Routes**, **Jobs** and **Provider-Trees** lists get a row of domain chips
-under their other filters, one per domain with rows in that list, plus
-**unassigned** for the rest. Each domain has the same colour on every page. A
-provider is in the domain its own class is in. An app with no domains sees no
-chips.
+### Where domains show up
+
+- 🧭 **The Domains page** lists every domain with how it was found (folder,
+  `domains.json`, attribute, …), its folders and its classes grouped by
+  namespace, followed by the findings and the unassigned classes. An app with
+  no domains gets an empty state that lists the layouts that would count.
+- 🏷️ **Every model, route, job and provider carries its domain**, so the other
+  pages can use it. A route belongs to its controller's domain, and a closure
+  route to the domain of the file it is written in. A provider belongs to the
+  domain of its own class, not to what it binds.
+- 🎛️ **Domain filters.** The Routes, Jobs and Provider-Trees lists show a row of
+  domain chips under their other filters: one per domain that has rows in that
+  list, plus **unassigned**. Click one to see just that domain's endpoints, jobs
+  or providers. An app with no domains sees no chips.
+- 🎨 **One colour per domain**, the same on every page, so Billing is
+  recognisably Billing wherever it appears.
+- 📄 **`/dissect/domains.json`** serves the same data as JSON, for scripts and
+  agents.
+
+> 🚧 **Coming next: the domain map.** A graph with one node per domain and the
+> dependencies between domains as edges, so you can see the shape of the whole
+> app at the domain level and click through to the classes behind each
+> dependency. It's being built now and will be documented here when it lands.
+
+---
 
 ## 🛣️ Routes
 
-The **Routes** tab is the other half of the same question. The graph says what
-your data looks like; this says how you reach it: every endpoint, what a
-request must carry, and what comes back.
+The graph says what your data looks like. The **Routes** page says how you
+reach it: every endpoint, what a request must carry, and what comes back.
 
 ```
 POST api/invoices                      Request   StoreInvoiceRequest
@@ -303,17 +286,42 @@ Response  resource · 201                 lines[].sku  string   req
   lines[]     array
 ```
 
-- 🔀 **Web / API.** The list splits into the routes your own frontend calls and the surface you have promised to the outside world, read from the middleware group each route file applies — so an API served from somewhere other than `/api` still lands in the right half.
-- 🧭 Endpoints stand on their own. They are not tied to the model graph, nothing on the graph narrows this list, and a rule that names a table is shown as written — `exists:customers,id` says what it says.
-- 🔎 Filter by path, route name, controller or verb; facet by method and by whose code it is (`app` / `vendor` / `framework`). Nothing is hidden from the export — the facets narrow it.
-- 👀 Every route always shows. Whatever you have selected or scoped elsewhere, the endpoint list is the whole table until *you* filter it here.
-- 🐢 `routes.json` is fetched when you first open the tab, not inlined — so the graph still boots with no round trips.
+- 🔀 **Web and API.** The list splits into the routes your own frontend calls
+  and the API you offer to others, based on the middleware group each route
+  file applies. An API served from somewhere other than `/api` still lands in
+  the right half.
+- 🌐 **Hosts.** Routes on different domains (hosts) are kept apart, and the host
+  is shown before the path.
+- 🔎 **Filter** by path, route name, controller or verb, and narrow by method,
+  by domain, and by whose code it is (`app`, `vendor` or `framework`). A
+  path-repository package counts as your own code.
+- 👀 **Nothing is hidden.** Whatever you have selected elsewhere, the endpoint
+  list shows every route until *you* filter it here.
+
+### 🎯 Where the shapes come from
+
+Requests are read from a `FormRequest`'s `rules()` when one is type-hinted, and
+from an inline `$request->validate([…])` otherwise. Responses are read from the
+return type and the `toArray()` of whatever `JsonResource` it names, nested
+resources included.
+
+Nothing in Laravel can be *asked* what an endpoint returns, so some of this is
+read from your source rather than run. Each shape says which:
+
+| Confidence | Meaning |
+| --- | --- |
+| `certain` | The framework produced it: `rules()` ran, or the resource declared its model with `@mixin`. |
+| `inferred` | Read from the source. Usually `rules()` could not run outside a request, or the resource never said what it wraps. |
+| `unknown` | The class was found but its shape could not be read. Treat it as incomplete. |
+
+A confidently wrong API description is worse than none, so this is shown, not
+smoothed over.
 
 ### 🧩 JSON:API
 
-Applications built on [laravel-json-api](https://laraveljsonapi.io) get their
-shapes from their **schemas**, since every route the package registers runs the
-same generic controller and a return type would say nothing.
+Apps built on [laravel-json-api](https://laraveljsonapi.io) get their shapes
+from their **schemas**, since every route that package registers runs the same
+generic controller and a return type would say nothing.
 
 ```
 POST v1/documents                      Request   JSON:API document
@@ -327,38 +335,25 @@ Response  JSON:API document  201           type        string  req
     relationships object                       data      object
 ```
 
-- 📦 The **envelope**, not the bare fields — you write `data.attributes.title`, so that is what the pane says.
-- 🔗 `posts/{post}/author` is described with the *author's* schema, and a `relationships/…` endpoint promises type and id and nothing else, because that is all a resource identifier object is.
-- 🚫 A `DELETE` says it answers `204` rather than reporting an empty body as a failure to find one.
-- ✅ Constraints come from the resource's `ResourceRequest` — rules written against `title` are shown where the value actually sits, at `data.attributes.title`.
-- 🩹 An update stays optional field by field, because a JSON:API update is a patch: the rules say what a value must look like *if you send it*, not that you have to.
+- 📦 The **envelope** is shown, not the bare fields: you write
+  `data.attributes.title`, so that is what the page says.
+- 🔗 `posts/{post}/author` is described with the *author's* schema, and a
+  `relationships/…` endpoint promises a type and an id and nothing else.
+- 🚫 A `DELETE` says it answers `204` instead of reporting an empty body as a
+  failure.
+- ✅ Rules from the resource's `ResourceRequest` are shown where the value
+  actually sits, at `data.attributes.title`.
+- 🩹 Update fields stay optional, because a JSON:API update is a patch: the rules
+  say what a value must look like *if you send it*.
 
-### 🎯 Where the shapes come from
-
-Requests are read from a `FormRequest`'s `rules()` where one is type-hinted, and
-from an inline `$request->validate([…])` otherwise. Responses are read from the
-return type and the `toArray()` of whatever `JsonResource` it names, nested
-resources included.
-
-Nothing in Laravel can be *asked* what an endpoint returns, so some of this is
-read from your source rather than run. Each shape says which:
-
-| Confidence | Meaning |
-| --- | --- |
-| `certain` | The framework itself produced it — `rules()` ran, or the resource declared its model with `@mixin`. |
-| `inferred` | Read from the source. Usually `rules()` could not run outside a request, or the resource never declared what it wraps. |
-| `unknown` | The class was found but its shape could not be read. Treat it as incomplete. |
-
-A confidently wrong API description is worse than none, so this is shown rather
-than smoothed over.
+---
 
 ## ⏱️ Jobs
 
-The **Jobs** tab answers the question a `202 Accepted` leaves behind: what is
-going to happen next, where, and carrying what. Jobs, queued listeners,
-mailables and queued notifications all end up on the same worker, so they are
-all here — found by the `ShouldQueue` interface rather than by which folder they
-sit in.
+The **Jobs** page answers the question a `202 Accepted` leaves behind: what
+happens next, where, and carrying what. Jobs, queued listeners, mailables and
+queued notifications all end up on the same worker, so they are all here,
+found by the `ShouldQueue` interface instead of by which folder they sit in.
 
 ```
 SendInvoice                            Queue     invoices
@@ -372,39 +367,39 @@ Carries                                  app/Http/…/InvoiceController.php:61
   Invoice ↗                              POST:api/invoices ↗
 ```
 
-- 🔗 **Dispatched by** links back to the endpoint that queues the job, and **Carries** jumps to the model on the graph. Expand a model card and click **Jobs** to go the other way.
-- 🧭 Grouped by queue, because the queue is the unit you point a *worker* at.
-- ⌀ Anything nothing was found to dispatch is flagged — dead code, or dispatched dynamically. It is the finding you cannot get from `queue:work`.
-- 🔎 Facet by kind and by queue; filter by name, class, queue or what dispatches it.
-- 🐢 `jobs.json` is fetched when you first open the tab, for the same reason `routes.json` is.
+- 🔗 **Dispatched by** links to the endpoint that queues the job, and
+  **Carries** jumps to the model on the graph.
+- 🧭 **Grouped by queue**, because the queue is what you point a worker at.
+- ⌀ **Never dispatched?** A job nothing dispatches is flagged: it is either
+  dead code or dispatched dynamically. That's something `queue:work` can't tell
+  you.
+- 🔎 **Filter** by name, class, queue or dispatcher, and narrow by kind, queue
+  and domain.
 
 ### 🎯 Where the queue name comes from
 
-A job that uses Laravel's `Queueable` trait **cannot** declare a `public $queue`
-property — PHP rejects it as an incompatible redefinition — so most jobs name
-their queue somewhere else. All of those places are read, and the tab says which
-one answered:
+A job using Laravel's `Queueable` trait **cannot** declare a `public $queue`
+property (PHP rejects the redefinition), so most jobs name their queue
+somewhere else. dissect reads all of those places and says which one answered:
 
 | Source | Meaning |
 | --- | --- |
-| `property` | A declared `$queue`. The usual form for a queued listener, which inherits nothing that claims the name. |
-| `constructor` | `$this->onQueue('…')` among the constructor's own statements. Not one inside an `if`: a queue that depends on the arguments is not one this can report. |
+| `property` | A declared `$queue`. The usual form for a queued listener. |
+| `constructor` | `$this->onQueue('…')` among the constructor's own statements. One inside an `if` doesn't count, since it depends on the arguments. |
 | `dispatch` | The class named none, and exactly one dispatch site chained `->onQueue('…')`. |
-| `mixed` | Two sites named two different queues. Picking one would invent a fact. |
-| `default` | Nothing anywhere named one. |
+| `mixed` | Two dispatch sites named two different queues. Picking one would invent a fact. |
+| `default` | Nothing named one. |
 
-Nothing is executed to find this out. `backoff()` and `middleware()` are read as
-source too — a `middleware()` returning `new WithoutOverlapping($this->order->id)`
-on an unconstructed job would be a fatal error, and describing your code must
-never be able to cause one.
+Nothing is executed to find this out. `backoff()` and `middleware()` are read
+from source too. Describing your code must never be able to break it.
+
+---
 
 ## 📡 Queue
 
-Every other tab describes your code. This one describes your queue, right now —
-so it is polled rather than fetched, never cached at either end, and it is the
-only page here that goes stale the moment you look away.
-
-Three tenses, because that is how anyone asks about a queue:
+Every other page describes your code. This one describes your queue, right
+now. It is polled every few seconds while open, never cached, and stops polling
+when you leave the page or hide the browser tab.
 
 ```
 database                         LISTENERS 1   MAIL 1   PUBLISHING 2
@@ -417,32 +412,33 @@ Past     Failed    2    WeeklyDigest     mail         3/3   4h ago
          Batches   2    Republish every post   86/120   2 failed   running
 ```
 
-- 🔗 Every row links to the job class on the **Jobs** tab — the same class, from the other side.
-- 🚦 `database` and `redis` can be listed. SQS, `sync`, `null` and a missing `jobs` table each say **why** they cannot be, rather than showing you an empty queue.
-- 🔀 An app with more than one queue connection gets a switcher; failures are readable even when the queue itself is not.
-- ⏸️ Polling stops when you leave the tab and when the browser tab is hidden. Nobody's queue is scanned for a page nobody is looking at.
+- 🔗 Every row links to its job class on the **Jobs** page.
+- 🚦 The `database` and `redis` drivers can be listed. SQS, `sync`, `null` and a
+  missing `jobs` table each say **why** they can't be, instead of showing an
+  empty queue.
+- 🔀 An app with several queue connections gets a switcher. Failed jobs are
+  readable even when the queue itself is not.
+- 🔢 Counts are always exact. A queue 40,000 deep reports 40,000 and lists the
+  first page.
 
-### 🕳️ The gap you should know about
+> 🕳️ **Laravel keeps no record of a job that succeeded.** It is queued, it runs,
+> it is deleted. So the history here means *what failed* and *what was
+> batched*, and an empty history means nothing failed, not that nothing ran.
+> That gap is why Horizon exists.
 
-**Laravel keeps no record of a job that succeeded.** It is queued, it runs, it
-is deleted, and nothing anywhere remembers it — which is precisely why Horizon
-exists. So "what was in the queue" means *what failed* and *what was batched*,
-and an empty history means nothing failed, not that nothing ran. The tab says
-this on the page rather than letting you infer it from a blank list.
+> 🔒 **Payloads are never unserialised.** The queue payload holds a serialised
+> instance of your job. Unserialising it would construct your objects, run
+> their `__wakeup`, and load every model a `SerializesModels` job carries.
+> dissect reads only the JSON envelope, and the payload is never put on the
+> page.
 
-### 🔒 What it will not do
+---
 
-The queue payload carries `data.command` — a serialised instance of your job.
-dissect **never unserialises it**. Doing so would construct your objects, run
-their `__wakeup`, and on a `SerializesModels` job go to the database for every
-model it carries; a tool that describes a queue must not be able to change one.
-Only the JSON envelope is read, and the payload itself is never put on the page.
+## 🌲 Provider-Trees
 
-## 🌲 Providers
-
-The **Providers** tab reads each service provider in your application and draws
-what it decides: the contracts it binds, what they resolve to, and — following
-constructor type-hints — what those classes need in turn.
+The **Provider-Trees** page reads each of your service providers and draws what
+it decides: the contracts it binds, what they resolve to, and, following
+constructor type-hints, what those classes need in turn.
 
 ```
 DocumentServiceProvider ── singleton ──▶ TextExtractor ── singleton ──▶ TikaTextExtractor
@@ -452,48 +448,269 @@ DocumentServiceProvider ── singleton ──▶ TextExtractor ── singleto
         └── contextual ──────────┘── contextual · when RenderThumbnail ──▶ VipsImageRenderer
 ```
 
-- 🧩 Contracts and the classes they resolve to are separate boxes — the difference between what somebody asks for and what they get is the whole point of a binding.
-- 🎯 `when()->needs()->give()` is drawn beside the default it overrides, labelled with who has to be asking.
-- 🔗 A provider that registers another continues into that provider's bindings rather than stopping at its name.
-- 🏷️ Side effects — events, gates, config, publishes, migrations, routes, views, commands — are counted as badges on the provider, not drawn as arrows that would bury the dependencies.
-- 〰️ The line says how sure it is: solid for what is written literally, dashed for what a constructor implied, dotted for what could not be read.
-- 🔎 Search matches a class anywhere in a tree, so "which provider wires up the transcoder?" is one word.
+- 🧩 Contracts and the classes they resolve to are separate boxes. What
+  somebody asks for versus what they get is the whole point of a binding.
+- 🎯 `when()->needs()->give()` is drawn next to the default it overrides,
+  labelled with who is asking.
+- 🔗 A provider that registers another continues into that provider's bindings.
+- 🏷️ Side effects (events, gates, config, publishes, migrations, routes, views,
+  commands) are counted as badges on the provider, so they don't bury the
+  dependencies.
+- 〰️ Line style says how sure it is: solid for what is written literally,
+  dashed for what a constructor implied, dotted for what couldn't be read.
+- 🔎 Search matches a class anywhere in any tree, so "which provider wires up
+  the transcoder?" is one word. Narrow by domain with the chips.
 
 ### 🕳️ What it cannot see
 
-Nothing is booted to find this out — registering a provider to watch what it
-binds would connect whatever its singletons connect to. So only what is written
-literally can be named. A binding built in a loop, a class name in a variable,
-or a binding tucked into a helper method is still *seen*, and shows up as a
-dotted "unresolved" box with the code as written, under a banner saying the tree
-is not fully analysed. A tree cut short by `max_depth` or `max_nodes` says that
-too.
+Nothing is booted to find this out, since registering a provider would connect
+whatever its singletons connect to. So only what is written literally can be
+named. A binding built in a loop, a class name in a variable, or a binding
+inside a helper method shows up as a dotted "unresolved" box with the code as
+written, under a banner saying the tree is not fully analysed. A tree cut short
+by `max_depth` or `max_nodes` says so too.
 
 The walk stops at framework and package code: `Illuminate\Filesystem\Filesystem`
-gets a box, and its own constructor is not read. A contract your provider type-
-hints but does not bind is a leaf — some other provider decides it, and guessing
-which would be reporting the running container as a fact about your source.
+gets a box, but its constructor isn't followed. A contract your provider
+type-hints but doesn't bind is a leaf, because some other provider decides it.
 
-Only your own providers are listed. `bootstrap/providers.php` and the providers
-packages register run into the hundreds and are nearly all vendor code.
+Only your own providers are listed. The ones in `bootstrap/providers.php` and
+those packages register run into the hundreds and are almost all vendor code.
+
+---
+
+## 🤝 Files you commit
+
+dissect keeps the things people author in a `.dissect/` folder at your project
+root. It's deliberately not in `storage/` (gitignored) or `vendor/` (wiped by
+`composer install`): these are worth agreeing on once and reviewing in a pull
+request.
+
+| File | Written by | Holds |
+| --- | --- | --- |
+| `.dissect/layout.json` | the page, when you drag a card | Where each model sits on the graph. |
+| `.dissect/views.json` | the page, when you save a view | Named subsets of the graph. |
+| `.dissect/domains.json` | you, by hand | Domains the folder layout doesn't express. Never written by dissect. |
+
+### 🧷 Upgrades and your files
+
+`composer update` can't touch these files. Each one records the format version
+it was written in, and dissect won't rewrite a file written by a **newer**
+version than the one you're running. It reads it, renders what it understands,
+and refuses the save with a message, instead of replacing your layout with the
+subset it recognised. So "layout not saved" on a machine with an older dissect
+is a version mismatch, not a bug.
+
+When a release changes the format, your file is copied to
+`.dissect/layout.json.v1.bak` before the first migrating write. An unparseable
+file is copied to `.dissect/layout.json.corrupt.bak` (then `.corrupt.2.bak` and
+so on) before being replaced, so no broken hand edit is lost.
+
+Format 2 identifies models by full class name (`App\Models\Invoice`) instead of
+short name. Older files are upgraded automatically. A short name that two
+models share stays in a view as both, and loses its position in the layout,
+since there's no telling which one was dragged there.
+
+---
+
+## ⚙️ Configuration
+
+Most settings can be changed through environment variables, so you rarely need
+the published config file.
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `DISSECT_ENABLED` | unset | Unset means "on in `local` only". Set `true` or `false` to decide explicitly. |
+| `DISSECT_PATH` | `dissect` | URL prefix the page is served from. |
+| `DISSECT_MODELS_PATH` | `app/Models` | Directory scanned for models. Relative paths resolve from the base path. For several directories, use `models.paths`. |
+| `DISSECT_DOMAINS` | `true` | `false` turns domain detection off entirely. |
+
+The rest live in `config/dissect.php`:
+
+<details>
+<summary><b>General</b></summary>
+
+- **`middleware`**: default `['web']`. Add your auth middleware here if you
+  enable the page outside local. The `viewDissect` gate check is always added
+  after this list.
+- **`layout_path`**: default `base_path('.dissect/layout.json')`.
+- **`views_path`**: default `base_path('.dissect/views.json')`.
+
+</details>
+
+<details>
+<summary><b>Models</b></summary>
+
+- **`models.paths`**: default `[]`, which means "use `models_path`". A list of
+  directories holding models, where `*` stands for one directory name.
+
+</details>
+
+<details>
+<summary><b>Domains</b></summary>
+
+- **`domains.file`**: default `base_path('.dissect/domains.json')`. Domains
+  written down by hand.
+- **`domains.root`**: default `base_path()`. Where folder layouts are looked for.
+- **`domains.paths`**: default `['app', 'src', 'Modules', 'app-modules', 'packages']`.
+  Where classes are looked for when listing every domain's members. Each
+  domain's own folders are always included.
+
+</details>
+
+<details>
+<summary><b>Routes</b></summary>
+
+- **`routes.watch_paths`**: default `['app', 'routes']`. Directories watched to
+  notice the endpoint list has changed. Narrow it to where your HTTP code lives
+  if `app/` is large.
+
+</details>
+
+<details>
+<summary><b>Jobs</b></summary>
+
+- **`jobs.paths`**: default `['app/Jobs', 'app/Listeners', 'app/Mail', 'app/Notifications']`.
+  Where queueable classes are looked for. Each class name is read from its own
+  file, so an unusual layout just needs its directory added.
+- **`jobs.watch_paths`**: default `['app', 'routes']`. Where dispatch sites are
+  looked for. This is the widest scan dissect does (every file is parsed), so
+  narrowing it helps most here.
+
+</details>
+
+<details>
+<summary><b>Providers</b></summary>
+
+- **`providers.paths`**: default `['app/Providers']`. Any concrete
+  `ServiceProvider` subclass in here counts.
+- **`providers.max_depth`**: default `4`. How many constructor hops a tree
+  follows before it stops and says so.
+- **`providers.max_nodes`**: default `150`. A hard cap per tree, to bound the
+  cost on a large app.
+- **`providers.watch_paths`**: default `['app']`. Wider than `providers.paths`
+  on purpose: a tree changes when any constructor down it does.
+
+</details>
+
+<details>
+<summary><b>Queue</b></summary>
+
+- **`queue.rows`**: default `50`. How many jobs each section lists. Counts are
+  always exact.
+- **`queue.poll_interval`**: default `5000` (ms). How often the Queue page
+  re-reads while it is open.
+
+</details>
+
+---
+
+## 🔐 Security: what keeps this off production
+
+It's easy to assume more protection than there is, so here's exactly how it
+works. The service provider is auto-discovered and boots on **every request in
+every environment** where the package is installed. One check decides whether
+the routes register:
+
+```php
+config('dissect.enabled') === null
+    ? app()->environment('local')   // the default
+    : (bool) config('dissect.enabled');
+```
+
+So the switch is **`APP_ENV`**, and two things have to hold that dissect can't
+enforce:
+
+1. Production deploys with `composer install --no-dev`, so a `--dev` install
+   isn't there at all.
+2. `APP_ENV` isn't `local` there, and nobody left `DISSECT_ENABLED=true` on
+   after debugging.
+
+Break either (a staging box left at `APP_ENV=local`, a deploy that installs dev
+dependencies) and the routes are live. That's why registering them isn't the
+same as letting anybody in.
+
+**Outside `local`, every dissect route checks the `viewDissect` gate**, the way
+Telescope checks `viewTelescope`. No gate defined means a 403. The check is
+added after your `middleware` list, so editing that list can't remove it. To use
+dissect on staging, enable it and say who may see it, for example in
+`AppServiceProvider::boot()`:
+
+```php
+use Illuminate\Support\Facades\Gate;
+
+Gate::define('viewDissect', fn ($user) => in_array($user->email, [
+    'you@example.com',
+]));
+```
+
+Give the closure a nullable user (`fn (?User $user = null) => …`) if the box is
+already behind a VPN or basic auth and guests should get in.
+
+Anyone who passes the gate sees:
+
+- your full schema, every route, every validation rule, every job, every
+  provider and every domain;
+- **what is on your queues right now**: which jobs, on which queue, with their
+  attempts and timings (never their arguments);
+- **failed jobs, including the first line of each exception**. SQL is cut out
+  of database errors, but other exception messages are shown as written, and
+  apps do put user data in those;
+- two POST endpoints that write `.dissect/layout.json` and `.dissect/views.json`
+  into your project root.
+
+---
 
 ## 🔍 How it works
 
-- **Schema** is built by `SchemaExporter` from Laravel's `ModelInspector` and cached against a fingerprint of your models directory, so the reflection and schema queries run once per model-file change rather than once per request.
-- **Routes** are read from the router itself; the request and response shapes behind them are read from your source with [nikic/php-parser](https://github.com/nikic/PHP-Parser), never by executing it. Cached against its own fingerprint, and only computed once you open the tab.
-- **Jobs** are found by interface across the configured directories, then every file under `jobs.watch_paths` is parsed for the places each one is dispatched — again read, never run. Its own fingerprint, its own cache, and only computed once you open the tab.
-- **Providers** are found by type across `providers.paths`; `register()` and `boot()` are parsed, `$bindings`/`$singletons` read by reflection, and constructors followed by reflection only — never resolved, never instantiated. Its own fingerprint over `providers.watch_paths`, its own cache, and only computed once you open the tab.
-- **The queue** is the one thing here that is not derived from your source, so it is the one thing that is never cached: `queue.json` is read on every request and the page polls it while it is open.
-- **The page** inlines schema, layout and views into the initial HTML, so it makes no XHR on boot.
-- **Live updates** work by polling that fingerprint — edit a model, and the graph refreshes without a file watcher. Edit a controller or a form request, and the endpoint list does the same; add a dispatch, and so does the job list; change a provider or a constructor under it, and so do the provider trees.
-- **Assets** are served straight from the package's `dist/` directory by a route with an allow-list of two filenames. Nothing to publish, nothing to re-publish after an upgrade.
+- **Read, never run.** Models come from Laravel's `ModelInspector`, routes from
+  the router, and everything else (request and response shapes, dispatch sites,
+  queue names, provider bindings, `#[Domain]` attributes) is parsed from your
+  source with [nikic/php-parser](https://github.com/nikic/PHP-Parser) or read by
+  reflection. No job is constructed, no provider is booted, no container
+  binding is resolved.
+- **Cached against fingerprints.** Each surface caches its result against a
+  fingerprint of the files it depends on, so the expensive work runs once per
+  change, not once per request. Editing `.dissect/domains.json` invalidates the
+  surfaces that carry a domain.
+- **Fast first paint.** The schema, layout and views are inlined into the
+  initial HTML, so the page makes no requests on boot. Routes, jobs, providers
+  and domains are fetched the first time you open their page.
+- **Live by polling.** The page polls those fingerprints, so editing a model, a
+  controller, a dispatch or a constructor refreshes the right page without a
+  file watcher.
+- **The queue is the exception.** It's runtime state, not source, so it's never
+  cached and is polled only while its page is open.
+- **Assets** are served from the package's `dist/` by a route with an
+  allow-list, so there's nothing to publish or re-publish after an upgrade.
 
-See [ARCHITECTURE.md](ARCHITECTURE.md) for the full design.
+Every page is backed by a JSON endpoint under your `DISSECT_PATH`, handy for
+scripts or for giving an agent a map of the app:
+
+| Endpoint | Contents |
+| --- | --- |
+| `/dissect/schema.json` | Models, columns and relations. |
+| `/dissect/routes.json` | Endpoints with request and response shapes. |
+| `/dissect/jobs.json` | Queueables, their queues and dispatch sites. |
+| `/dissect/providers.json` | Provider trees. |
+| `/dissect/domains.json` | Domains, their classes, findings and unassigned classes. |
+| `/dissect/queue.json` | The live queue. |
+
+See [ARCHITECTURE.md](ARCHITECTURE.md) for the full design and every payload
+format.
+
+## 🗺️ Roadmap
+
+- 🧭 **Domain map.** Domains as nodes and the dependencies between them as
+  edges. In progress.
+- 📜 **OpenAPI export** from the route shapes dissect already reads.
+- ✅ **Contract compliance**: checking that endpoints return what they promise.
 
 ## 🛠️ Contributing
 
-The package develops against [Orchestra Testbench](https://packages.tools/testbench),
-with a Workbench application in `workbench/`.
+The package is developed against
+[Orchestra Testbench](https://packages.tools/testbench), with a Workbench
+application in `workbench/`.
 
 ```sh
 composer install
@@ -503,31 +720,42 @@ composer serve      # build the workbench app and serve it
 composer test       # PHPUnit
 pnpm test:unit      # Vitest
 pnpm test:e2e       # Playwright
-pnpm build          # compile the frontend into dist/
-
-composer serve:huge # serve a generated 122-model schema instead
-composer huge:clean # and remove it again
+pnpm build          # type-check and compile the frontend into dist/
+pnpm lint           # oxlint + eslint
 ```
 
-The fixture in `workbench/app/Models` is small on purpose — it covers every
-relation family and column kind, and the tests assert against it. 🐘
-`workbench/app/Http` and `workbench/routes` do the same job for the endpoint
-list: a form request whose `rules()` cannot be run, a resource with no model
-behind it, a closure route, an invokable controller.
-`composer serve:huge` generates the opposite fixture, a schema large enough to
-show what layout, the minimap and saved views do under load.
+### 🧪 Fixtures
+
+- **`workbench/app`** is small on purpose. It covers every relation family and
+  column kind, a form request whose `rules()` can't run, a resource with no
+  model behind it, a closure route and an invokable controller. The tests
+  assert against it. It has no domains, to prove an app without them is left
+  alone.
+- **`workbench/domains`** is a second app that *does* have domains: Billing and
+  Sales under `app/Domain`, an Identity domain built from a `domains.json`
+  entry and a `#[Domain]` attribute, a stale attribute that disagrees with its
+  folder, and a class no domain claims.
+
+  ```sh
+  touch .workbench-domains   # serve the domain fixture instead
+  composer serve
+  rm .workbench-domains      # back to the plain app
+  ```
+
+- **`composer serve:huge`** generates a 122-model schema, to see what layout,
+  the minimap and saved views do under load. `composer huge:clean` removes it.
 
 ### ⚡ Frontend hot reload
 
-`composer serve:hmr` in one terminal and `pnpm dev` in another runs the real
-Laravel host with the frontend served from Vite, so frontend edits hot-reload
-while the PHP side stays genuine.
+Run `composer serve:hmr` in one terminal and `pnpm dev` in another. You get the
+real Laravel host with the frontend served from Vite, so frontend edits
+hot-reload while the PHP side stays real.
 
 ### 🏷️ Releasing
 
-`dist/` is committed on purpose — it is the compiled bundle the Composer
-package serves, and the whole promise is one `composer require` with no build
-step in the host application. So **every release must rebuild it**:
+`dist/` is committed on purpose. It's the compiled bundle the Composer package
+serves, and the whole promise is one `composer require` with no build step in
+your app. So **every release must rebuild it**:
 
 ```sh
 pnpm build
