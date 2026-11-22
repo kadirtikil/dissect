@@ -637,7 +637,7 @@ main.ts                 mounts App; no router (see "Decisions")
     │   └── QueueSection   one tense as a table, or why it could not be read
     └── DomainsPanel    every domain, findings, unassigned; or what would count as one
         └── DomainCard     name, how it was found, folders, classes by namespace
-            └── DomainLinks   depends on / used by, one chip per domain; opens to the references
+            └── DomainLinks   depends on / used by, one chip per domain, red when it breaks a rule; opens to the references
 
 components/domains/DomainFacet.vue   the domain chips every list shares
 
@@ -650,6 +650,7 @@ stores/provider.ts      lazy load, search, selection, which cards are open
 stores/queue.ts         the odd one: polled runtime state, nothing to cache
 stores/domains.ts       lazy load of the domain list; polled like the other surfaces; the colour order
 stores/classes.ts       lazy load of the class index, only once there are domains; polled the same way
+stores/boundaries.ts    lazy load of the rules and their violations, beside the class index
 stores/navigation.ts    which page is open: fragment, then storage, then default
 pages/registry.ts       every page there is — the one file a new surface is added to
 lib/toolbar.ts          where a page hangs its own header controls
@@ -666,6 +667,7 @@ lib/providerKinds.ts    node/edge kind → colour; confidence → dash
 lib/elapsed.ts          "2m ago" / "in 4h" — a queue is read in relative time
 lib/domains.ts          domain → colour (the ramp, then spread hues); the colour order; facet keys; how one was found, in words
 lib/dependencies.ts     the class index folded into domain → domain links, each with its references
+lib/boundaries.ts       what a rule allows (BoundaryRule::allows, again) and how it reads
 lib/bootstrap.ts        the host seam
 ```
 
@@ -1344,7 +1346,7 @@ Config (`config/dissect.php`): `enabled`, `path`, `middleware`,
 | Change which domain wins for a class | `src/Architecture/ContextResolver.php` |
 | Change what the domain list reports | `src/Architecture/DomainMap.php` |
 | Change what dissect:check prints or when it fails | `src/Console/CheckCommand.php` |
-| Add a kind of boundary rule | read it in `DomainFile::readRules()`, hold it on `BoundaryRule`, check it in `Boundaries::violations()` |
+| Add a kind of boundary rule | read it in `DomainFile::readRules()`, hold it on `BoundaryRule`, check it in `Boundaries::violations()`; the page reads it in `resources/js/lib/boundaries.ts` |
 | Change what counts as the application's code | `src/Support/CodeOwnership.php` |
 | Change what counts as a route change | `src/Routes/RouteFingerprint.php`, `routes.watch_paths` |
 | Change how the endpoint list is filtered or grouped | `resources/js/lib/routeFilters.ts` |
