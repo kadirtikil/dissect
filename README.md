@@ -64,6 +64,8 @@ And the parts that make it easy to live with:
   refreshes on its own, with no file watcher to run.
 - 💻 **Works without the page too.** `php artisan dissect:export` prints any of
   it as JSON, a Markdown digest, or a Mermaid diagram of the models.
+- 🚧 **Guardrails between domains.** Write down which domain may use which, and
+  `php artisan dissect:check` fails CI when the code disagrees.
 - 🤖 **An MCP server for agents.** `php artisan mcp:start dissect` answers
   questions about one model, route, job or provider at a time.
 
@@ -351,9 +353,43 @@ php artisan dissect:export boundaries --format=md
 - Sales may not use Billing: Customer → Invoice (relation, line 19). `app/Domain/Sales/Models/Customer.php:19`
 ```
 
-> 🚧 **Coming next:** `dissect:check`, which fails when a rule is broken, and
-> a Claude Code hook that runs it on every file an agent edits. Then
-> violations on the Domains page.
+#### Failing the build
+
+`dissect:check` exits with 1 when a rule is broken, so CI or a pre-commit hook
+can stop on it:
+
+```bash
+php artisan dissect:check
+```
+
+```
+app/Domain/Sales/Models/Customer.php:19 Sales may not use Billing: Customer → Invoice (relation, line 19).
+
+   ERROR  1 violation of 2 rules.
+```
+
+- **`--files=app/Domain/Sales/Models/Customer.php`** reports only what those
+  files break. The whole app is still read, since whether a class may be named
+  depends on which domain *it* is in, but you only hear about the files you
+  gave it. Repeat the option or separate paths with commas.
+- **`--format=github`** writes [workflow annotations](https://docs.github.com/en/actions/reference/workflow-commands-for-github-actions#setting-an-error-message),
+  so a violation shows up on its line in the pull request.
+- **`--format=json`** gives a script the verdict (`passed`) and everything
+  behind it.
+
+It also fails when `.dissect/domains.json` has a problem, such as invalid JSON,
+an unknown key or a rule naming a domain that doesn't exist. Otherwise a broken
+rules file would pass as "no rules". With no rules at all it passes and says
+there was nothing to check. A file that doesn't parse is listed as not
+checked, and doesn't fail on its own.
+
+```yaml
+# .github/workflows/ci.yml
+- run: php artisan dissect:check --format=github
+```
+
+> 🚧 **Coming next:** a Claude Code hook that runs `dissect:check --files` on
+> every file an agent edits, and violations on the Domains page.
 
 > 🚧 **Coming next: the domain map.** A graph with one node per domain and the
 > dependencies between domains as edges, so you can see the shape of the whole
@@ -594,6 +630,7 @@ php artisan dissect:export boundaries --format=md         # where a domain break
 php artisan dissect:export jobs --format=md               # a digest to read
 php artisan dissect:export schema --format=mermaid        # the models as an ER diagram
 php artisan dissect:export --format=md --output=docs/app.md
+php artisan dissect:check                                 # exit 1 if a domain breaks its rule
 ```
 
 - **`json`** is exactly the payload the page reads (see the endpoints under

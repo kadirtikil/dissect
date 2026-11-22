@@ -211,6 +211,7 @@ DissectServiceProvider    wiring; registers routes only when enabled
   ├── Support\Surfaces        every payload by name, for callers that are not the page
   ├── Support\PayloadCache    one fingerprint-keyed cache for the page, the console and MCP
   ├── Console\ExportCommand   dissect:export — a surface as json, md or mermaid
+  ├── Console\CheckCommand    dissect:check — exit 1 on a violation or a broken rules file
   │     ├── Digest\Markdown     a payload as one line per thing, per item reusable
   │     ├── Digest\Mermaid      the schema as an erDiagram, inverses folded
   │     └── Support\ClassNames  short class names, the rule classNames.ts uses
@@ -1282,6 +1283,8 @@ are running. `tests/StateVersioningTest.php` pins all of it.
 | **A reference is a name in the syntax, not a resolved call** | `$invoice->customer->notify()` reaches three classes through variables whose types are only known by running the code or by a type checker's inference. Names are what a boundary rule can be checked against without guessing, and what an agent edits |
 | **Laravel-aware kinds win over syntax kinds** | `dispatch(new SendInvoice)` is a `new` to a parser and a dispatch to anyone reading it. A rule like "Sales may dispatch Billing's jobs but not build its models" needs the difference, and a name counted twice would inflate every number built on it |
 | **A domain without a rule is not checked** | Rules are how a team says a boundary exists. Checking every domain against an implicit "use nothing" would make the first run all noise, and an app adopting rules one domain at a time needs the others left alone |
+| **`dissect:check --files` still reads the whole app** | Whether `Customer` may name `Invoice` depends on which domain `Invoice` is in, wherever it lives. Only the report narrows. The payload cache means a second check before the next edit costs nothing |
+| **`dissect:check` fails on a broken rules file** | A file that does not parse has no rules, and "no rules" passes. Without this, the easiest way to turn a guardrail off would be a missing comma |
 | **A rule that cannot be read is reported, and is never stricter than it was** | A typo in a guardrail is worse than no guardrail: it looks like a check. `may_uses` is a problem in words, and an unreadable `may_use` means "unrestricted", not "nothing" |
 | **Only app-to-app references go on the wire** | Most of every file is framework. Sending it would multiply the payload for a page that only draws the app, and the checks that need it run on the server |
 | **Highlight is not selection** | Canvas selection is a gesture that feeds view membership; opening an endpoint must not quietly change what a new view would contain |
@@ -1336,6 +1339,7 @@ Config (`config/dissect.php`): `enabled`, `path`, `middleware`,
 | Recognise another folder layout as domains | `src/Architecture/Conventions.php` |
 | Change which domain wins for a class | `src/Architecture/ContextResolver.php` |
 | Change what the domain list reports | `src/Architecture/DomainMap.php` |
+| Change what dissect:check prints or when it fails | `src/Console/CheckCommand.php` |
 | Add a kind of boundary rule | read it in `DomainFile::readRules()`, hold it on `BoundaryRule`, check it in `Boundaries::violations()` |
 | Change what counts as the application's code | `src/Support/CodeOwnership.php` |
 | Change what counts as a route change | `src/Routes/RouteFingerprint.php`, `routes.watch_paths` |
