@@ -255,6 +255,11 @@ attribute that names a domain nothing else defines.
   `domains.json`, attribute, …), its folders and its classes grouped by
   namespace, followed by the findings and the unassigned classes. An app with
   no domains gets an empty state that lists the layouts that would count.
+- 🔗 **What each domain depends on, and what uses it.** Under each domain, one
+  chip per other domain its classes name, and one per domain whose classes name
+  its own, with how many references there are. A ⇄ marks two domains that name
+  each other. Click a chip to see every reference behind it: which class, which
+  class it names, how (relation, dispatch, type, …), and the file and line.
 - 🏷️ **Every model, route, job and provider carries its domain**, so the other
   pages can use it. A route belongs to its controller's domain, and a closure
   route to the domain of the file it is written in. A provider belongs to the
@@ -271,9 +276,9 @@ attribute that names a domain nothing else defines.
 ### Which class uses which
 
 dissect also reads every class, interface, trait and enum in your source
-folders, and every other one of them it names. The page doesn't use it yet;
-it's the groundwork for the domain map. You can ask for it from the terminal
-or an agent today:
+folders, and every other one of them it names. The Domains page uses it to
+show how domains depend on each other. You can ask for it from the terminal or
+an agent too:
 
 ```bash
 php artisan dissect:export classes --format=md

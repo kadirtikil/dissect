@@ -633,6 +633,7 @@ main.ts                 mounts App; no router (see "Decisions")
     │   └── QueueSection   one tense as a table, or why it could not be read
     └── DomainsPanel    every domain, findings, unassigned; or what would count as one
         └── DomainCard     name, how it was found, folders, classes by namespace
+            └── DomainLinks   depends on / used by, one chip per domain; opens to the references
 
 components/domains/DomainFacet.vue   the domain chips every list shares
 
@@ -644,6 +645,7 @@ stores/jobs.ts          the same, for the queue surface
 stores/provider.ts      lazy load, search, selection, which cards are open
 stores/queue.ts         the odd one: polled runtime state, nothing to cache
 stores/domains.ts       lazy load of the domain list; polled like the other surfaces; the colour order
+stores/classes.ts       lazy load of the class index, only once there are domains; polled the same way
 stores/navigation.ts    which page is open: fragment, then storage, then default
 pages/registry.ts       every page there is — the one file a new surface is added to
 lib/toolbar.ts          where a page hangs its own header controls
@@ -659,6 +661,7 @@ lib/providerLayout.ts   tiers from the server's depth; order by parents' height
 lib/providerKinds.ts    node/edge kind → colour; confidence → dash
 lib/elapsed.ts          "2m ago" / "in 4h" — a queue is read in relative time
 lib/domains.ts          domain → colour (the ramp, then spread hues); the colour order; facet keys; how one was found, in words
+lib/dependencies.ts     the class index folded into domain → domain links, each with its references
 lib/bootstrap.ts        the host seam
 ```
 
@@ -1061,7 +1064,8 @@ words; the file being broken never makes the endpoint fail.
 Served at `/dissect/classes.json` and fetched only when asked for: building it
 parses every PHP file under `domains.paths`. On Laravel's own source (1,757
 files) a cold build takes about 3 seconds and 55 MB; after that it is cached
-until a file changes.
+until a file changes. The page asks for it when the Domains page opens on an
+app that has domains, and never otherwise.
 
 ```json
 {
@@ -1311,6 +1315,7 @@ Config (`config/dissect.php`): `enabled`, `path`, `middleware`,
 | Change provider node/edge colours or dashes | `resources/js/lib/providerKinds.ts` |
 | Change what a provider card shows | `resources/js/components/provider-tree/tree/ProviderNode.vue` |
 | Change what the domain list shows | `resources/js/pages/DomainsPanel.vue`, `components/domains/DomainCard.vue` |
+| Change what counts as one domain depending on another | `domainDependencies()` in `resources/js/lib/dependencies.ts`, `between()` in `src/Digest/Markdown.php` (keep the two counting alike) |
 | Change the domain chips on the lists | `resources/js/components/domains/DomainFacet.vue`, and `contexts` in each of `lib/{route,job,provider}Filters.ts` |
 | Change domain colours or how a source is worded | `resources/js/lib/domains.ts` |
 | Add a surface to `dissect:export` | `NAMES` and `export()` in `src/Support/Surfaces.php`, then a method in `src/Digest/Markdown.php` |
