@@ -399,4 +399,53 @@ class MarkdownTest extends TestCase
         $this->assertStringContainsString("- uses: no other class in the app\n- used by: no other class in the app", $this->markdown->class($index['classes'][3], $index));
         $this->assertStringStartsWith('## Clock (interface)', $this->markdown->class($index['classes'][4], $index));
     }
+
+    #[Test]
+    public function boundaries_say_when_nothing_is_checked(): void
+    {
+        $this->assertSame(
+            "# Boundaries\n\nNo boundary rules. Add a \"rules\" object to .dissect/domains.json to check a domain.\n",
+            $this->markdown->render('boundaries', ['enabled' => true, 'rules' => [], 'violations' => []]),
+        );
+        $this->assertStringContainsString('switched off', $this->markdown->boundaries(['enabled' => false]));
+    }
+
+    #[Test]
+    public function boundaries_list_rules_problems_and_each_violation_where_it_is(): void
+    {
+        $out = $this->markdown->render('boundaries', [
+            'enabled' => true,
+            'rules' => [
+                ['domain' => 'Billing', 'may_use' => ['Identity'], 'must_not_use' => ['Illuminate\Http']],
+                ['domain' => 'Sales', 'may_use' => [], 'must_not_use' => []],
+            ],
+            'violations' => [
+                ['domain' => 'Billing', 'file' => 'app/Billing/Invoice.php', 'lines' => [9, 12], 'message' => 'Billing may not use Sales: Invoice → Customer (relation, lines 9, 12).'],
+                ['domain' => 'Sales', 'file' => 'app/Sales/Customer.php', 'lines' => [8], 'message' => 'Sales may not use Billing: Customer → Invoice (relation, line 8).'],
+            ],
+            'problems' => ['rules.Sales.may_use: no domain is called Identiy.'],
+            'unchecked' => ['app/Broken.php'],
+        ]);
+
+        $this->assertSame(<<<'MD'
+            # Boundaries
+
+            2 rules, 2 violations.
+            1 file could not be parsed, so it was not checked: app/Broken.php.
+
+            ## Rules
+            - **Billing** may use Identity; must not use Illuminate\Http
+            - **Sales** may use no other domain
+
+            ## Problems with the rules
+            - rules.Sales.may_use: no domain is called Identiy.
+
+            ## Billing (1)
+            - Billing may not use Sales: Invoice → Customer (relation, lines 9, 12). `app/Billing/Invoice.php:9`
+
+            ## Sales (1)
+            - Sales may not use Billing: Customer → Invoice (relation, line 8). `app/Sales/Customer.php:8`
+
+            MD, $out);
+    }
 }
