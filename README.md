@@ -744,6 +744,9 @@ a guessed one a client would trust. When dissect only inferred a shape, the
 operation's description says so. When it couldn't work out a response, the
 operation has a `default` response that says that instead.
 
+The Routes page offers the same file: **OpenAPI** in its header saves
+`openapi.json`, byte for byte what the command writes.
+
 It passes Redocly's linter with no structural problems. Three of its
 recommended style rules will still flag it, on purpose:
 
