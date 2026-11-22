@@ -5,6 +5,7 @@ namespace KdrDev\Dissect\Http\Controllers;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use KdrDev\Dissect\Architecture\Boundaries;
 use KdrDev\Dissect\Architecture\ClassIndex;
 use KdrDev\Dissect\Architecture\DomainMap;
 use KdrDev\Dissect\Exceptions\StateFileException;
@@ -108,6 +109,11 @@ class DissectController
             $payload['classes'] = app(ClassIndex::class)->fingerprint();
         }
 
+        // And the boundary check, which also moves when a rule is edited.
+        if ($request->boolean('boundaries')) {
+            $payload['boundaries'] = app(Boundaries::class)->fingerprint();
+        }
+
         // The whole point is to see the current value; a cached 200 would make
         // the page believe nothing had changed for as long as the browser
         // decided to hold on to it.
@@ -196,6 +202,21 @@ class DissectController
 
         return response()
             ->json($this->cache->remember('classes', $fingerprint, fn () => $index->export()) + ['fingerprint' => $fingerprint])
+            ->header('Cache-Control', 'no-store');
+    }
+
+    /**
+     * Every place a domain breaks the rule written for it in domains.json.
+     *
+     * Fetched when asked for, like the class index it reads. An app with no
+     * rules gets an empty list without the index being built.
+     */
+    public function boundariesJson(Boundaries $boundaries): JsonResponse
+    {
+        $fingerprint = $boundaries->fingerprint();
+
+        return response()
+            ->json($this->cache->remember('boundaries', $fingerprint, fn () => $boundaries->export()) + ['fingerprint' => $fingerprint])
             ->header('Cache-Control', 'no-store');
     }
 

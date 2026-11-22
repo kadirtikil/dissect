@@ -4,6 +4,7 @@ namespace KdrDev\Dissect\Support;
 
 use Illuminate\Contracts\Container\Container;
 use InvalidArgumentException;
+use KdrDev\Dissect\Architecture\Boundaries;
 use KdrDev\Dissect\Architecture\ClassIndex;
 use KdrDev\Dissect\Architecture\DomainMap;
 use KdrDev\Dissect\Jobs\JobExporter;
@@ -26,7 +27,7 @@ use KdrDev\Dissect\SchemaExporter;
 final class Surfaces
 {
     /** In the order a reader meets them: data, then how it is reached. */
-    public const NAMES = ['schema', 'routes', 'jobs', 'providers', 'domains', 'classes'];
+    public const NAMES = ['schema', 'routes', 'jobs', 'providers', 'domains', 'classes', 'boundaries'];
 
     public function __construct(
         protected Container $app,
@@ -43,6 +44,7 @@ final class Surfaces
             'providers' => $this->app->make(ProviderExporter::class),
             'domains' => $this->app->make(DomainMap::class),
             'classes' => $this->app->make(ClassIndex::class),
+            'boundaries' => $this->app->make(Boundaries::class),
             default => throw new InvalidArgumentException(
                 "There is no surface called \"{$name}\". Pick one of: ".implode(', ', self::NAMES).'.'
             ),
