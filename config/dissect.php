@@ -260,4 +260,18 @@ return [
 
     'views_path' => base_path('.dissect/views.json'),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Snapshot file
+    |--------------------------------------------------------------------------
+    |
+    | Where `php artisan dissect:snapshot` writes down the models, routes, jobs
+    | and providers as they are, for `dissect:diff` to compare against. Commit
+    | it: it is the "before" that a change is read against, and taking a new
+    | one when a change is accepted puts what was accepted in the PR's diff.
+    |
+    */
+
+    'snapshot_path' => base_path('.dissect/snapshot.json'),
+
 ];
