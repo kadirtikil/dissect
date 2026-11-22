@@ -203,6 +203,11 @@ DissectServiceProvider    wiring; registers routes only when enabled
   │     ├── DomainAttribute     #[Domain('…')] read from tokens, never by loading the class
   │     └── DomainMap           /domains.json: every domain and its classes, built on demand
   ├── Support\CodeOwnership   app / vendor / framework, for routes and provider trees alike
+  ├── Support\Surfaces        every payload by name, for callers that are not the page
+  ├── Console\ExportCommand   dissect:export — a surface as json, md or mermaid
+  │     ├── Digest\Markdown     a payload as one line per thing, per item reusable
+  │     ├── Digest\Mermaid      the schema as an erDiagram, inverses folded
+  │     └── Support\ClassNames  short class names, the rule classNames.ts uses
   ├── QueueSnapshot           what is on the queue *right now* — never cached
   │     ├── QueueReaderFactory  driver → a reader, or the reason there isn't one
   │     │     ├── DatabaseQueueReader  three predicates over the jobs table
@@ -1181,6 +1186,10 @@ are running. `tests/StateVersioningTest.php` pins all of it.
 | **Domain views are derived, not stored** | A domain's members are its folders'. Storing them in views.json would let the two drift apart. A domain view is read-only, and copying it into a saved view is the deliberate step that makes it yours to edit |
 | **A relation into another domain is marked by width and label, not colour** | The relation families already use the colour ramp, and domains share it. A second colour meaning on edges would make both unreadable |
 | **A plain app gets no domains** | Detection only matches layouts that mean "domains". A starter kit's `Auth` folders under controllers and requests are not one, which is why the layer-first rule requires `app/Models/{Name}` |
+| **`dissect:export` is registered outside the `enabled` gate** | The gate keeps a web page off production. A console command cannot be reached from the web, and an export in CI is exactly the case where `APP_ENV` is not `local` |
+| **The export goes through `Surfaces`, not the controller** | The same exporter, the same cache and the same payload as the endpoint. A second path to the data would be a second set of answers that agree only until one of them changes |
+| **The Markdown digest adds nothing the payload does not say** | It is read by people and agents who will not check it against the JSON. A confidence the payload carries is printed, a cut list says how much was cut, and a relation with no known keys is shown without them rather than with a guessed pair |
+| **Mermaid is for the schema only** | Routes and jobs are lists, and a provider tree is already a tree on the page. An ER diagram is the one shape a README cannot draw any other way |
 | **Highlight is not selection** | Canvas selection is a gesture that feeds view membership; opening an endpoint must not quietly change what a new view would contain |
 
 ---
@@ -1259,6 +1268,10 @@ Config (`config/dissect.php`): `enabled`, `path`, `middleware`,
 | Change what the domain list shows | `resources/js/pages/DomainsPanel.vue`, `components/domains/DomainCard.vue` |
 | Change the domain chips on the lists | `resources/js/components/domains/DomainFacet.vue`, and `contexts` in each of `lib/{route,job,provider}Filters.ts` |
 | Change domain colours or how a source is worded | `resources/js/lib/domains.ts` |
+| Add a surface to `dissect:export` | `NAMES` and `export()` in `src/Support/Surfaces.php`, then a method in `src/Digest/Markdown.php` |
+| Add an export format | `formats()` and the `match` in `src/Console/ExportCommand.php` |
+| Change what the Markdown digest says | `src/Digest/Markdown.php` — one method per surface and one per item |
+| Change the Mermaid diagram | `src/Digest/Mermaid.php` — `CARDINALITY` for line ends, `relations()` for folding |
 | Change the theme | `resources/js/assets/main.css` (tokens), `vue-flow-theme.css` (canvas) |
 | Change the page shell | `resources/views/app.blade.php` |
 
