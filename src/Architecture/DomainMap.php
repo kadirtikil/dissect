@@ -2,10 +2,7 @@
 
 namespace KdrDev\Dissect\Architecture;
 
-use KdrDev\Dissect\Routes\RouteFingerprint;
 use KdrDev\Dissect\Support\ClassFile;
-use Symfony\Component\Finder\Finder;
-use Symfony\Component\Finder\SplFileInfo;
 
 /**
  * The domain list: every domain, how it was found, and the classes in it.
@@ -19,17 +16,10 @@ use Symfony\Component\Finder\SplFileInfo;
  */
 final class DomainMap
 {
-    /** Folders no domain lives in, wherever they turn up. */
-    public const SKIPPED = ['vendor', 'node_modules', 'tests', 'Tests', 'storage', 'bootstrap'];
-
-    /**
-     * @param  array<int, string>  $paths  Where classes are looked for, relative to the root
-     *                                     or absolute. Domain roots are always added.
-     */
     public function __construct(
         protected ContextResolver $resolver,
         protected DomainFile $file,
-        protected array $paths = ['app', 'src', 'Modules', 'app-modules', 'packages'],
+        protected SourceFiles $sources,
     ) {}
 
     /**
@@ -63,7 +53,7 @@ final class DomainMap
         $unassigned = [];
         $findings = [];
 
-        foreach ($this->classFiles($contexts) as $path => $class) {
+        foreach ($this->classFiles() as $path => $class) {
             $attribute = DomainAttribute::in($path);
             $folder = $this->resolver->fromFolder($path);
             $context = $attribute ?? $folder;
@@ -107,7 +97,7 @@ final class DomainMap
             $domains[] = [
                 'name' => (string) $name,
                 'sources' => array_values(array_unique($found)),
-                'roots' => array_map($this->relative(...), $context?->roots ?? []),
+                'roots' => array_map($this->sources->relative(...), $context?->roots ?? []),
                 'classes' => $members,
             ];
         }
@@ -145,11 +135,7 @@ final class DomainMap
             return 'off';
         }
 
-        $directories = $this->directories($this->resolver->contexts());
-
-        return substr(sha1(
-            (new RouteFingerprint($directories))->signal().':'.$this->file->signal()
-        ), 0, 16);
+        return substr(sha1($this->sources->signal().':'.$this->file->signal()), 0, 16);
     }
 
     /**
@@ -164,41 +150,13 @@ final class DomainMap
     /**
      * Every class declared under the walked folders, by its resolved path.
      *
-     * @param  array<string, Context>  $contexts
      * @return array<string, string>
      */
-    protected function classFiles(array $contexts): array
+    protected function classFiles(): array
     {
-        $files = [];
-
-        // A domain can be a single file, which no directory walk reaches.
-        foreach ($contexts as $context) {
-            foreach ($context->roots as $root) {
-                if (is_file($root)) {
-                    $files[$root] = true;
-                }
-            }
-        }
-
-        $directories = $this->directories($contexts);
-
-        if ($directories !== []) {
-            $finder = (new Finder)->in($directories)->files()->name('*.php')
-                // Relative to the walked folder, so where the application
-                // itself happens to live is never mistaken for one.
-                ->filter(fn (SplFileInfo $file) => array_intersect(
-                    explode('/', str_replace(DIRECTORY_SEPARATOR, '/', $file->getRelativePath())),
-                    self::SKIPPED,
-                ) === []);
-
-            foreach ($finder as $file) {
-                $files[$file->getRealPath() ?: $file->getPathname()] = true;
-            }
-        }
-
         $classes = [];
 
-        foreach (array_keys($files) as $path) {
+        foreach ($this->sources->files() as $path) {
             $class = ClassFile::classIn($path);
 
             if ($class !== null) {
@@ -209,64 +167,13 @@ final class DomainMap
         return $classes;
     }
 
-    /**
-     * The configured folders that exist, plus every domain's.
-     *
-     * @param  array<string, Context>  $contexts
-     * @return array<int, string>
-     */
-    protected function directories(array $contexts): array
-    {
-        $directories = [];
-
-        foreach ($this->paths as $path) {
-            $directories[] = str_starts_with($path, DIRECTORY_SEPARATOR)
-                ? $path
-                : rtrim($this->resolver->root(), DIRECTORY_SEPARATOR).DIRECTORY_SEPARATOR.$path;
-        }
-
-        foreach ($contexts as $context) {
-            array_push($directories, ...$context->roots);
-        }
-
-        $existing = [];
-
-        foreach ($directories as $directory) {
-            if (is_dir($directory)) {
-                $existing[realpath($directory) ?: $directory] = true;
-            }
-        }
-
-        // A domain root inside a walked folder would be walked twice.
-        $directories = array_keys($existing);
-        sort($directories);
-
-        return array_values(array_filter($directories, function (string $directory) use ($directories) {
-            foreach ($directories as $other) {
-                if ($other !== $directory && str_starts_with($directory, $other.DIRECTORY_SEPARATOR)) {
-                    return false;
-                }
-            }
-
-            return true;
-        }));
-    }
-
-    /** A path as somebody would type it: relative to the root when under it. */
-    protected function relative(string $path): string
-    {
-        $root = rtrim(realpath($this->resolver->root()) ?: $this->resolver->root(), DIRECTORY_SEPARATOR).DIRECTORY_SEPARATOR;
-
-        return str_replace(DIRECTORY_SEPARATOR, '/', str_starts_with($path, $root) ? substr($path, strlen($root)) : $path);
-    }
-
     /** @return array{kind: string, class: string, file: string, context: string, folder: ?string, message: string} */
     protected function finding(string $kind, string $class, string $path, string $context, ?string $folder, string $message): array
     {
         return [
             'kind' => $kind,
             'class' => $class,
-            'file' => $this->relative($path),
+            'file' => $this->sources->relative($path),
             'context' => $context,
             'folder' => $folder,
             'message' => $message,
