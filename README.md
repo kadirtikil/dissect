@@ -257,6 +257,9 @@ attribute that names a domain nothing else defines.
   `domains.json`, attribute, …), its folders and its classes grouped by
   namespace, followed by the findings and the unassigned classes. An app with
   no domains gets an empty state that lists the layouts that would count.
+- 🚧 **Boundary rules**, once you write some: each domain's rule on its card,
+  links that break one in red, and every violation listed with its file and
+  line.
 - 🔗 **What each domain depends on, and what uses it.** Under each domain, one
   chip per other domain its classes name, and one per domain whose classes name
   its own, with how many references there are. A ⇄ marks two domains that name
@@ -434,7 +437,14 @@ only change .dissect/domains.json if you were asked to move it.
 The [MCP server](#-for-agents-mcp) has the same check as `dissect_check`, for
 an agent to ask before it edits rather than be told after.
 
-> 🚧 **Coming next:** violations on the Domains page.
+#### On the Domains page
+
+Each domain card shows its rule. A link into another domain that breaks a rule
+turns red, under both domains, and opening it says which rule every reference
+across it breaks. The page header counts the violations, and a **Broken
+rules** list below the domains has each one with its file and line: what
+`dissect:check` fails on. A rule naming a domain that doesn't exist is listed
+with the other `domains.json` problems at the top.
 
 > 🚧 **Coming next: the domain map.** A graph with one node per domain and the
 > dependencies between domains as edges, so you can see the shape of the whole

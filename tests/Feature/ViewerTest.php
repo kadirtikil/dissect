@@ -31,6 +31,7 @@ class ViewerTest extends TestCase
         $this->get('/dissect')
             ->assertOk()
             ->assertSee('classesUrl: '.json_encode(route('dissect.classes')), escape: false)
+            ->assertSee('boundariesUrl: '.json_encode(route('dissect.boundaries')), escape: false)
             ->assertDontSee('"classes":[', escape: false);
     }
 

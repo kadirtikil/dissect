@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test'
 import type { DomainsFile } from '../resources/js/types/domains'
 import type { ClassesFile } from '../resources/js/types/classes'
+import type { BoundariesFile } from '../resources/js/types/boundaries'
 
 /**
  * The domain list.
@@ -208,7 +209,7 @@ test('says which domains each one depends on, and lists the references behind it
 
 test('an app with no domains never asks for the class index', async ({ page }) => {
   let asked = false
-  await page.route('**/classes.json', (route) => {
+  await page.route(/\/(classes|boundaries)\.json/, (route) => {
     asked = true
     return route.fulfill({ json: CLASSES })
   })
@@ -225,4 +226,106 @@ test('lists domains without dependencies when the class index will not load', as
   await expect(page.getByTestId('classes-status')).toHaveText(/Could not load classes\.json/)
   await expect(page.locator('[data-domain="Billing"]')).toBeVisible()
   await expect(page.getByTestId('domain-links')).toHaveCount(0)
+})
+
+/** Sales may use nothing; Billing may use Sales and must keep requests out. */
+const BOUNDARIES: BoundariesFile = {
+  enabled: true,
+  rules: [
+    { domain: 'Billing', may_use: ['Sales'], must_not_use: ['Illuminate\\Http'] },
+    { domain: 'Sales', may_use: [], must_not_use: [] },
+  ],
+  violations: [
+    {
+      rule: 'may_use',
+      domain: 'Sales',
+      from: 'App\\Domain\\Sales\\Models\\Customer',
+      file: 'app/Domain/Sales/Models/Customer.php',
+      to: 'App\\Domain\\Billing\\Models\\Invoice',
+      to_domain: 'Billing',
+      namespace: null,
+      kind: 'relation',
+      lines: [19],
+      message: 'Sales may not use Billing: Customer → Invoice (relation, line 19).',
+    },
+  ],
+  problems: [],
+  unchecked: [],
+}
+
+async function openWithRules(page: import('@playwright/test').Page, boundaries: BoundariesFile) {
+  await page.route('**/classes.json', (route) => route.fulfill({ json: CLASSES }))
+  await page.route('**/boundaries.json', (route) => route.fulfill({ json: boundaries }))
+  await open(page, WITH_SALES)
+}
+
+test('shows each rule, the links that break one, and every violation', async ({ page }) => {
+  await openWithRules(page, BOUNDARIES)
+
+  await expect(page.getByText('1 violation', { exact: true }).first()).toBeVisible()
+
+  const sales = page.locator('[data-domain="Sales"]')
+  const billing = page.locator('[data-domain="Billing"]')
+
+  await expect(sales.getByTestId('domain-rule')).toHaveText(/may use no other domain/)
+  await expect(billing.getByTestId('domain-rule')).toHaveText(
+    /may use Sales; must not use Illuminate\\Http/,
+  )
+  await expect(sales.getByTestId('domain-violations')).toHaveText('1 violation')
+  await expect(billing.getByTestId('domain-violations')).toHaveCount(0)
+
+  // The link is forbidden from both ends: Sales → Billing breaks Sales's rule,
+  // so it is red under Sales's "Depends on" and Billing's "Used by". Billing
+  // → Sales is allowed by Billing's rule.
+  const salesOut = sales.locator('[data-direction="depends-on"] [data-link="Billing"]')
+
+  await expect(salesOut).toHaveAttribute('data-forbidden', '')
+  await expect(billing.locator('[data-direction="used-by"] [data-link="Sales"]')).toHaveAttribute(
+    'data-forbidden',
+    '',
+  )
+  await expect(
+    billing.locator('[data-direction="depends-on"] [data-link="Sales"]'),
+  ).not.toHaveAttribute('data-forbidden')
+
+  await salesOut.click()
+  await expect(sales.getByTestId('link-rule')).toHaveText(
+    "Every reference here breaks Sales's rule: may use no other domain",
+  )
+
+  const broken = page.getByTestId('domain-broken-rules').locator('[data-broken="Sales"]')
+
+  await expect(broken.getByText('may not use Billing')).toBeVisible()
+  await expect(broken.getByText('app/Domain/Sales/Models/Customer.php:19')).toBeVisible()
+})
+
+test('says the rules hold when nothing breaks them', async ({ page }) => {
+  await openWithRules(page, { ...BOUNDARIES, violations: [] })
+
+  await expect(page.getByText('2 rules kept')).toBeVisible()
+  await expect(page.getByTestId('domain-broken-rules')).toHaveCount(0)
+  await expect(page.locator('[data-forbidden]').first()).toBeVisible()
+})
+
+test('lists a rule naming a domain nothing defines with the other domains.json problems', async ({
+  page,
+}) => {
+  await openWithRules(page, {
+    ...BOUNDARIES,
+    problems: ['rules.Sales.may_use: no domain is called Biling.'],
+  })
+
+  await expect(
+    page.getByTestId('domain-problems').getByText('no domain is called Biling'),
+  ).toBeVisible()
+})
+
+test('lists domains without rules when boundaries.json will not load', async ({ page }) => {
+  await page.route('**/classes.json', (route) => route.fulfill({ json: CLASSES }))
+  await page.route('**/boundaries.json', (route) => route.fulfill({ status: 500, body: 'boom' }))
+  await open(page, WITH_SALES)
+
+  await expect(page.getByTestId('boundaries-status')).toHaveText(/Could not load boundaries\.json/)
+  await expect(page.getByTestId('domain-rule')).toHaveCount(0)
+  await expect(page.locator('[data-domain="Billing"] [data-link]').first()).toBeVisible()
 })

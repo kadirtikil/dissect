@@ -36,6 +36,7 @@
             providersUrl: @json(route('dissect.providers')),
             domainsUrl: @json(route('dissect.domains')),
             classesUrl: @json(route('dissect.classes')),
+            boundariesUrl: @json(route('dissect.boundaries')),
             {{-- Only the names, which cost a few directory listings: enough
                  for every page to give a domain the same colour. --}}
             domains: @json($domains),
