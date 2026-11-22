@@ -4,6 +4,7 @@ namespace KdrDev\Dissect\Tests\Mcp;
 
 use KdrDev\Dissect\Mcp\DissectServer;
 use KdrDev\Dissect\Mcp\Payloads;
+use KdrDev\Dissect\Mcp\Tools\ClassReferences;
 use KdrDev\Dissect\Mcp\Tools\Domain;
 use KdrDev\Dissect\Mcp\Tools\Job;
 use KdrDev\Dissect\Mcp\Tools\Model;
@@ -33,7 +34,7 @@ class ToolsTest extends TestCase
     {
         $this->assertNotNull($this->app->make(Registrar::class)->getLocalServer('dissect'));
 
-        DissectServer::tools()->assertRegistered([Search::class, Model::class, Route::class, Job::class, Provider::class, Domain::class]);
+        DissectServer::tools()->assertRegistered([Search::class, Model::class, Route::class, Job::class, Provider::class, Domain::class, ClassReferences::class]);
     }
 
     #[Test]
