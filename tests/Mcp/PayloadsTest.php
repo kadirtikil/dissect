@@ -34,7 +34,7 @@ class PayloadsTest extends TestCase
     #[Test]
     public function every_surface_is_one_process(): void
     {
-        $this->assertSame(['schema', 'routes', 'jobs', 'providers', 'domains'], array_keys($this->payloads()->all()));
+        $this->assertSame(['schema', 'routes', 'jobs', 'providers', 'domains', 'classes'], array_keys($this->payloads()->all()));
     }
 
     #[Test]
