@@ -8,6 +8,8 @@ import { baseName } from '@/lib/classNames'
 import { useDomainsStore } from '@/stores/domains'
 import { useClassesStore } from '@/stores/classes'
 import { dependenciesOf, domainDependencies } from '@/lib/dependencies'
+import { useBoundariesStore } from '@/stores/boundaries'
+import { describeRule, ruleFor, violationsByDomain } from '@/lib/boundaries'
 
 const store = useDomainsStore()
 const { status, error, file, palette, stats } = storeToRefs(store)
@@ -20,7 +22,20 @@ const {
   stats: classStats,
 } = storeToRefs(classes)
 
+const boundaries = useBoundariesStore()
+const {
+  status: boundariesStatus,
+  error: boundariesError,
+  file: checked,
+  stats: boundaryStats,
+} = storeToRefs(boundaries)
+
 const showUnassigned = ref(false)
+
+/** What is wrong with domains.json, its rules included, in one list. */
+const problems = computed(() => [...file.value.problems, ...checked.value.problems])
+
+const broken = computed(() => violationsByDomain(checked.value.violations))
 
 const dependencies = computed(() =>
   classesStatus.value === 'ready' ? domainDependencies(index.value.classes) : null,
@@ -44,7 +59,9 @@ onMounted(() => store.load())
 watch(
   () => status.value === 'ready' && file.value.domains.length > 0,
   (wanted) => {
-    if (wanted) void classes.load()
+    if (!wanted) return
+    void classes.load()
+    void boundaries.load()
   },
   { immediate: true },
 )
@@ -60,6 +77,16 @@ watch(
           <template v-if="stats.findings"> · {{ stats.findings }} to check</template>
           <template v-if="classesStatus === 'ready'">
             · {{ classStats.classes }} {{ classStats.classes === 1 ? 'class' : 'classes' }} read
+          </template>
+          <template v-if="boundariesStatus === 'ready' && boundaryStats.rules">
+            ·
+            <span v-if="boundaryStats.violations" class="text-destructive">
+              {{ boundaryStats.violations }}
+              {{ boundaryStats.violations === 1 ? 'violation' : 'violations' }}
+            </span>
+            <template v-else>
+              {{ boundaryStats.rules }} {{ boundaryStats.rules === 1 ? 'rule' : 'rules' }} kept
+            </template>
           </template>
         </template>
         <template v-else>Bounded contexts</template>
@@ -84,7 +111,7 @@ watch(
       <!-- What is wrong with the hand-written file comes first: until it is
            fixed, some of what follows is not what was meant. -->
       <div
-        v-if="file.problems.length"
+        v-if="problems.length"
         class="rounded-md border border-destructive/40 bg-card px-4 py-3"
         data-testid="domain-problems"
       >
@@ -92,7 +119,7 @@ watch(
           <TriangleAlert class="size-3.5" /> .dissect/domains.json
         </p>
         <ul class="mt-1 list-disc pl-5 font-mono text-[11px] text-muted-foreground">
-          <li v-for="problem in file.problems" :key="problem">{{ problem }}</li>
+          <li v-for="problem in problems" :key="problem">{{ problem }}</li>
         </ul>
       </div>
 
@@ -150,8 +177,69 @@ watch(
             :domain="domain"
             :names="palette"
             :dependencies="dependencies && dependenciesOf(dependencies, domain.name)"
+            :rules="checked.rules"
+            :violations="broken.get(domain.name)?.length ?? 0"
           />
         </div>
+
+        <p
+          v-if="boundariesStatus === 'error'"
+          class="font-mono text-[11px] text-destructive"
+          data-testid="boundaries-status"
+        >
+          Could not load boundaries.json: {{ boundariesError }}. The rules are not shown.
+        </p>
+
+        <section v-if="broken.size" data-testid="domain-broken-rules">
+          <h2 class="font-mono text-xs font-semibold text-destructive">Broken rules</h2>
+          <p class="mt-1 font-mono text-[11px] text-muted-foreground">
+            What <code>php artisan dissect:check</code> fails on.
+            <template v-if="checked.unchecked.length">
+              {{ checked.unchecked.length }}
+              {{ checked.unchecked.length === 1 ? 'file does' : 'files do' }} not parse and
+              {{ checked.unchecked.length === 1 ? 'was' : 'were' }} not checked.
+            </template>
+          </p>
+          <div
+            v-for="[domain, found] in broken"
+            :key="domain"
+            class="mt-2 rounded-md border border-destructive/40 bg-card"
+            :data-broken="domain"
+          >
+            <p class="border-b px-4 py-2 font-mono text-[11px]">
+              <span class="font-semibold">{{ domain }}</span>
+              <span v-if="ruleFor(checked.rules, domain)" class="text-muted-foreground">
+                · {{ describeRule(ruleFor(checked.rules, domain)!) }}
+              </span>
+            </p>
+            <ul class="divide-y">
+              <li
+                v-for="violation in found"
+                :key="`${violation.rule}|${violation.from}|${violation.to}|${violation.kind}`"
+                class="px-4 py-1.5"
+              >
+                <p
+                  class="flex flex-wrap items-baseline gap-x-2 font-mono text-xs"
+                  :title="`${violation.from} → ${violation.to}`"
+                >
+                  {{ baseName(violation.from) }} → {{ baseName(violation.to) }}
+                  <span class="rounded border px-1 text-[10px] text-muted-foreground">
+                    {{ violation.kind }}
+                  </span>
+                  <span class="text-[11px] text-destructive">
+                    <template v-if="violation.rule === 'must_not_use'">
+                      must not use {{ violation.namespace }}
+                    </template>
+                    <template v-else>may not use {{ violation.to_domain }}</template>
+                  </span>
+                </p>
+                <p class="font-mono text-[10px] text-muted-foreground/70">
+                  {{ violation.file }}:{{ violation.lines.join(', ') }}
+                </p>
+              </li>
+            </ul>
+          </div>
+        </section>
 
         <section v-if="file.findings.length" data-testid="domain-findings">
           <h2 class="font-mono text-xs font-semibold">To check</h2>
