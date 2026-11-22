@@ -20,6 +20,7 @@ import { useJobsStore } from '@/stores/jobs'
 import { useProviderStore } from '@/stores/provider'
 import { useDomainsStore } from '@/stores/domains'
 import { useClassesStore } from '@/stores/classes'
+import { useBoundariesStore } from '@/stores/boundaries'
 import { bootstrap } from '@/lib/bootstrap'
 import { baseName, shortNames } from '@/lib/classNames'
 import { crossesInto, domainColor, domainPalette } from '@/lib/domains'
@@ -448,6 +449,7 @@ export const useSchemaStore = defineStore('schema', () => {
       const providers = useProviderStore()
       const domains = useDomainsStore()
       const classes = useClassesStore()
+      const boundaries = useBoundariesStore()
 
       try {
         // The derived surfaces all walk a far wider tree than the model signal
@@ -460,6 +462,7 @@ export const useSchemaStore = defineStore('schema', () => {
           providers.loaded ? 'providers=1' : null,
           domains.loaded ? 'domains=1' : null,
           classes.loaded ? 'classes=1' : null,
+          boundaries.loaded ? 'boundaries=1' : null,
         ].filter((part) => part !== null)
 
         const res = await fetch(asked.length ? `${url!}?${asked.join('&')}` : url!, {
@@ -501,6 +504,14 @@ export const useSchemaStore = defineStore('schema', () => {
         // more: any edit that adds or drops a reference between two classes.
         if (typeof payload?.classes === 'string' && payload.classes !== classes.fingerprint) {
           await classes.refresh()
+        }
+
+        // And the boundary check, which also moves when a rule is edited.
+        if (
+          typeof payload?.boundaries === 'string' &&
+          payload.boundaries !== boundaries.fingerprint
+        ) {
+          await boundaries.refresh()
         }
 
         if (typeof next !== 'string' || next === fingerprint.value) return

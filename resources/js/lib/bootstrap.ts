@@ -49,6 +49,11 @@ export interface Bootstrap {
    */
   classesUrl?: string
   /**
+   * Endpoint returning the boundary rules and their violations. A URL for the
+   * same reason: it is read off the class index above.
+   */
+  boundariesUrl?: string
+  /**
    * Every domain the folders and domains.json name, sorted. Only the names:
    * they cost a few directory listings, and they are what keeps a domain the
    * same colour on every page.
