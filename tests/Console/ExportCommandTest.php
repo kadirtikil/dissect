@@ -78,6 +78,46 @@ class ExportCommandTest extends TestCase
     }
 
     #[Test]
+    public function openapi_describes_the_api_routes(): void
+    {
+        config([
+            'app.name' => 'Workbench',
+            'dissect.openapi.version' => '2.0.0',
+            'dissect.openapi.servers' => ['https://api.example.com'],
+        ]);
+
+        $this->assertSame(0, Artisan::call('dissect:export', ['surface' => 'routes', '--format' => 'openapi']));
+        $document = json_decode(Artisan::output(), true, 512, JSON_THROW_ON_ERROR);
+
+        $this->assertSame('3.1.0', $document['openapi']);
+        $this->assertSame('Workbench', $document['info']['title']);
+        $this->assertSame('2.0.0', $document['info']['version']);
+        $this->assertStringContainsString('Nothing here is written by hand', $document['info']['description']);
+        $this->assertSame([['url' => 'https://api.example.com']], $document['servers']);
+        $this->assertArrayHasKey('/api/posts', $document['paths']);
+
+        // The web stack's pages are not the API, unless asked for.
+        $this->assertArrayNotHasKey('/', $document['paths']);
+
+        config(['dissect.openapi.stacks' => ['api', 'web'], 'dissect.openapi.title' => 'Everything']);
+        Artisan::call('dissect:export', ['surface' => 'routes', '--format' => 'openapi']);
+        $everything = json_decode(Artisan::output(), true);
+
+        $this->assertSame('Everything', $everything['info']['title']);
+        $this->assertGreaterThan(count($document['paths']), count($everything['paths']));
+    }
+
+    #[Test]
+    public function openapi_is_refused_for_anything_but_the_routes(): void
+    {
+        $this->artisan('dissect:export', ['surface' => 'schema', '--format' => 'openapi'])
+            ->expectsOutputToContain('OpenAPI describes the routes only.')
+            ->assertExitCode(2);
+
+        $this->artisan('dissect:export', ['--format' => 'openapi'])->assertExitCode(2);
+    }
+
+    #[Test]
     public function it_writes_to_a_file_when_asked(): void
     {
         $path = sys_get_temp_dir().'/dissect-export-'.uniqid().'/nested/jobs.json';
