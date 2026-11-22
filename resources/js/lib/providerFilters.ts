@@ -1,4 +1,5 @@
 import type { Provider } from '@/types/providers'
+import { contextKey, matchesContexts } from '@/lib/domains'
 
 /**
  * Narrowing the provider list.
@@ -9,10 +10,16 @@ import type { Provider } from '@/types/providers'
 
 export interface ProviderFilterState {
   search: string
+  /**
+   * Empty means every domain. Keys come from `contextKey`. A provider is in
+   * the domain its own class is in, not the domains of what it binds.
+   */
+  contexts: string[]
 }
 
 export const EMPTY_PROVIDER_FILTERS: ProviderFilterState = {
   search: '',
+  contexts: [],
 }
 
 /**
@@ -41,5 +48,25 @@ export function matchesSearch(provider: Provider, search: string): boolean {
 }
 
 export function filterProviders(providers: Provider[], state: ProviderFilterState): Provider[] {
-  return providers.filter((provider) => matchesSearch(provider, state.search))
+  return providers.filter(
+    (provider) =>
+      matchesSearch(provider, state.search) && matchesContexts(provider.context, state.contexts),
+  )
+}
+
+/** Providers per domain key within the search, the selection left out. */
+export function contextCounts(
+  providers: Provider[],
+  state: ProviderFilterState,
+): Record<string, number> {
+  const counts: Record<string, number> = {}
+
+  for (const provider of providers) {
+    if (!matchesSearch(provider, state.search)) continue
+
+    const key = contextKey(provider.context)
+    counts[key] = (counts[key] ?? 0) + 1
+  }
+
+  return counts
 }

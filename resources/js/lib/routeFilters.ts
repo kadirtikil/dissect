@@ -1,4 +1,5 @@
 import { shortNames } from '@/lib/classNames'
+import { contextKey, matchesContexts } from '@/lib/domains'
 import type { ApiRoute } from '@/types/routes'
 
 /**
@@ -23,6 +24,11 @@ export interface RouteFilterState {
    * whose code runs, this is who the endpoint is for.
    */
   stacks: string[]
+  /**
+   * Empty means every domain. Keys come from `contextKey`, so the routes in
+   * no domain can be picked too.
+   */
+  contexts: string[]
 }
 
 export const EMPTY_FILTERS: RouteFilterState = {
@@ -30,6 +36,7 @@ export const EMPTY_FILTERS: RouteFilterState = {
   methods: [],
   groups: [],
   stacks: [],
+  contexts: [],
 }
 
 export function matchesSearch(route: ApiRoute, search: string): boolean {
@@ -67,7 +74,8 @@ export function matchesRoute(route: ApiRoute, state: RouteFilterState): boolean 
     matchesSearch(route, state.search) &&
     matchesMethods(route, state.methods) &&
     matchesGroups(route, state.groups) &&
-    matchesStacks(route, state.stacks)
+    matchesStacks(route, state.stacks) &&
+    matchesContexts(route.context, state.contexts)
   )
 }
 
@@ -89,32 +97,44 @@ export function facetCounts(
   methods: Record<string, number>
   groups: Record<string, number>
   stacks: Record<string, number>
+  contexts: Record<string, number>
 } {
   const methods: Record<string, number> = {}
   const groups: Record<string, number> = {}
   const stacks: Record<string, number> = {}
+  const contexts: Record<string, number> = {}
 
   for (const route of routes) {
-    const base = matchesSearch(route, state.search)
+    if (!matchesSearch(route, state.search)) continue
 
-    if (base && matchesGroups(route, state.groups) && matchesStacks(route, state.stacks)) {
-      for (const method of route.methods) {
-        methods[method] = (methods[method] ?? 0) + 1
+    const method = matchesMethods(route, state.methods)
+    const group = matchesGroups(route, state.groups)
+    const stack = matchesStacks(route, state.stacks)
+    const context = matchesContexts(route.context, state.contexts)
+
+    if (group && stack && context) {
+      for (const m of route.methods) {
+        methods[m] = (methods[m] ?? 0) + 1
       }
     }
 
-    if (base && matchesMethods(route, state.methods) && matchesStacks(route, state.stacks)) {
+    if (method && stack && context) {
       groups[route.group] = (groups[route.group] ?? 0) + 1
     }
 
     // The stack counts deliberately ignore the stack selection but honour the
     // rest, so the switcher always reports the true size of the other half.
-    if (base && matchesMethods(route, state.methods) && matchesGroups(route, state.groups)) {
+    if (method && group && context) {
       stacks[route.stack] = (stacks[route.stack] ?? 0) + 1
+    }
+
+    if (method && group && stack) {
+      const key = contextKey(route.context)
+      contexts[key] = (contexts[key] ?? 0) + 1
     }
   }
 
-  return { methods, groups, stacks }
+  return { methods, groups, stacks, contexts }
 }
 
 export interface RouteGrouping {

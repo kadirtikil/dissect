@@ -185,3 +185,28 @@ describe('groupJobs', () => {
     expect(grouped[0]?.jobs.map((j) => j.id)).toEqual(['a', 'b'])
   })
 })
+
+describe('the domain facet', () => {
+  const jobs = [
+    job({ id: 'SendInvoice', context: 'Billing' }),
+    job({ id: 'ChargeCard', context: 'Billing', kind: 'listener' }),
+    job({ id: 'ExpireQuotes', context: 'Sales' }),
+    job({ id: 'PruneLogs' }),
+  ]
+
+  it('narrows to the selected domains, or to the jobs in none', () => {
+    const ids = (contexts: string[]) =>
+      filterJobs(jobs, { ...EMPTY_FILTERS, contexts }).map((j) => j.id)
+
+    expect(ids(['Billing'])).toEqual(['SendInvoice', 'ChargeCard'])
+    expect(ids([''])).toEqual(['PruneLogs'])
+  })
+
+  it('counts each domain within the other filters but not its own', () => {
+    const counts = facetCounts(jobs, { ...EMPTY_FILTERS, kinds: ['job'], contexts: ['Billing'] })
+
+    expect(counts.contexts).toEqual({ Billing: 1, Sales: 1, '': 1 })
+    expect(counts.kinds).toEqual({ job: 1, listener: 1 })
+    expect(counts.undispatched).toBe(1)
+  })
+})

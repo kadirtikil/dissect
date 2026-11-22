@@ -2,12 +2,13 @@
 import { computed } from 'vue'
 import { storeToRefs } from 'pinia'
 import { X } from '@lucide/vue'
+import DomainFacet from '@/components/domains/DomainFacet.vue'
 import { useRoutesStore } from '@/stores/routes'
 import { methodColor, methodRank } from '@/lib/httpMethods'
 import { STACK_ORDER, stackSpec } from '@/lib/routeStacks'
 
 const store = useRoutesStore()
-const { search, methods, groups, stacks, facets, stats } = storeToRefs(store)
+const { search, methods, groups, stacks, contexts, facets, stats } = storeToRefs(store)
 
 /**
  * Only the verbs and groups this application actually has.
@@ -45,7 +46,8 @@ const filtered = computed(
     search.value !== '' ||
     methods.value.length > 0 ||
     groups.value.length > 0 ||
-    stacks.value.length > 0,
+    stacks.value.length > 0 ||
+    contexts.value.length > 0,
 )
 </script>
 
@@ -156,5 +158,7 @@ const filtered = computed(
         <span class="ml-1 opacity-60 tabular-nums">{{ facets.groups[group] }}</span>
       </button>
     </div>
+
+    <DomainFacet :counts="facets.contexts" :selected="contexts" @toggle="store.toggleContext" />
   </div>
 </template>

@@ -26,6 +26,7 @@ class NoDomainsTest extends TestCase
         $this->assertSame([], $payload['findings']);
         $this->assertSame([], $payload['problems']);
         $this->assertContains('Workbench\\App\\Models\\Post', $payload['unassigned']);
+        $this->get('/dissect')->assertOk()->assertSee('domains: []', escape: false);
     }
 
     #[Test]

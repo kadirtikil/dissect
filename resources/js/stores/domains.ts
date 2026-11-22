@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { computed, ref, shallowRef } from 'vue'
 import type { DomainsFile } from '@/types/domains'
 import { bootstrap } from '@/lib/bootstrap'
+import { domainPalette } from '@/lib/domains'
 
 type Status = 'idle' | 'loading' | 'ready' | 'error'
 
@@ -33,8 +34,16 @@ export const useDomainsStore = defineStore('domains', () => {
 
   const loaded = computed(() => status.value === 'ready')
 
-  /** Every domain name, in the order colours are handed out. */
+  /** Every domain on the list. */
   const names = computed(() => file.value.domains.map((d) => d.name))
+
+  /**
+   * The order colours are handed out in, for every page.
+   *
+   * Starts from the names the page was given rather than from this list, so
+   * a page that never opens the list colours its rows the same way.
+   */
+  const palette = computed(() => domainPalette(bootstrap().domains ?? [], names.value))
 
   const stats = computed(() => ({
     domains: file.value.domains.length,
@@ -104,5 +113,5 @@ export const useDomainsStore = defineStore('domains', () => {
     }
   }
 
-  return { status, error, file, fingerprint, loaded, names, stats, load, refresh }
+  return { status, error, file, fingerprint, loaded, names, palette, stats, load, refresh }
 })

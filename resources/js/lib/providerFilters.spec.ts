@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import type { Provider, ProviderNode } from '@/types/providers'
-import { EMPTY_PROVIDER_FILTERS, filterProviders, matchesSearch } from '@/lib/providerFilters'
+import {
+  EMPTY_PROVIDER_FILTERS,
+  contextCounts,
+  filterProviders,
+  matchesSearch,
+} from '@/lib/providerFilters'
 
 /** A node with everything empty, so each test states only what it is about. */
 function node(overrides: Partial<ProviderNode> = {}): ProviderNode {
@@ -112,8 +117,29 @@ describe('filterProviders', () => {
   })
 
   it('keeps only what matches, in order', () => {
-    expect(filterProviders(providers, { search: 'billing' }).map((p) => p.name)).toEqual([
-      'BillingServiceProvider',
-    ])
+    expect(
+      filterProviders(providers, { ...EMPTY_PROVIDER_FILTERS, search: 'billing' }).map(
+        (p) => p.name,
+      ),
+    ).toEqual(['BillingServiceProvider'])
+  })
+})
+
+describe('the domain facet', () => {
+  const providers = [
+    provider({ id: 'App\\Domain\\Billing\\BillingServiceProvider', context: 'Billing' }),
+    provider({ id: 'App\\Providers\\AppServiceProvider', context: null }),
+  ]
+
+  it('narrows to the providers whose own class is in a domain', () => {
+    const names = (contexts: string[]) =>
+      filterProviders(providers, { ...EMPTY_PROVIDER_FILTERS, contexts }).map((p) => p.name)
+
+    expect(names(['Billing'])).toEqual(['BillingServiceProvider'])
+    expect(names([''])).toEqual(['AppServiceProvider'])
+  })
+
+  it('counts within the search, ignoring its own selection', () => {
+    expect(contextCounts(providers, { search: 'billing', contexts: [''] })).toEqual({ Billing: 1 })
   })
 })

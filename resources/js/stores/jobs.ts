@@ -31,6 +31,9 @@ export const useJobsStore = defineStore('jobs', () => {
   const queues = ref<string[]>([])
   const undispatchedOnly = ref(false)
 
+  /** Domain keys, as the domain chips give them. */
+  const contexts = ref<string[]>([])
+
   /**
    * "Jobs carrying this model" — set when somebody arrives here from a model
    * card rather than by opening the list.
@@ -64,6 +67,7 @@ export const useJobsStore = defineStore('jobs', () => {
     // the ambient view scope.
     models: modelFilter.value ? [modelFilter.value] : viewModels.value,
     undispatchedOnly: undispatchedOnly.value,
+    contexts: contexts.value,
   }))
 
   const visible = computed(() => filterJobs(jobs.value, filters.value))
@@ -119,6 +123,12 @@ export const useJobsStore = defineStore('jobs', () => {
       : [...queues.value, queue]
   }
 
+  function toggleContext(context: string) {
+    contexts.value = contexts.value.includes(context)
+      ? contexts.value.filter((c) => c !== context)
+      : [...contexts.value, context]
+  }
+
   /** Arriving from a model card: one model, and nothing else in the way. */
   function filterByModel(model: string | null) {
     modelFilter.value = model
@@ -126,6 +136,7 @@ export const useJobsStore = defineStore('jobs', () => {
     kinds.value = []
     queues.value = []
     undispatchedOnly.value = false
+    contexts.value = []
     selectedId.value = null
   }
 
@@ -149,6 +160,7 @@ export const useJobsStore = defineStore('jobs', () => {
     queues.value = []
     modelFilter.value = null
     undispatchedOnly.value = false
+    contexts.value = []
   }
 
   function endpoint(): string {
@@ -219,6 +231,7 @@ export const useJobsStore = defineStore('jobs', () => {
     kinds,
     queues,
     undispatchedOnly,
+    contexts,
     modelFilter,
     scopeToView,
     selectedId,
@@ -233,6 +246,7 @@ export const useJobsStore = defineStore('jobs', () => {
     select,
     toggleKind,
     toggleQueue,
+    toggleContext,
     filterByModel,
     focusJob,
     clearFilters,

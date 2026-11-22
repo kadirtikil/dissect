@@ -39,6 +39,13 @@ class DomainsTest extends TestCase
     }
 
     #[Test]
+    public function the_page_is_handed_every_domain_name_for_its_colours(): void
+    {
+        $this->get('/dissect')->assertOk()
+            ->assertSee('domains: ["Billing","Identity","Sales"]', escape: false);
+    }
+
+    #[Test]
     public function every_class_is_listed_under_its_domain(): void
     {
         $domains = $this->domains();
