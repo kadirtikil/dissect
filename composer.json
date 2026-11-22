@@ -25,6 +25,7 @@
         "illuminate/database": "^13.0",
         "illuminate/routing": "^13.0",
         "illuminate/support": "^13.0",
+        "laravel/mcp": "^1.2",
         "nikic/php-parser": "^5.0"
     },
     "suggest": {
