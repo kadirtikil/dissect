@@ -51,7 +51,7 @@ final class Snapshot
         return [
             'version' => self::VERSION,
             'models' => self::models($payloads['schema'] ?? []),
-            'routes' => self::keyed($payloads['routes']['routes'] ?? [], self::route(...)),
+            'routes' => self::keyed(array_filter($payloads['routes']['routes'] ?? [], fn (array $route) => ! self::ours($route)), self::route(...)),
             'jobs' => self::keyed($payloads['jobs']['jobs'] ?? [], self::job(...)),
             'providers' => self::keyed($payloads['providers']['providers'] ?? [], self::provider(...)),
         ];
@@ -154,6 +154,16 @@ final class Snapshot
             ], $node['columns'] ?? []), 'facts', 'name')),
             'relations' => self::sorted($relations[$node['id']] ?? []),
         ]));
+    }
+
+    /**
+     * dissect's own page and endpoints. They are registered only where the
+     * page is switched on, so a snapshot taken locally would have them and
+     * CI's would not, and every one would read as a route removed.
+     */
+    protected static function ours(array $route): bool
+    {
+        return str_starts_with(ltrim((string) ($route['action']['class'] ?? ''), '\\'), 'KdrDev\\Dissect\\');
     }
 
     /** @return array<string, mixed> */

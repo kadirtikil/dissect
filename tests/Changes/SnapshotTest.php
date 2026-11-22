@@ -202,6 +202,25 @@ class SnapshotTest extends TestCase
     }
 
     #[Test]
+    public function dissects_own_routes_are_left_out(): void
+    {
+        $payloads = $this->payloads();
+        $payloads['routes']['routes'][] = [
+            'id' => 'GET|HEAD:dissect/changes.json',
+            'name' => 'dissect.changes',
+            'middleware' => ['web'],
+            'action' => ['type' => 'controller', 'class' => 'KdrDev\\Dissect\\Http\\Controllers\\DissectController', 'method' => 'changesJson', 'label' => 'DissectController@changesJson'],
+        ];
+
+        $this->assertSame(['GET:up', 'POST:api/invoices'], array_keys(Snapshot::of($payloads)['routes']));
+
+        // And from the real app, where the page is switched on.
+        $this->assertNotEmpty(array_filter($this->app['router']->getRoutes()->getRoutes(), fn ($route) => str_starts_with((string) $route->getName(), 'dissect.')));
+        $taken = $this->app->make(Snapshot::class)->take();
+        $this->assertSame([], array_filter(array_keys($taken['routes']), fn (string $id) => str_contains($id, ':dissect')));
+    }
+
+    #[Test]
     public function taking_one_of_the_workbench_twice_gives_the_same_bytes(): void
     {
         $first = Snapshot::encode($this->app->make(Snapshot::class)->take());
