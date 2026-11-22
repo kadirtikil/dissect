@@ -114,4 +114,70 @@ class DomainFileTest extends TestCase
         ], $file->problems());
         $this->assertSame(['Ok'], array_map(fn ($c) => $c->name, $file->contexts()));
     }
+
+    #[Test]
+    public function it_reads_each_domains_rule(): void
+    {
+        $file = $this->file(['rules' => [
+            'Sales' => ['may_use' => ['Billing', 'Billing'], 'must_not_use' => ['\\Illuminate\\Http', 'App\\Support\\Clock']],
+            'Billing' => ['must_not_use' => ['Illuminate\\Http']],
+            'Identity' => ['may_use' => []],
+        ]]);
+
+        $rules = $file->rules();
+
+        // Keyed and sorted by domain.
+        $this->assertSame(['Billing', 'Identity', 'Sales'], array_keys($rules));
+        $this->assertSame(
+            ['domain' => 'Sales', 'may_use' => ['Billing'], 'must_not_use' => ['Illuminate\\Http', 'App\\Support\\Clock']],
+            $rules['Sales']->toArray(),
+        );
+
+        // No may_use: free to use any domain. An empty one: free to use none.
+        $this->assertNull($rules['Billing']->mayUse);
+        $this->assertSame([], $rules['Identity']->mayUse);
+        $this->assertSame([], $file->problems());
+    }
+
+    #[Test]
+    public function a_rule_allows_its_own_domain_and_its_list_and_forbids_by_namespace(): void
+    {
+        $rule = $this->file(['rules' => ['Sales' => ['may_use' => ['Billing'], 'must_not_use' => ['Illuminate\\Http']]]])->rules()['Sales'];
+
+        $this->assertTrue($rule->allows('Sales'));
+        $this->assertTrue($rule->allows('Billing'));
+        $this->assertFalse($rule->allows('Identity'));
+
+        $this->assertSame('Illuminate\\Http', $rule->forbids('Illuminate\\Http\\Request'));
+        $this->assertSame('Illuminate\\Http', $rule->forbids('Illuminate\\Http'));
+        // A namespace is a whole segment, not a prefix of a name.
+        $this->assertNull($rule->forbids('Illuminate\\HttpClient\\Factory'));
+        $this->assertNull($rule->forbids('Illuminate\\Support\\Collection'));
+    }
+
+    #[Test]
+    public function a_mistyped_rule_is_reported_and_never_silently_stricter(): void
+    {
+        $this->assertSame(['"rules" must be an object keyed by domain name.'], $this->file(['rules' => ['Sales']])->problems());
+
+        $file = $this->file(['rules' => [
+            'Sales' => ['may_uses' => ['Billing']],
+            'Billing' => ['may_use' => 'Sales', 'must_not_use' => ['Illuminate\\Http', 42]],
+            'Identity' => 'none',
+        ]]);
+
+        $this->assertSame([
+            'rules.Sales: unknown key "may_uses"; a rule has may_use and must_not_use.',
+            'rules.Billing.may_use must be a list of names.',
+            'rules.Billing.must_not_use: every entry must be a non-empty string.',
+            'rules.Identity must be an object with may_use and/or must_not_use.',
+        ], $file->problems());
+
+        // A may_use that cannot be read leaves the domain unrestricted rather
+        // than forbidding everything; what could be read still applies.
+        $this->assertNull($file->rules()['Billing']->mayUse);
+        $this->assertSame(['Illuminate\\Http'], $file->rules()['Billing']->mustNotUse);
+        $this->assertNull($file->rules()['Sales']->mayUse);
+        $this->assertArrayNotHasKey('Identity', $file->rules());
+    }
 }

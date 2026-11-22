@@ -54,4 +54,16 @@ class NoDomainsTest extends TestCase
             }
         }
     }
+
+    #[Test]
+    public function a_plain_app_has_no_rules_and_nothing_to_break(): void
+    {
+        config()->set('dissect.domains.root', realpath(__DIR__.'/../../workbench'));
+
+        $payload = $this->getJson('/dissect/boundaries.json')->assertOk()->json();
+
+        $this->assertSame([], $payload['rules']);
+        $this->assertSame([], $payload['violations']);
+        $this->assertSame([], $payload['problems']);
+    }
 }

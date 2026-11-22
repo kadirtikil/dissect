@@ -18,7 +18,7 @@ class SurfacesTest extends TestCase
     {
         $surfaces = $this->app->make(Surfaces::class);
 
-        foreach (['schema' => 'nodes', 'routes' => 'routes', 'jobs' => 'jobs', 'providers' => 'providers', 'domains' => 'domains', 'classes' => 'classes'] as $name => $key) {
+        foreach (['schema' => 'nodes', 'routes' => 'routes', 'jobs' => 'jobs', 'providers' => 'providers', 'domains' => 'domains', 'classes' => 'classes', 'boundaries' => 'violations'] as $name => $key) {
             $payload = $surfaces->export($name);
             $served = $this->getJson("/dissect/{$name}.json")->assertOk()->json();
 
@@ -64,7 +64,7 @@ class SurfacesTest extends TestCase
     public function an_unknown_surface_says_what_there_is(): void
     {
         $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('Pick one of: schema, routes, jobs, providers, domains, classes.');
+        $this->expectExceptionMessage('Pick one of: schema, routes, jobs, providers, domains, classes, boundaries.');
 
         $this->app->make(Surfaces::class)->export('queue');
     }

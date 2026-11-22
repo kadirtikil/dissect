@@ -21,11 +21,11 @@ use Throwable;
 class ExportCommand extends Command
 {
     protected $signature = 'dissect:export
-        {surface=all : schema, routes, jobs, providers, domains, classes, or all}
+        {surface=all : schema, routes, jobs, providers, domains, classes, boundaries, or all}
         {--format=json : json, md for a digest to read, or mermaid for the models as a diagram}
         {--output= : Write to this file instead of the terminal}';
 
-    protected $description = 'Export the models, routes, jobs, providers, domains or class references dissect reads';
+    protected $description = 'Export the models, routes, jobs, providers, domains, class references or boundary violations dissect reads';
 
     public function handle(Surfaces $surfaces, Filesystem $files, Markdown $markdown, Mermaid $mermaid): int
     {

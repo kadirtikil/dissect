@@ -307,6 +307,54 @@ a `dispatch` and not also a `new`. Only references between your own classes
 are listed. Everything is read as syntax, so nothing is loaded or run, and a
 file that doesn't parse is listed as such rather than skipped silently.
 
+### Boundary rules
+
+Once you know which domain uses which, you can say which ones *may*. Add a
+`rules` object to `.dissect/domains.json`, keyed by domain:
+
+```json
+{
+    "version": 1,
+    "rules": {
+        "Billing": { "may_use": ["Shared"], "must_not_use": ["Illuminate\\Http"] },
+        "Sales": { "may_use": ["Billing", "Shared"] }
+    }
+}
+```
+
+- **`may_use`** lists the other domains this one's classes may name. Anything
+  else is a violation. Leave the key out to allow every domain, or give an
+  empty list to allow none. A domain may always use itself, and a class in no
+  domain is never a violation.
+- **`must_not_use`** lists namespaces (or single classes) this domain must not
+  name at all, the framework's and packages' included. `Illuminate\Http` keeps
+  requests out of a domain layer.
+
+A domain with no rule isn't checked, so you can start with one domain and add
+the rest when they're ready. An app with no rules never builds the class index
+for it. Every reference kind counts, the Laravel ones included: a relation, a
+dispatched job or a container binding across a boundary is a violation like
+any `new` or type hint.
+
+A rule that can't be read, or that names a domain that doesn't exist, is
+reported rather than ignored. A typo in an allow-list would otherwise be a
+check that never fires.
+
+```bash
+php artisan dissect:export boundaries --format=md
+```
+
+```
+2 rules, 1 violation.
+
+## Sales (1)
+- Sales may not use Billing: Customer → Invoice (relation, line 19). `app/Domain/Sales/Models/Customer.php:19`
+```
+
+> 🚧 **Coming next:** `dissect:check`, which fails when a rule is broken, and
+> a Claude Code hook that runs it on every file an agent edits. Then
+> violations on the Domains page.
+
 > 🚧 **Coming next: the domain map.** A graph with one node per domain and the
 > dependencies between domains as edges, so you can see the shape of the whole
 > app at the domain level and click through to the classes behind each
@@ -542,6 +590,7 @@ a script, for a CI step, and for handing an agent a map of the app.
 php artisan dissect:export                                # every surface, as JSON
 php artisan dissect:export routes                         # one surface
 php artisan dissect:export classes --format=md            # which class uses which
+php artisan dissect:export boundaries --format=md         # where a domain breaks its rule
 php artisan dissect:export jobs --format=md               # a digest to read
 php artisan dissect:export schema --format=mermaid        # the models as an ER diagram
 php artisan dissect:export --format=md --output=docs/app.md
@@ -642,7 +691,7 @@ request.
 | --- | --- | --- |
 | `.dissect/layout.json` | the page, when you drag a card | Where each model sits on the graph. |
 | `.dissect/views.json` | the page, when you save a view | Named subsets of the graph. |
-| `.dissect/domains.json` | you, by hand | Domains the folder layout doesn't express. Never written by dissect. |
+| `.dissect/domains.json` | you, by hand | Domains the folder layout doesn't express, and the boundary rules between them. Never written by dissect. |
 
 ### 🧷 Upgrades and your files
 
@@ -848,6 +897,7 @@ one but the queue can also be printed with
 | `/dissect/providers.json` | Provider trees. |
 | `/dissect/domains.json` | Domains, their classes, findings and unassigned classes. |
 | `/dissect/classes.json` | Every class and the app classes it uses. |
+| `/dissect/boundaries.json` | The boundary rules, what's wrong with them, and every violation. |
 | `/dissect/queue.json` | The live queue. |
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for the full design and every payload

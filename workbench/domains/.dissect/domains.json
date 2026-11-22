@@ -5,5 +5,9 @@
             "name": "Identity",
             "paths": ["app/Http/Controllers/Auth"]
         }
-    ]
+    ],
+    "rules": {
+        "Billing": { "may_use": ["Sales"], "must_not_use": ["Illuminate\\Http"] },
+        "Sales": { "may_use": [] }
+    }
 }

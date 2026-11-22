@@ -45,6 +45,7 @@ final class Markdown
             'providers' => $this->providers($payload),
             'domains' => $this->domains($payload),
             'classes' => $this->classes($payload),
+            'boundaries' => $this->boundaries($payload),
         };
     }
 
@@ -689,6 +690,86 @@ final class Markdown
 
             return '- '.$pair.': '.array_sum($counts[$pair]).' ('.implode(', ', $kinds).')';
         }, array_keys($counts));
+    }
+
+    // ── Boundaries ────────────────────────────────────────────────────────
+
+    /**
+     * The rules, what is wrong with them, and every violation with the file
+     * and line it is at: what an agent needs to fix one.
+     *
+     * @param  array<string, mixed>  $payload
+     */
+    public function boundaries(array $payload): string
+    {
+        $rules = $payload['rules'] ?? [];
+        $violations = $payload['violations'] ?? [];
+        $lines = ['# Boundaries', ''];
+
+        if (! ($payload['enabled'] ?? true)) {
+            return $this->join([...$lines, 'Domain detection is switched off (dissect.domains.enabled), so no rule is checked.']);
+        }
+
+        if ($rules === []) {
+            return $this->join([...$lines, 'No boundary rules. Add a "rules" object to .dissect/domains.json to check a domain.']);
+        }
+
+        $lines[] = count($rules).' '.(count($rules) === 1 ? 'rule' : 'rules').', '
+            .($violations === [] ? 'no violations.' : count($violations).' '.(count($violations) === 1 ? 'violation.' : 'violations.'));
+
+        if ($payload['unchecked'] ?? []) {
+            $lines[] = count($payload['unchecked']).' '.(count($payload['unchecked']) === 1 ? 'file' : 'files').' could not be parsed, so '
+                .(count($payload['unchecked']) === 1 ? 'it was' : 'they were').' not checked: '.implode(', ', $payload['unchecked']).'.';
+        }
+
+        $lines[] = '';
+        $lines[] = '## Rules';
+
+        foreach ($rules as $rule) {
+            $lines[] = '- '.$this->rule($rule);
+        }
+
+        if ($payload['problems'] ?? []) {
+            $lines[] = '';
+            $lines[] = '## Problems with the rules';
+
+            foreach ($payload['problems'] as $problem) {
+                $lines[] = '- '.$problem;
+            }
+        }
+
+        $byDomain = [];
+
+        foreach ($violations as $violation) {
+            $byDomain[$violation['domain']][] = $violation;
+        }
+
+        foreach ($byDomain as $domain => $found) {
+            $lines[] = '';
+            $lines[] = '## '.$domain.' ('.count($found).')';
+
+            foreach ($found as $violation) {
+                $lines[] = '- '.$violation['message'].' `'.$violation['file'].':'.($violation['lines'][0] ?? 0).'`';
+            }
+        }
+
+        return $this->join($lines);
+    }
+
+    /** @param  array<string, mixed>  $rule */
+    protected function rule(array $rule): string
+    {
+        $parts = [];
+
+        if (($rule['may_use'] ?? null) !== null) {
+            $parts[] = $rule['may_use'] === [] ? 'may use no other domain' : 'may use '.implode(', ', $rule['may_use']);
+        }
+
+        if ($rule['must_not_use'] ?? []) {
+            $parts[] = 'must not use '.implode(', ', $rule['must_not_use']);
+        }
+
+        return '**'.$rule['domain'].'** '.($parts === [] ? 'has an empty rule' : implode('; ', $parts));
     }
 
     // ── Shared ────────────────────────────────────────────────────────────
