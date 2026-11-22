@@ -643,9 +643,11 @@ main.ts                 mounts App; no router (see "Decisions")
     │   └── JobDetail      queue, retries, payload, middleware, dispatchers, carries
     ├── QueuePanel      depth, then the three tenses; polls while it is open
     │   └── QueueSection   one tense as a table, or why it could not be read
-    └── DomainsPanel    every domain, findings, unassigned; or what would count as one
-        └── DomainCard     name, how it was found, folders, classes by namespace
-            └── DomainLinks   depends on / used by, one chip per domain, red when it breaks a rule; opens to the references
+    ├── DomainsPanel    every domain, findings, unassigned; or what would count as one
+    │   └── DomainCard     name, how it was found, folders, classes by namespace
+    │       └── DomainLinks   depends on / used by, one chip per domain, red when it breaks a rule; opens to the references
+    └── ChangesPanel    the baseline switch, start/restart/stop watching, severity chips, changes by part
+        └── ChangeItem     severity, name, new/gone/changed, each fact; opens the item on its page
 
 components/domains/DomainFacet.vue   the domain chips every list shares
 
@@ -659,6 +661,7 @@ stores/queue.ts         the odd one: polled runtime state, nothing to cache
 stores/domains.ts       lazy load of the domain list; polled like the other surfaces; the colour order
 stores/classes.ts       lazy load of the class index, only once there are domains; polled the same way
 stores/boundaries.ts    lazy load of the rules and their violations, beside the class index
+stores/changes.ts       lazy load of the change report; the chosen baseline; start and stop watching
 stores/navigation.ts    which page is open: fragment, then storage, then default
 pages/registry.ts       every page there is — the one file a new surface is added to
 lib/toolbar.ts          where a page hangs its own header controls
@@ -676,6 +679,7 @@ lib/elapsed.ts          "2m ago" / "in 4h" — a queue is read in relative time
 lib/domains.ts          domain → colour (the ramp, then spread hues); the colour order; facet keys; how one was found, in words
 lib/dependencies.ts     the class index folded into domain → domain links, each with its references
 lib/boundaries.ts       what a rule allows (BoundaryRule::allows, again) and how it reads
+lib/changes.ts          parts in sidebar order, severity → colour, the header line; nothing judged here
 lib/bootstrap.ts        the host seam
 ```
 
@@ -1358,7 +1362,7 @@ are running. `tests/StateVersioningTest.php` pins all of it.
 | **`dist/` is committed** | The package serves it directly. One `composer require`, no build step in the host app. `.gitignore` and Tailwind's `@source not` both encode this |
 | **Assets served by a route, not `vendor:publish`** | Nothing to re-publish after `composer update` |
 | **Standalone Blade page, not Inertia** | No dependency on the host's frontend build, Vue version or Tailwind version; the host's design tokens cannot collide with ours |
-| **No vue-router** | The page is registered as exactly one GET route with no SPA fallback, so a reload on a path-matching route 404s however the mount prefix is resolved. Pages are addressed by fragment instead (`stores/navigation.ts`), which never reaches the server. Five flat pages with no params also buy nothing from a router |
+| **No vue-router** | The page is registered as exactly one GET route with no SPA fallback, so a reload on a path-matching route 404s however the mount prefix is resolved. Pages are addressed by fragment instead (`stores/navigation.ts`), which never reaches the server. Flat pages with no params also buy nothing from a router |
 | **The graph is not mounted by the page registry** | It starts the change poller the routes surface also depends on. Mount it lazily like the others and live updates elsewhere stop until somebody visits the graph. `pages/registry.ts` carries the warning next to the flag |
 | **Routes local-only by default** | It exposes the full schema and writes a file. The gate is `APP_ENV`, not install-time: the provider is auto-discovered and boots wherever the package is installed, so `middleware` is the control that holds when the environment check does not |
 | **A newer state file is never overwritten** | Both authored files are rewritten in full and sanitised on read, so saving over a format this version does not understand is silent data loss. Refusing has to ship *before* the format changes to be worth anything |
@@ -1425,6 +1429,8 @@ are running. `tests/StateVersioningTest.php` pins all of it.
 | **The summary counts items, not facts** | "2 breaking" is two things somebody has to look at. A model that lost five columns is one thing to look at |
 | **Watching lives in `storage/`, the snapshot in `.dissect/`** | The snapshot is what the team agreed on and is reviewed in PRs. Watching is one person's "since I sat down", and committing it would make every teammate's diff start from someone else's afternoon |
 | **The page and agents prefer watching; the CLI defaults to the snapshot** | Someone who started watching wants to see what changed since. CI has no one watching, and must not change its answer because a `storage/` file happens to exist |
+| **The page shows the server's report as it is** | Severity and wording come from `Changes\Report`, so the page only groups, colours and filters. Judging a change again in TypeScript would be the second engine the one-engine decision rules out |
+| **The page can start watching, not snapshot** | Watching is one person's, in `storage/`, and starting it from where you're looking is the point. The committed snapshot is the team's, so it's taken in the terminal and reviewed in a PR |
 | **`dissect_changes` cannot start watching** | Every MCP tool is read-only. An agent that could move its own baseline could make its changes disappear from the report |
 | **`dissect:diff` exits 0 unless `--fail-on` is given** | A diff is a report. Whether a breaking change is allowed is the team's call, made in CI with `--fail-on` |
 | **Highlight is not selection** | Canvas selection is a gesture that feeds view membership; opening an endpoint must not quietly change what a new view would contain |
@@ -1515,6 +1521,7 @@ Config (`config/dissect.php`): `enabled`, `path`, `middleware`,
 | Change how a change is worded | `src/Changes/Wording.php` |
 | Change where baselines live, or which one is preferred | `src/Changes/Baselines.php` (`NAMES` is the order of preference) |
 | Change what dissect:diff prints, or when it fails | `src/Console/DiffCommand.php`; Markdown in `Markdown::changes()` |
+| Change what the Changes page shows | `resources/js/pages/ChangesPanel.vue`, `components/changes/ChangeItem.vue`, `lib/changes.ts` |
 | Add a surface to `dissect:export` | `NAMES` and `export()` in `src/Support/Surfaces.php`, then a method in `src/Digest/Markdown.php` |
 | Change how long a payload is cached, or what invalidates it | `src/Support/PayloadCache.php` (the stamp), and each exporter's `fingerprint()` |
 | Add an export format | `formats()` and the `match` in `src/Console/ExportCommand.php` |
