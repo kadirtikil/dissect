@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test'
 import type { DomainsFile } from '../resources/js/types/domains'
+import type { ClassesFile } from '../resources/js/types/classes'
 
 /**
  * The domain list.
@@ -97,4 +98,131 @@ test('reports a broken domains.json above everything else', async ({ page }) => 
   await expect(page.getByTestId('domain-problems').getByText('not valid JSON')).toBeVisible()
   // The folders still count while the file is broken.
   await expect(page.locator('[data-domain="Billing"]')).toBeVisible()
+})
+
+/** The class index for SPLIT, plus a Sales domain the domain list need not name. */
+const CLASSES: ClassesFile = {
+  classes: [
+    {
+      id: 'App\\Domain\\Billing\\Models\\Invoice',
+      kind: 'class',
+      abstract: false,
+      file: 'app/Domain/Billing/Models/Invoice.php',
+      line: 10,
+      context: 'Billing',
+      uses: [
+        { to: 'App\\Domain\\Sales\\Models\\Customer', kind: 'relation', lines: [15] },
+        { to: 'App\\Domain\\Billing\\Jobs\\SendInvoice', kind: 'dispatch', lines: [30] },
+      ],
+    },
+    {
+      id: 'App\\Domain\\Billing\\Jobs\\SendInvoice',
+      kind: 'class',
+      abstract: false,
+      file: 'app/Domain/Billing/Jobs/SendInvoice.php',
+      line: 8,
+      context: 'Billing',
+      uses: [{ to: 'App\\Domain\\Sales\\Models\\Customer', kind: 'type', lines: [12, 14] }],
+    },
+    {
+      id: 'App\\Domain\\Sales\\Models\\Customer',
+      kind: 'class',
+      abstract: false,
+      file: 'app/Domain/Sales/Models/Customer.php',
+      line: 9,
+      context: 'Sales',
+      uses: [{ to: 'App\\Domain\\Billing\\Models\\Invoice', kind: 'relation', lines: [19] }],
+    },
+    {
+      id: 'App\\Http\\Controllers\\Auth\\LoginController',
+      kind: 'class',
+      abstract: false,
+      file: 'app/Http/Controllers/Auth/LoginController.php',
+      line: 7,
+      context: 'Identity',
+      uses: [{ to: 'App\\Support\\Clock', kind: 'static', lines: [20] }],
+    },
+    {
+      id: 'App\\Support\\Clock',
+      kind: 'class',
+      abstract: false,
+      file: 'app/Support/Clock.php',
+      line: 5,
+      context: null,
+      uses: [],
+    },
+  ],
+  unreadable: [],
+}
+
+const WITH_SALES: DomainsFile = {
+  ...SPLIT,
+  domains: [
+    ...SPLIT.domains,
+    {
+      name: 'Sales',
+      sources: ['domain-folder'],
+      roots: ['app/Domain/Sales'],
+      classes: ['App\\Domain\\Sales\\Models\\Customer'],
+    },
+  ],
+}
+
+test('says which domains each one depends on, and lists the references behind it', async ({
+  page,
+}) => {
+  await page.route('**/classes.json', (route) => route.fulfill({ json: CLASSES }))
+  await open(page, WITH_SALES)
+
+  await expect(page.getByText('5 classes read')).toBeVisible()
+
+  const billing = page.locator('[data-domain="Billing"]')
+  const dependsOn = billing.locator('[data-direction="depends-on"]')
+  const usedBy = billing.locator('[data-direction="used-by"]')
+
+  // One reference per class pair and kind; the job Invoice dispatches stays
+  // inside Billing and does not count.
+  await expect(dependsOn.locator('[data-link="Sales"]')).toHaveText(/Sales\s*2/)
+  await expect(usedBy.locator('[data-link="Sales"]')).toHaveText(/Sales\s*1/)
+  await expect(dependsOn.getByLabel('names this domain back')).toBeVisible()
+
+  const references = billing.getByTestId('link-references')
+
+  await expect(references).toHaveCount(0)
+  await dependsOn.locator('[data-link="Sales"]').click()
+  await expect(references.getByText('relation 1 · type 1')).toBeVisible()
+  await expect(references.getByText('app/Domain/Billing/Models/Invoice.php:15')).toBeVisible()
+  await expect(references.getByText('app/Domain/Billing/Jobs/SendInvoice.php:12, 14')).toBeVisible()
+
+  // The same chip again folds it; the other direction opens its own.
+  await dependsOn.locator('[data-link="Sales"]').click()
+  await expect(references).toHaveCount(0)
+  await usedBy.locator('[data-link="Sales"]').click()
+  await expect(references.getByText('app/Domain/Sales/Models/Customer.php:19')).toBeVisible()
+
+  // A reference to a class in no domain is not a dependency.
+  await expect(page.locator('[data-domain="Identity"]').getByTestId('domain-links')).toHaveText(
+    /No class here names another domain's/,
+  )
+})
+
+test('an app with no domains never asks for the class index', async ({ page }) => {
+  let asked = false
+  await page.route('**/classes.json', (route) => {
+    asked = true
+    return route.fulfill({ json: CLASSES })
+  })
+
+  await open(page)
+  await expect(page.getByTestId('domains-empty')).toBeVisible()
+  expect(asked).toBe(false)
+})
+
+test('lists domains without dependencies when the class index will not load', async ({ page }) => {
+  await page.route('**/classes.json', (route) => route.fulfill({ status: 500, body: 'boom' }))
+  await open(page, WITH_SALES)
+
+  await expect(page.getByTestId('classes-status')).toHaveText(/Could not load classes\.json/)
+  await expect(page.locator('[data-domain="Billing"]')).toBeVisible()
+  await expect(page.getByTestId('domain-links')).toHaveCount(0)
 })
