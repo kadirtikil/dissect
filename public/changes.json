@@ -1,0 +1,10 @@
+{
+  "against": null,
+  "baselines": {
+    "watch": { "exists": false, "path": "storage/dissect/watch.json", "taken_at": null },
+    "snapshot": { "exists": false, "path": ".dissect/snapshot.json", "taken_at": null }
+  },
+  "problem": null,
+  "summary": { "breaking": 0, "risky": 0, "additive": 0 },
+  "changes": []
+}

@@ -54,6 +54,13 @@ export interface Bootstrap {
    */
   boundariesUrl?: string
   /**
+   * Endpoint returning what changed since a baseline. A URL: it takes a
+   * snapshot of the app to build, so only the Changes page asks for it.
+   */
+  changesUrl?: string
+  /** Where to POST to start watching, and DELETE to stop. */
+  watchUrl?: string
+  /**
    * Every domain the folders and domains.json name, sorted. Only the names:
    * they cost a few directory listings, and they are what keeps a domain the
    * same colour on every page.
