@@ -204,7 +204,9 @@ DissectServiceProvider    wiring; registers routes only when enabled
   │     ├── DomainMap           /domains.json: every domain and its classes, built on demand
   │     ├── SourceFiles         the one walk of the app's own PHP files, shared by both
   │     ├── ClassIndex          /classes.json: every class and the app classes it names
-  │     └── References          php-parser visitor: each name a declaration uses, and how
+  │     ├── References          php-parser visitor: each name a declaration uses, and how
+  │     ├── BoundaryRule        one domain's may_use / must_not_use, from domains.json
+  │     └── Boundaries          /boundaries.json: every reference that breaks a rule
   ├── Support\CodeOwnership   app / vendor / framework, for routes and provider trees alike
   ├── Support\Surfaces        every payload by name, for callers that are not the page
   ├── Support\PayloadCache    one fingerprint-keyed cache for the page, the console and MCP
@@ -1099,6 +1101,49 @@ Read, never written: there is no editor for it yet. Paths are relative to
 `domains.root` or absolute, `*` stands for one directory name, and a path may
 name one file. `conventions: false` turns folder detection off.
 
+`rules` is optional, keyed by domain name, and may name any domain however it
+was found:
+
+```json
+"rules": { "Sales": { "may_use": ["Billing"], "must_not_use": ["Illuminate\\Http"] } }
+```
+
+`may_use` missing means every domain is allowed; `[]` means none. A rule's own
+domain is always allowed. `must_not_use` entries are namespaces matched by
+whole segment (`Illuminate\Http` covers `Illuminate\Http\Request`, not
+`Illuminate\HttpClient`). A key that isn't one of the two, or a field that
+isn't a list of names, is a problem in words. An unreadable `may_use` leaves the
+domain unrestricted rather than forbidding everything on a typo.
+
+### `boundaries.json` (generated — never hand-edited, never written)
+
+Served at `/dissect/boundaries.json` and by `dissect:export boundaries`. Built
+from `ClassIndex::declarations()`, so framework references count for
+`must_not_use`. With no rules it returns at once and never builds the index.
+
+```json
+{
+  "enabled": true,
+  "rules": [{ "domain": "Sales", "may_use": [], "must_not_use": [] }],
+  "violations": [
+    { "rule": "may_use", "domain": "Sales",
+      "from": "App\\Domain\\Sales\\Models\\Customer", "file": "app/Domain/Sales/Models/Customer.php",
+      "to": "App\\Domain\\Billing\\Models\\Invoice", "to_domain": "Billing", "namespace": null,
+      "kind": "relation", "lines": [19],
+      "message": "Sales may not use Billing: Customer → Invoice (relation, line 19)." }
+  ],
+  "problems": ["rules.Sales.may_use: no domain is called Biling."],
+  "unchecked": ["app/Support/Broken.php"],
+  "fingerprint": "4b0e…"
+}
+```
+
+`rule` is `may_use` or `must_not_use`; `namespace` is the `must_not_use` entry
+that matched. One reference breaking both rules is two violations. `problems`
+here are rules naming a domain nothing defines; what is wrong with the file
+itself is in `domains.json`'s `problems`. `unchecked` lists files that did not
+parse. The fingerprint is the source walk's signal plus the rules file's.
+
 ### `layout.json` (authored — safe to commit and review)
 
 ```json
@@ -1236,6 +1281,8 @@ are running. `tests/StateVersioningTest.php` pins all of it.
 | **The class index parses each file once and keeps none of the trees** | The route analyzers' `ClassSource` keeps every tree it parses, which is right for the few classes behind a route and wrong for every file in the app. The index keeps only what it found |
 | **A reference is a name in the syntax, not a resolved call** | `$invoice->customer->notify()` reaches three classes through variables whose types are only known by running the code or by a type checker's inference. Names are what a boundary rule can be checked against without guessing, and what an agent edits |
 | **Laravel-aware kinds win over syntax kinds** | `dispatch(new SendInvoice)` is a `new` to a parser and a dispatch to anyone reading it. A rule like "Sales may dispatch Billing's jobs but not build its models" needs the difference, and a name counted twice would inflate every number built on it |
+| **A domain without a rule is not checked** | Rules are how a team says a boundary exists. Checking every domain against an implicit "use nothing" would make the first run all noise, and an app adopting rules one domain at a time needs the others left alone |
+| **A rule that cannot be read is reported, and is never stricter than it was** | A typo in a guardrail is worse than no guardrail: it looks like a check. `may_uses` is a problem in words, and an unreadable `may_use` means "unrestricted", not "nothing" |
 | **Only app-to-app references go on the wire** | Most of every file is framework. Sending it would multiply the payload for a page that only draws the app, and the checks that need it run on the server |
 | **Highlight is not selection** | Canvas selection is a gesture that feeds view membership; opening an endpoint must not quietly change what a new view would contain |
 
@@ -1289,6 +1336,7 @@ Config (`config/dissect.php`): `enabled`, `path`, `middleware`,
 | Recognise another folder layout as domains | `src/Architecture/Conventions.php` |
 | Change which domain wins for a class | `src/Architecture/ContextResolver.php` |
 | Change what the domain list reports | `src/Architecture/DomainMap.php` |
+| Add a kind of boundary rule | read it in `DomainFile::readRules()`, hold it on `BoundaryRule`, check it in `Boundaries::violations()` |
 | Change what counts as the application's code | `src/Support/CodeOwnership.php` |
 | Change what counts as a route change | `src/Routes/RouteFingerprint.php`, `routes.watch_paths` |
 | Change how the endpoint list is filtered or grouped | `resources/js/lib/routeFilters.ts` |
