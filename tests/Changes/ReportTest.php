@@ -184,6 +184,29 @@ class ReportTest extends TestCase
     }
 
     #[Test]
+    public function a_field_now_required_is_not_also_said_to_have_gained_the_rule(): void
+    {
+        $route = fn (bool $required, array $rules) => ['routes' => ['POST:api/x' => ['request' => ['source' => 'form-request', 'fields' => [
+            'body' => ['type' => 'string', 'required' => $required, 'rules' => $rules],
+        ]]]]];
+
+        $report = Report::between($route(false, ['nullable', 'string']), $route(true, ['required', 'string']));
+
+        $this->assertSame(
+            ['~ request field body: now required', '- rule nullable on request field body'],
+            array_column($report['changes'][0]['facts'], 'text'),
+        );
+    }
+
+    #[Test]
+    public function the_summary_reads_as_a_sentence(): void
+    {
+        $this->assertSame('3 changes: 1 breaking, 2 additive', Report::summary(['breaking' => 1, 'risky' => 0, 'additive' => 2]));
+        $this->assertSame('1 change since .dissect/snapshot.json: 1 risky', Report::summary(['breaking' => 0, 'risky' => 1, 'additive' => 0], '.dissect/snapshot.json'));
+        $this->assertSame('0 changes', Report::summary(['breaking' => 0, 'risky' => 0, 'additive' => 0]));
+    }
+
+    #[Test]
     public function nothing_changed_is_an_empty_report(): void
     {
         $this->assertSame(['summary' => ['breaking' => 0, 'risky' => 0, 'additive' => 0], 'changes' => []], Report::between($this->before(), $this->before()));

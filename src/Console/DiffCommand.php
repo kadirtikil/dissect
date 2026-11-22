@@ -111,7 +111,7 @@ class DiffCommand extends Command
         }
 
         $this->newLine();
-        $this->components->info(Report::summary($report['summary'])." since {$shown}.");
+        $this->components->info(Report::summary($report['summary'], $shown).'.');
     }
 
     /** The severity in its colour, padded so every line's text starts in one column. */

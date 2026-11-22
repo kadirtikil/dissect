@@ -84,7 +84,7 @@ class DiffCommandTest extends TestCase
         $this->assertStringContainsString("  additive + route POST api/posts\n", $out);
         $this->assertStringContainsString("  breaking ~ route PUT|PATCH api/posts/{post}\n", $out);
         $this->assertStringContainsString("  breaking     ~ name posts.edit → posts.update\n", $out);
-        $this->assertStringContainsString('3 changes: 1 breaking, 2 additive since '.$this->file.'.', $out);
+        $this->assertStringContainsString('3 changes since '.$this->file.': 1 breaking, 2 additive.', $out);
     }
 
     #[Test]

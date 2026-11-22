@@ -30,7 +30,7 @@ final class Report
                 ...$fact,
                 'severity' => Severity::ofFact($change['part'], $fact),
                 'text' => Wording::fact($fact),
-            ], $change['facts']);
+            ], self::withoutEchoes($change['facts']));
 
             $name = $names[$change['part']][$change['id']] ?? $change['id'];
 
@@ -60,16 +60,41 @@ final class Report
     }
 
     /**
-     * "3 changes: 1 breaking, 2 additive", or "0 changes".
+     * Facts that only repeat another: a field that is "now required" also
+     * gained the rule `required`, and saying both is saying it twice.
+     *
+     * @param  array<int, array{path: array<int, string>, change: string, before: mixed, after: mixed}>  $facts
+     * @return array<int, array{path: array<int, string>, change: string, before: mixed, after: mixed}>
+     */
+    protected static function withoutEchoes(array $facts): array
+    {
+        $required = [];
+
+        foreach ($facts as $fact) {
+            if (end($fact['path']) === 'required') {
+                $required[implode("\0", array_slice($fact['path'], 0, -1))] = true;
+            }
+        }
+
+        return array_values(array_filter($facts, fn (array $fact) => ! (
+            end($fact['path']) === 'rules'
+            && in_array($fact['before'] ?? $fact['after'], ['required'], true)
+            && isset($required[implode("\0", array_slice($fact['path'], 0, -1))])
+        )));
+    }
+
+    /**
+     * "3 changes: 1 breaking, 2 additive", or with $since,
+     * "3 changes since .dissect/snapshot.json: 1 breaking, 2 additive".
      *
      * @param  array<string, int>  $summary
      */
-    public static function summary(array $summary): string
+    public static function summary(array $summary, ?string $since = null): string
     {
         $total = array_sum($summary);
         $counted = array_map(fn (string $severity, int $count) => "{$count} {$severity}", array_keys(array_filter($summary)), array_filter($summary));
 
-        return $total.' '.($total === 1 ? 'change' : 'changes').($counted === [] ? '' : ': '.implode(', ', $counted));
+        return $total.' '.($total === 1 ? 'change' : 'changes').($since === null ? '' : " since {$since}").($counted === [] ? '' : ': '.implode(', ', $counted));
     }
 
     /**
