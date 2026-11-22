@@ -21,6 +21,7 @@ import { useProviderStore } from '@/stores/provider'
 import { useDomainsStore } from '@/stores/domains'
 import { useClassesStore } from '@/stores/classes'
 import { useBoundariesStore } from '@/stores/boundaries'
+import { useChangesStore } from '@/stores/changes'
 import { bootstrap } from '@/lib/bootstrap'
 import { baseName, shortNames } from '@/lib/classNames'
 import { crossesInto, domainColor, domainPalette } from '@/lib/domains'
@@ -450,6 +451,7 @@ export const useSchemaStore = defineStore('schema', () => {
       const domains = useDomainsStore()
       const classes = useClassesStore()
       const boundaries = useBoundariesStore()
+      const changes = useChangesStore()
 
       try {
         // The derived surfaces all walk a far wider tree than the model signal
@@ -463,6 +465,7 @@ export const useSchemaStore = defineStore('schema', () => {
           domains.loaded ? 'domains=1' : null,
           classes.loaded ? 'classes=1' : null,
           boundaries.loaded ? 'boundaries=1' : null,
+          changes.loaded ? 'changes=1' : null,
         ].filter((part) => part !== null)
 
         const res = await fetch(asked.length ? `${url!}?${asked.join('&')}` : url!, {
@@ -512,6 +515,12 @@ export const useSchemaStore = defineStore('schema', () => {
           payload.boundaries !== boundaries.fingerprint
         ) {
           await boundaries.refresh()
+        }
+
+        // And what changed since a baseline: it moves with any of the four
+        // surfaces a snapshot is made of, or when watching starts or stops.
+        if (typeof payload?.changes === 'string' && payload.changes !== changes.fingerprint) {
+          await changes.refresh()
         }
 
         if (typeof next !== 'string' || next === fingerprint.value) return

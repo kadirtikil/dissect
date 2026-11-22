@@ -48,6 +48,7 @@ The sidebar has one page for each question:
 | 📡 **Queue** | What is happening *right now*? Waiting, running, delayed and failed jobs, plus batches. Live and polled. |
 | 🌲 **Provider-Trees** | What is wired to what? Each service provider's bindings, what they resolve to, and the constructors behind them, drawn as a tree. |
 | 🧭 **Domains** | How is this app split up? Every domain, how it was found, its classes, and anything that looks out of place. |
+| 🕰️ **Changes** | What did I (or an agent) just change? Every model, route, job and provider that's new, gone or different since you started watching or since the committed snapshot, and how risky each change is. |
 
 Each page has its own address (`/dissect#/routes`, `/dissect#/domains`, …), so
 you can bookmark one or link a colleague to it.
@@ -817,6 +818,21 @@ committed snapshot otherwise. The server's instructions ask the agent to tell
 you about anything breaking. The tool only reads, so it can't start watching
 itself. With nothing to compare against, it says so and tells the agent who
 can.
+
+#### On the Changes page
+
+![The Changes page after an agent's edit: a model, three routes and a job, each with what changed and how bad it is](https://raw.githubusercontent.com/kadirtikil/dissect/pr-assets/changes/page.png)
+
+The same report, live. **Start watching** there instead of in the terminal.
+**Restart** forgets what changed so far, and **Stop** goes back to the
+committed snapshot. Changes arrive as you edit, with no reload, like the rest
+of the page. Each item can be opened on its own page, except one that was
+removed. The switch at the top picks the baseline, and the chips hide a
+severity.
+
+The page can start and stop watching, but it never writes or removes the
+committed snapshot. That's taken in the terminal, and reviewed in a pull
+request.
 
 ---
 
