@@ -28,6 +28,9 @@ class AuthorizeTest extends TestCase
             'asset' => ['get', '/dissect/assets/dissect.js'],
             'layout write' => ['post', '/dissect/layout'],
             'views write' => ['post', '/dissect/views'],
+            'changes' => ['get', '/dissect/changes.json'],
+            'start watching' => ['post', '/dissect/changes/watch'],
+            'stop watching' => ['delete', '/dissect/changes/watch'],
         ];
     }
 

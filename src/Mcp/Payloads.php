@@ -103,6 +103,37 @@ final class Payloads
         return $this->decode($process->getOutput(), 'dissect:check');
     }
 
+    /**
+     * What `dissect:diff --format=json` says against a baseline: read fresh,
+     * so the app is compared as it is now.
+     *
+     * @return array{against: string, summary: array<string, int>, changes: array<int, array<string, mixed>>}
+     */
+    public function changes(string $against): array
+    {
+        if ($this->surfaces !== null) {
+            $code = Artisan::call('dissect:diff', ['--format' => 'json', '--against' => $against]);
+            $output = Artisan::output();
+        } else {
+            $process = new Process(
+                [...(array) $this->artisan, 'dissect:diff', '--format=json', '--against='.$against, '--no-ansi', '--no-interaction'],
+                $this->cwd,
+                timeout: $this->timeout,
+            );
+
+            $process->run();
+            $code = $process->getExitCode();
+            $output = $code === 0 ? $process->getOutput() : trim($process->getOutput()."\n".$process->getErrorOutput());
+        }
+
+        // A baseline it cannot read is said in words, and passed on as such.
+        if ($code !== 0) {
+            throw new RuntimeException(trim(preg_replace('/^\s*ERROR\s+/m', '', $output) ?? $output));
+        }
+
+        return $this->decode($output, 'dissect:diff');
+    }
+
     /** @return array<string, mixed> */
     protected function decode(string $output, string $command): array
     {

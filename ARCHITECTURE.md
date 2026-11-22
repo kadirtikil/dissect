@@ -223,10 +223,11 @@ DissectServiceProvider    wiring; registers routes only when enabled
   │     ├── Changes\Severity    breaking / risky / additive, for whoever depends on it
   │     ├── Changes\Wording     a change as one line: "+ column refunded_at (datetime, nullable)"
   │     └── Changes\Report      the three together, plus a summary; what every reader is given
+  ├── Changes\Baselines       the committed snapshot and the watch baseline: where, read, write
   ├── Mcp\DissectServer       mcp:start dissect — read-only tools, one entry at a time
   │     ├── Mcp\Payloads        each call's payloads from a fresh dissect:export
   │     ├── Mcp\Lookup          an entry by any name, exact before partial
-  │     └── Mcp\Tools\*         search, model, route, job, provider, domain, class, check
+  │     └── Mcp\Tools\*         search, model, route, job, provider, domain, class, check, changes
   ├── QueueSnapshot           what is on the queue *right now* — never cached
   │     ├── QueueReaderFactory  driver → a reader, or the reason there isn't one
   │     │     ├── DatabaseQueueReader  three predicates over the jobs table
@@ -1155,6 +1156,47 @@ here are rules naming a domain nothing defines; what is wrong with the file
 itself is in `domains.json`'s `problems`. `unchecked` lists files that did not
 parse. The fingerprint is the source walk's signal plus the rules file's.
 
+### `changes.json` (generated — never cached, never written)
+
+```json
+{
+  "against": "watch",
+  "baselines": {
+    "watch":    { "exists": true,  "path": "storage/dissect/watch.json", "taken_at": "2026-11-22T14:02:11+00:00" },
+    "snapshot": { "exists": false, "path": ".dissect/snapshot.json",     "taken_at": null }
+  },
+  "problem": null,
+  "summary": { "breaking": 1, "risky": 0, "additive": 1 },
+  "changes": [
+    {
+      "part": "routes", "id": "POST:api/posts", "name": "POST api/posts",
+      "change": "changed", "severity": "breaking", "text": "~ route POST api/posts",
+      "facts": [
+        { "path": ["request", "fields", "slug"], "change": "added", "before": null,
+          "after": { "type": "string", "required": true, "rules": ["required", "string"] },
+          "severity": "breaking", "text": "+ request field slug (string, required)" }
+      ]
+    }
+  ],
+  "fingerprint": "0c1d2e3f4a5b6c7d"
+}
+```
+
+`Report::between()` with the baseline in `against`, which is watching if it
+exists, else the committed snapshot, or the one asked for with `?against=`.
+`null` means there is neither, and `changes` is empty. A baseline that cannot
+be read (missing, not a snapshot, another format) is `problem`, in words, with
+a 200: the page shows it rather than failing.
+
+`POST /changes/watch` takes a snapshot into `watch_path`; `DELETE` removes it.
+Both answer `{ ok, baselines }`. The committed snapshot is never written or
+removed over HTTP.
+
+Not cached: the snapshot it takes reads each surface through the payload
+cache, so with nothing changed it costs one comparison. The poll's
+`changes=1` fingerprint moves with the schema, route, job and provider
+fingerprints, the payload cache stamp, and each baseline's mtime and size.
+
 ### `layout.json` (authored — safe to commit and review)
 
 ```json
@@ -1381,6 +1423,9 @@ are running. `tests/StateVersioningTest.php` pins all of it.
 | **One diff engine, in PHP** | The terminal, an agent and the page must report the same changes in the same words. A diff written in the browser would have to be written again for the CLI and MCP, and the two would drift |
 | **Severity is about who depends on the change** | "Breaking" means something that worked stops working for a caller: a client, a `route()` call, a queued job. A column type change might be fine, so it is risky, not breaking; a newly required request field is a 422 for every old client, so it is breaking |
 | **The summary counts items, not facts** | "2 breaking" is two things somebody has to look at. A model that lost five columns is one thing to look at |
+| **Watching lives in `storage/`, the snapshot in `.dissect/`** | The snapshot is what the team agreed on and is reviewed in PRs. Watching is one person's "since I sat down", and committing it would make every teammate's diff start from someone else's afternoon |
+| **The page and agents prefer watching; the CLI defaults to the snapshot** | Someone who started watching wants to see what changed since. CI has no one watching, and must not change its answer because a `storage/` file happens to exist |
+| **`dissect_changes` cannot start watching** | Every MCP tool is read-only. An agent that could move its own baseline could make its changes disappear from the report |
 | **`dissect:diff` exits 0 unless `--fail-on` is given** | A diff is a report. Whether a breaking change is allowed is the team's call, made in CI with `--fail-on` |
 | **Highlight is not selection** | Canvas selection is a gesture that feeds view membership; opening an endpoint must not quietly change what a new view would contain |
 
@@ -1468,6 +1513,7 @@ Config (`config/dissect.php`): `enabled`, `path`, `middleware`,
 | Change what a snapshot keeps | `src/Changes/Snapshot.php`, then bump `Snapshot::VERSION` |
 | Change how bad a change is judged | a rule in `Severity::rules()` (`src/Changes/Severity.php`) |
 | Change how a change is worded | `src/Changes/Wording.php` |
+| Change where baselines live, or which one is preferred | `src/Changes/Baselines.php` (`NAMES` is the order of preference) |
 | Change what dissect:diff prints, or when it fails | `src/Console/DiffCommand.php`; Markdown in `Markdown::changes()` |
 | Add a surface to `dissect:export` | `NAMES` and `export()` in `src/Support/Surfaces.php`, then a method in `src/Digest/Markdown.php` |
 | Change how long a payload is cached, or what invalidates it | `src/Support/PayloadCache.php` (the stamp), and each exporter's `fingerprint()` |

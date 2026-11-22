@@ -4,6 +4,7 @@ namespace KdrDev\Dissect\Console;
 
 use Illuminate\Console\Command;
 use Illuminate\Filesystem\Filesystem;
+use KdrDev\Dissect\Changes\Baselines;
 use KdrDev\Dissect\Changes\Snapshot;
 use Throwable;
 
@@ -18,13 +19,14 @@ use Throwable;
 class SnapshotCommand extends Command
 {
     protected $signature = 'dissect:snapshot
+        {--watch : Start watching instead: a snapshot in storage/, never committed, for the page and agents to compare against}
         {--output= : Write it here instead of the snapshot file in config/dissect.php}';
 
     protected $description = 'Write a snapshot of the models, routes, jobs and providers, for dissect:diff to compare against';
 
-    public function handle(Snapshot $snapshot, Filesystem $files): int
+    public function handle(Snapshot $snapshot, Filesystem $files, Baselines $baselines): int
     {
-        $path = $this->path();
+        $path = $this->path($baselines);
 
         try {
             $taken = $snapshot->take();
@@ -35,28 +37,31 @@ class SnapshotCommand extends Command
         }
 
         $json = Snapshot::encode($taken);
-        $shown = $this->shown($path);
+        $shown = $baselines->shown($path);
+        $watching = (bool) $this->option('watch');
 
-        if ($files->exists($path) && $files->get($path) === $json) {
+        if (! $watching && $files->exists($path) && $files->get($path) === $json) {
             $this->components->info("Nothing changed since the snapshot in {$shown}.");
 
             return self::SUCCESS;
         }
 
         try {
-            $this->write($files, $path, $json);
+            $baselines->write($path, $json);
         } catch (Throwable $e) {
             $this->components->error("Could not write {$shown}: {$e->getMessage()}");
 
             return self::FAILURE;
         }
 
-        $this->components->info('Wrote a snapshot of '.$this->counted(Snapshot::counts($taken))." to {$shown}.");
+        $this->components->info($watching
+            ? 'Watching from now: '.$this->counted(Snapshot::counts($taken)).". The page and dissect_changes compare against it; php artisan dissect:diff --against=watch does too."
+            : 'Wrote a snapshot of '.$this->counted(Snapshot::counts($taken))." to {$shown}.");
 
         return self::SUCCESS;
     }
 
-    protected function path(): string
+    protected function path(Baselines $baselines): string
     {
         $output = $this->option('output');
 
@@ -64,49 +69,7 @@ class SnapshotCommand extends Command
             return str_starts_with($output, DIRECTORY_SEPARATOR) ? $output : getcwd().DIRECTORY_SEPARATOR.$output;
         }
 
-        return (string) config('dissect.snapshot_path', base_path('.dissect/snapshot.json'));
-    }
-
-    /**
-     * Written beside the old one, then moved over it: a snapshot is the
-     * baseline every later diff is read against, and half of one would be
-     * read as everything having been removed.
-     */
-    protected function write(Filesystem $files, string $path, string $json): void
-    {
-        $files->ensureDirectoryExists(dirname($path));
-
-        // tempnam() falls back to the system's temp directory when this one
-        // is not writable, and a rename from there may cross disks.
-        $temporary = @tempnam(dirname($path), '.snapshot-');
-
-        if ($temporary === false || dirname($temporary) !== (realpath(dirname($path)) ?: dirname($path))) {
-            $temporary === false || @unlink($temporary);
-
-            throw new \RuntimeException('cannot create a file in '.dirname($path).'.');
-        }
-
-        try {
-            if (file_put_contents($temporary, $json) !== strlen($json)) {
-                throw new \RuntimeException('the disk took only part of it.');
-            }
-
-            chmod($temporary, 0644);
-
-            if (! rename($temporary, $path)) {
-                throw new \RuntimeException('cannot move it into place.');
-            }
-        } finally {
-            @unlink($temporary);
-        }
-    }
-
-    /** Relative to the app when it is inside it, as a reader would type it. */
-    protected function shown(string $path): string
-    {
-        $base = rtrim(base_path(), DIRECTORY_SEPARATOR).DIRECTORY_SEPARATOR;
-
-        return str_starts_with($path, $base) ? substr($path, strlen($base)) : $path;
+        return $baselines->path($this->option('watch') ? Baselines::WATCH : Baselines::SNAPSHOT);
     }
 
     /** @param  array<string, int>  $counts */
