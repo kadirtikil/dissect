@@ -12,6 +12,7 @@ use KdrDev\Dissect\Architecture\ContextResolver;
 use KdrDev\Dissect\Architecture\Conventions;
 use KdrDev\Dissect\Architecture\DomainFile;
 use KdrDev\Dissect\Architecture\DomainMap;
+use KdrDev\Dissect\Console\ExportCommand;
 use KdrDev\Dissect\Http\Middleware\Authorize;
 use KdrDev\Dissect\Jobs\DispatchScanner;
 use KdrDev\Dissect\Jobs\JobDiscovery;
@@ -258,6 +259,13 @@ class DissectServiceProvider extends ServiceProvider
 
         if ($this->shouldRegisterRoutes()) {
             $this->registerRoutes();
+        }
+
+        // Not behind `dissect.enabled` or the viewer's gate: those guard a
+        // page served over HTTP. A command is run by whoever already has a
+        // shell on the machine, and reads nothing that shell could not.
+        if ($this->app->runningInConsole()) {
+            $this->commands([ExportCommand::class]);
         }
     }
 
