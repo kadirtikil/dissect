@@ -8,6 +8,10 @@ use Illuminate\Http\Response;
 use KdrDev\Dissect\Architecture\Boundaries;
 use KdrDev\Dissect\Architecture\ClassIndex;
 use KdrDev\Dissect\Architecture\DomainMap;
+use KdrDev\Dissect\Changes\Baselines;
+use KdrDev\Dissect\Changes\Report;
+use KdrDev\Dissect\Changes\Snapshot;
+use KdrDev\Dissect\Changes\UnreadableSnapshot;
 use KdrDev\Dissect\Exceptions\StateFileException;
 use KdrDev\Dissect\Jobs\JobExporter;
 use KdrDev\Dissect\LayoutRepository;
@@ -114,6 +118,12 @@ class DissectController
             $payload['boundaries'] = app(Boundaries::class)->fingerprint();
         }
 
+        // And what changed since a baseline, which moves with any of the four
+        // surfaces a snapshot is made of, or when watching starts or stops.
+        if ($request->boolean('changes')) {
+            $payload['changes'] = $this->changesFingerprint();
+        }
+
         // The whole point is to see the current value; a cached 200 would make
         // the page believe nothing had changed for as long as the browser
         // decided to hold on to it.
@@ -218,6 +228,59 @@ class DissectController
         return response()
             ->json($this->cache->remember('boundaries', $fingerprint, fn () => $boundaries->export()) + ['fingerprint' => $fingerprint])
             ->header('Cache-Control', 'no-store');
+    }
+
+    /**
+     * What changed since a baseline: watching if somebody started to, else
+     * the committed snapshot, or the one asked for with ?against=.
+     *
+     * Built per request rather than cached: the snapshot it takes reads each
+     * surface through the payload cache, so with nothing changed it costs a
+     * comparison, and a baseline taken a second ago must count at once.
+     */
+    public function changesJson(Request $request, Baselines $baselines, Snapshot $snapshot): JsonResponse
+    {
+        $asked = (string) $request->query('against', '');
+        $against = Baselines::has($asked) ? $asked : $baselines->preferred();
+        $report = ['summary' => ['breaking' => 0, 'risky' => 0, 'additive' => 0], 'changes' => []];
+        $problem = null;
+
+        if ($against !== null) {
+            try {
+                $report = Report::between($baselines->read($against), $snapshot->take());
+            } catch (UnreadableSnapshot $e) {
+                $problem = $e->getMessage();
+            }
+        }
+
+        return response()
+            ->json([
+                'against' => $against,
+                'baselines' => $baselines->describe(),
+                'problem' => $problem,
+                ...$report,
+                'fingerprint' => $this->changesFingerprint(),
+            ])
+            ->header('Cache-Control', 'no-store');
+    }
+
+    /** Starts watching: a snapshot of the app as it is now, in storage/. */
+    public function startWatching(Baselines $baselines, Snapshot $snapshot): JsonResponse
+    {
+        try {
+            $baselines->write($baselines->path(Baselines::WATCH), Snapshot::encode($snapshot->take()));
+        } catch (Throwable $e) {
+            return response()->json(['ok' => false, 'message' => 'Could not start watching: '.$e->getMessage()], 500);
+        }
+
+        return response()->json(['ok' => true, 'baselines' => $baselines->describe()]);
+    }
+
+    public function stopWatching(Baselines $baselines): JsonResponse
+    {
+        $baselines->forget(Baselines::WATCH);
+
+        return response()->json(['ok' => true, 'baselines' => $baselines->describe()]);
     }
 
     /**
@@ -394,6 +457,19 @@ class DissectController
     }
 
     /** Memoised: index() renders it and keys the schema cache with it. */
+    /** Every surface a snapshot is made of, and the baselines themselves. */
+    protected function changesFingerprint(): string
+    {
+        return substr(sha1(implode('|', [
+            $this->cache->key('changes', ''),
+            $this->fingerprint(),
+            $this->routeFingerprint(),
+            $this->jobFingerprint(),
+            $this->providerFingerprint(),
+            app(Baselines::class)->signal(),
+        ])), 0, 16);
+    }
+
     protected function fingerprint(): string
     {
         return $this->fingerprint ??= $this->exporter->fingerprint();
