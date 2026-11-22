@@ -686,6 +686,7 @@ php artisan dissect:export jobs --format=md               # a digest to read
 php artisan dissect:export schema --format=mermaid        # the models as an ER diagram
 php artisan dissect:export --format=md --output=docs/app.md
 php artisan dissect:check                                 # exit 1 if a domain breaks its rule
+php artisan dissect:snapshot                              # write down what the app looks like now
 ```
 
 - **`json`** is exactly the payload the page reads (see the endpoints under
@@ -711,6 +712,34 @@ The command works whether or not the page is enabled. It only reads your code,
 and an Artisan command can't be reached from the web, so it doesn't need the
 `dissect.enabled` switch or the `viewDissect` gate. The queue isn't exported:
 it's runtime state, and a file of it would be stale before anyone opened it.
+
+### 🕰️ Snapshots
+
+`dissect:snapshot` writes `.dissect/snapshot.json`. It holds every model, route,
+job and provider as it is now, each one under the id the page uses for it, and
+reduced to what a change to the code can move:
+
+- **Models:** table, columns and relations.
+- **Routes:** name, action, middleware, parameters, request fields and response.
+- **Jobs:** queue, retries, traits, payload, and what dispatches them.
+- **Providers:** what each one binds.
+
+Commit it. It's the "before" for reading a change against. When a change is
+accepted, take a new one, and the snapshot's own diff in the pull request says
+what was accepted:
+
+```diff
+     "App\\Models\\Invoice": {
+         "table": "invoices",
+         "columns": {
++            "refunded_at": {"type": "datetime", "nullable": true, "unique": false, …},
+```
+
+Taking a snapshot twice gives the same bytes, and a run that finds nothing new
+leaves the file alone. Nothing in it moves unless the code does: there's no
+timestamp, no absolute path, no line a closure happens to start on. Each
+column, field or setting is one line, so the file's diff is one line per
+changed thing. `--output=` writes it somewhere else.
 
 ---
 
@@ -785,6 +814,7 @@ request.
 | `.dissect/layout.json` | the page, when you drag a card | Where each model sits on the graph. |
 | `.dissect/views.json` | the page, when you save a view | Named subsets of the graph. |
 | `.dissect/domains.json` | you, by hand | Domains the folder layout doesn't express, and the boundary rules between them. Never written by dissect. |
+| `.dissect/snapshot.json` | `php artisan dissect:snapshot` | The models, routes, jobs and providers as they were when it was taken. |
 
 ### 🧷 Upgrades and your files
 
@@ -829,6 +859,7 @@ The rest live in `config/dissect.php`:
   after this list.
 - **`layout_path`**: default `base_path('.dissect/layout.json')`.
 - **`views_path`**: default `base_path('.dissect/views.json')`.
+- **`snapshot_path`**: default `base_path('.dissect/snapshot.json')`, where `dissect:snapshot` writes.
 
 </details>
 

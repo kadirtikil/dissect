@@ -216,6 +216,8 @@ DissectServiceProvider    wiring; registers routes only when enabled
   │     ├── Digest\Markdown     a payload as one line per thing, per item reusable
   │     ├── Digest\Mermaid      the schema as an erDiagram, inverses folded
   │     └── Support\ClassNames  short class names, the rule classNames.ts uses
+  ├── Console\SnapshotCommand dissect:snapshot — write .dissect/snapshot.json, atomically
+  │     └── Changes\Snapshot    every model, route, job and provider, reduced to what code moves
   ├── Mcp\DissectServer       mcp:start dissect — read-only tools, one entry at a time
   │     ├── Mcp\Payloads        each call's payloads from a fresh dissect:export
   │     ├── Mcp\Lookup          an entry by any name, exact before partial
@@ -1176,6 +1178,59 @@ class names). Both hosts validate against the same rules — `ViewRepository` on
 PHP side, `sanitiseViews()` in the dev-server plugin — so a file written by
 either is one the other accepts.
 
+### `.dissect/snapshot.json` (generated — committed, never hand-edited)
+
+```json
+{
+    "version": 1,
+    "models": {
+        "App\\Models\\Invoice": {
+            "table": "invoices",
+            "connection": "mysql",
+            "context": "Billing",
+            "columns": {
+                "id": {"type": "bigint", "nullable": false, "unique": true, "increments": true, "fillable": false, "hidden": false, "cast": "int", "virtual": false}
+            },
+            "relations": {
+                "customer": {
+                    "type": "BelongsTo",
+                    "target": "App\\Models\\Customer",
+                    "keys": {"source": "customer_id", "target": "id", "via": null}
+                }
+            }
+        }
+    },
+    "routes": { "POST:api/invoices": { "name": "invoices.store", "action": "App\\Http\\Controllers\\InvoiceController@store", "middleware": ["api"], "context": "Billing", "request": { "source": "form-request", "class": "…", "fields": { "total": {"type": "integer", "required": true, "rules": ["required", "integer"]} } }, "response": { "source": "resource", "class": "…", "status": 201, "fields": { "id": {"kind": "scalar", "conditional": false} } } } },
+    "jobs": { "App\\Jobs\\SendInvoice": { "kind": "job", "context": "Billing", "queue": "mail", "connection": null, "retry": {…}, "traits": {…}, "payload": { "invoice": {"type": "App\\Models\\Invoice", "optional": false, "variadic": false, "default": null} }, "middleware": [], "events": [], "dispatched_by": ["InvoiceController@send"] } },
+    "providers": { "App\\Providers\\BillingServiceProvider": { "context": "Billing", "deferred": false, "provides": [], "edges": { "App\\Contracts\\Gateway -> App\\Services\\StripeGateway": {"kind": "bind"} } } }
+}
+```
+
+Written by `dissect:snapshot` from `schema.json`, `routes.json`, `jobs.json`
+and `providers.json`, through `Changes\Snapshot::of()`. Each item is keyed by
+the id its payload already uses, and its facts are keyed by name (columns,
+relations, fields, parameters), so a later snapshot can be compared item by
+item and fact by fact without matching anything up. Every map is sorted by key.
+
+What is left out is anything that moves without the code moving:
+`generated_at`, absolute paths (provider nodes, dispatch sites), a closure's
+`label` (its line), a dispatch's line, `confidence`, and display-only fields
+such as a column's `label`. So the same code gives the same bytes, wherever
+it is read. dissect's own routes are left out too: they exist only where the
+page is switched on, so CI would read each one as a route removed.
+
+An empty map inside an item is left out, because `[]` cannot say whether it
+was a map or a list, and readers treat a missing map as an empty one. A part
+with nothing in it is still written as `{}`. Lists stay, empty or not.
+
+`Snapshot::encode()` puts any map or list made only of plain values on one
+line, below the item level. A column, field, parameter or retry setting is
+one line, so the file's diff in a pull request is one line per changed thing.
+
+`version` is bumped whenever a fact is added, removed or reshaped. A snapshot
+with a different version is not a baseline to compare against: it would read
+as every item having changed.
+
 ### The `version` field is load-bearing
 
 Both authored files are rewritten **in full** on every save, and both are read
@@ -1293,6 +1348,9 @@ are running. `tests/StateVersioningTest.php` pins all of it.
 | **`dissect:check` fails on a broken rules file** | A file that does not parse has no rules, and "no rules" passes. Without this, the easiest way to turn a guardrail off would be a missing comma |
 | **A rule that cannot be read is reported, and is never stricter than it was** | A typo in a guardrail is worse than no guardrail: it looks like a check. `may_uses` is a problem in words, and an unreadable `may_use` means "unrestricted", not "nothing" |
 | **Only app-to-app references go on the wire** | Most of every file is framework. Sending it would multiply the payload for a page that only draws the app, and the checks that need it run on the server |
+| **A snapshot keeps only what code changes move** | It is committed and compared against. A timestamp, an absolute path or a closure's line would make every snapshot differ from the last, and a diff full of those hides the one change that matters |
+| **A snapshot is facts keyed by name, not the payloads** | Payloads are lists in display order. Keyed by id and by name, two snapshots compare item by item without matching anything up, and a column moving in the table is not a change |
+| **`dissect:snapshot` replaces the file in one move** | A half-written baseline would read as everything having been removed |
 | **Highlight is not selection** | Canvas selection is a gesture that feeds view membership; opening an endpoint must not quietly change what a new view would contain |
 
 ---
@@ -1376,6 +1434,7 @@ Config (`config/dissect.php`): `enabled`, `path`, `middleware`,
 | Change what counts as one domain depending on another | `domainDependencies()` in `resources/js/lib/dependencies.ts`, `between()` in `src/Digest/Markdown.php` (keep the two counting alike) |
 | Change the domain chips on the lists | `resources/js/components/domains/DomainFacet.vue`, and `contexts` in each of `lib/{route,job,provider}Filters.ts` |
 | Change domain colours or how a source is worded | `resources/js/lib/domains.ts` |
+| Change what a snapshot keeps | `src/Changes/Snapshot.php`, then bump `Snapshot::VERSION` |
 | Add a surface to `dissect:export` | `NAMES` and `export()` in `src/Support/Surfaces.php`, then a method in `src/Digest/Markdown.php` |
 | Change how long a payload is cached, or what invalidates it | `src/Support/PayloadCache.php` (the stamp), and each exporter's `fingerprint()` |
 | Add an export format | `formats()` and the `match` in `src/Console/ExportCommand.php` |
