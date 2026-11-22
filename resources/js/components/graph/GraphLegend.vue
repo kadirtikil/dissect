@@ -1,5 +1,9 @@
 <script setup lang="ts">
+import { storeToRefs } from 'pinia'
 import { RELATION_FAMILIES } from '@/lib/relations'
+import { useSchemaStore } from '@/stores/schema'
+
+const { crossesDomains } = storeToRefs(useSchemaStore())
 </script>
 
 <template>
@@ -22,6 +26,15 @@ import { RELATION_FAMILIES } from '@/lib/relations'
         />
       </svg>
       <span class="font-mono text-[10px] text-foreground">{{ family.label }}</span>
+    </div>
+
+    <!-- Only in an app with a relation that leaves its domain: the line is
+         thicker in its family's colour, and its label says where it goes. -->
+    <div v-if="crossesDomains" class="flex items-center gap-2" data-testid="legend-crosses">
+      <svg width="18" height="6" aria-hidden="true" class="shrink-0">
+        <line x1="0" y1="3" x2="18" y2="3" stroke="var(--muted-foreground)" stroke-width="3" />
+      </svg>
+      <span class="font-mono text-[10px] text-foreground">Crosses into → Domain</span>
     </div>
   </div>
 </template>

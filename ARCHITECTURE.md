@@ -599,9 +599,9 @@ main.ts                 mounts App; no router (see "Decisions")
     ├── AppSidebar      brand, one nav button per registry entry, theme toggle
     ├── LandingPage     the overview: counts, entry points, freshness
     ├── GraphCanvas     Vue Flow wiring, loading/error states, drag handling
-    │   ├── ViewMenu    saved views: switch, edit membership, create, delete
-    │   ├── ModelNode   one model: name, table, relation count, columns
-    │   └── GraphLegend relation families
+    │   ├── ViewMenu    saved views: switch, edit membership, create, delete; domain views, copy
+    │   ├── ModelNode   one model: name, table, domain, relation count, columns
+    │   └── GraphLegend relation families; crossings into another domain
     ├── RoutesPanel     list ▏ detail
     │   ├── RouteFilters   search + facet chips with counts, then DomainFacet
     │   ├── RouteList      grouped by controller (full class name), collapsible
@@ -625,7 +625,7 @@ components/domains/DomainFacet.vue   the domain chips every list shares
 
 stores/schema.ts        load → normalise → order → place → filter to the view
 stores/layout.ts        saved positions, debounce, prune, persist
-stores/views.ts         saved views, active view, persist
+stores/views.ts         saved views, the derived domain views, active view, persist
 stores/routes.ts        lazy load, filter state, selection
 stores/jobs.ts          the same, for the queue surface
 stores/provider.ts      lazy load, search, selection, which cards are open
@@ -996,6 +996,24 @@ so a domain keeps its colour across pages without any of them fetching
 cached against its own signal, none of which watches `.dissect/domains.json`,
 so that file's modification time is part of the cache stamp.
 
+On the graph, a model node's data carries its `context`. `ModelNode` writes it
+beside the table name (on the same line, so `estimateNodeHeight` is
+unchanged) and colours the card's left bar with it. `buildEdge` takes the
+domain a relation crosses into, from `crossesInto()`: only a relation between
+two models that are both in a domain, and not the same one. Such an edge is
+drawn at 3 instead of 1.5, gets the `crosses-domain` class and a `→ Domain`
+label suffix. Colour is left to the relation families, which already use the
+same ramp.
+
+Every domain with a model in it is also a view, `domain:{Name}`. A saved
+view's id is a slug, so the prefix can never collide. These views are derived,
+never stored: the schema store registers a function with the views store
+(`deriveDomainViews`) because the schema store already reads the views store,
+and the reverse import would be a cycle. They are read-only. `copyToView()`
+saves one as an ordinary view. `setActive()` lets a `domain:` id through
+unchecked, because views load before the graph they come from, and one whose
+domain has gone resolves to no view, which shows the whole graph.
+
 ### `domains.json` (generated — never hand-edited, never written)
 
 Served at `/dissect/domains.json` and fetched only when asked for, since
@@ -1160,6 +1178,8 @@ are running. `tests/StateVersioningTest.php` pins all of it.
 | **An unassigned class is never guessed into a domain** | A guess shown with the same weight as a fact is the "confidently wrong" this package refuses elsewhere. Suggesting domains is a separate, later feature that says it is a suggestion |
 | **`#[Domain]` is matched by short name and read from tokens** | The app owns the attribute class, so no dev dependency leaks into production code. Reading tokens means listing every class never loads one |
 | **Domain colours follow a list the page is given** | Ordering by the names a list happens to have rows in would give Billing one colour on the routes and another on the jobs. The names cost a few directory listings, so they are inlined rather than fetched |
+| **Domain views are derived, not stored** | A domain's members are its folders'. Storing them in views.json would let the two drift apart. A domain view is read-only, and copying it into a saved view is the deliberate step that makes it yours to edit |
+| **A relation into another domain is marked by width and label, not colour** | The relation families already use the colour ramp, and domains share it. A second colour meaning on edges would make both unreadable |
 | **A plain app gets no domains** | Detection only matches layouts that mean "domains". A starter kit's `Auth` folders under controllers and requests are not one, which is why the layer-first rule requires `app/Models/{Name}` |
 | **Highlight is not selection** | Canvas selection is a gesture that feeds view membership; opening an endpoint must not quietly change what a new view would contain |
 
@@ -1199,6 +1219,8 @@ Config (`config/dissect.php`): `enabled`, `path`, `middleware`,
 | Change the grid | `resources/js/lib/layout.ts` |
 | Change what a view stores | `src/ViewRepository.php`, `sanitiseViews()` in `vite-plugin-persistence.ts`, `resources/js/stores/views.ts` |
 | Change how a view is chosen or created | `resources/js/components/graph/ViewMenu.vue` |
+| Change which views a domain gives, or how one is copied | `deriveDomainViews` in `resources/js/stores/schema.ts`, `copyToView()` in `stores/views.ts` |
+| Change how a relation into another domain is drawn | `buildEdge()` in `resources/js/stores/schema.ts`, `crossesInto()` in `lib/domains.ts`, `.crosses-domain` in `assets/vue-flow-theme.css` |
 | Change what an expanded card shows | `resources/js/components/graph/ModelNode.vue` |
 | Change relation colours/families | `resources/js/lib/relations.ts` |
 | Change which columns a relation is drawn between | `relationKeys()` in `src/SchemaExporter.php`, `resources/js/lib/relationHandles.ts` |

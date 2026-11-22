@@ -271,6 +271,17 @@ attribute that names a domain nothing else defines.
 
 ---
 
+On the **Models** graph, each card names its domain beside the table, and its
+left edge takes the domain's colour. A relation from a model in one domain to a
+model in another is drawn thicker, and its label says which domain it goes
+into (`invoices → Billing`). Relations to a model in no domain are not counted
+as crossings.
+
+Every domain is also a view in the view menu, under **Domains**. A domain view
+shows that domain's models and follows its folders, so it can't be edited.
+**Copy to a saved view** turns it into an ordinary view in
+`.dissect/views.json`, which you can then change.
+
 ## 🛣️ Routes
 
 The graph says what your data looks like. The **Routes** page says how you

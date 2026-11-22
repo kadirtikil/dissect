@@ -172,4 +172,6 @@ export interface ModelNodeData {
    * typically a vendor model (Passkey, DatabaseNotification) outside the scan.
    */
   external: boolean
+  /** The domain the model is in, or null: unassigned, or outside the scan. */
+  context: string | null
 }

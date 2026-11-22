@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   UNASSIGNED,
   contextKey,
+  crossesInto,
   domainColor,
   domainPalette,
   matchesContexts,
@@ -74,5 +75,17 @@ describe('matchesContexts', () => {
     expect(contextKey(undefined)).toBe(UNASSIGNED)
     expect(matchesContexts(undefined, [UNASSIGNED])).toBe(true)
     expect(matchesContexts('Billing', [UNASSIGNED])).toBe(false)
+  })
+})
+
+describe('crossesInto', () => {
+  it('names the domain a relation crosses into', () => {
+    expect(crossesInto('Sales', 'Billing')).toBe('Billing')
+  })
+
+  it('is null inside one domain, or when either end is in none', () => {
+    expect(crossesInto('Billing', 'Billing')).toBeNull()
+    expect(crossesInto('Billing', null)).toBeNull()
+    expect(crossesInto(undefined, 'Billing')).toBeNull()
   })
 })

@@ -191,6 +191,12 @@
   stroke-width: 2.5 !important;
 }
 
+/* A relation into another domain is drawn at 3 (see buildEdge), so hovering
+   it must not make it thinner. */
+.vue-flow__edge.crosses-domain:hover .vue-flow__edge-path {
+  stroke-width: 4 !important;
+}
+
 /* Edge labels: the pill background and its text. */
 .vue-flow__edge-textbg {
   fill: var(--background);

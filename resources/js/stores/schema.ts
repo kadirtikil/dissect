@@ -14,13 +14,14 @@ import { familyFor } from '@/lib/relations'
 import { NODE_HANDLE, handleFor, keyColumns } from '@/lib/relationHandles'
 import { layoutGraph } from '@/lib/layout'
 import { useLayoutStore } from '@/stores/layout'
-import { useViewsStore } from '@/stores/views'
+import { DOMAIN_VIEW_PREFIX, useViewsStore } from '@/stores/views'
 import { useRoutesStore } from '@/stores/routes'
 import { useJobsStore } from '@/stores/jobs'
 import { useProviderStore } from '@/stores/provider'
 import { useDomainsStore } from '@/stores/domains'
 import { bootstrap } from '@/lib/bootstrap'
 import { baseName, shortNames } from '@/lib/classNames'
+import { crossesInto, domainColor, domainPalette } from '@/lib/domains'
 
 type Status = 'idle' | 'loading' | 'ready' | 'error'
 
@@ -113,6 +114,48 @@ export const useSchemaStore = defineStore('schema', () => {
   function labelOf(id: string): string {
     return labels.value.get(id) ?? baseName(id)
   }
+
+  /** Whether any relation leaves its domain, so the legend can explain it. */
+  const crossesDomains = computed(() =>
+    edges.value.some((e) => (e.data as { crosses?: string | null } | undefined)?.crosses),
+  )
+
+  /**
+   * The colour order for the graph: the page's domains first, as on every
+   * other page, then any a model names that the page was not told about.
+   */
+  const palette = computed(() =>
+    domainPalette(
+      useDomainsStore().palette,
+      nodes.value.flatMap((n) => (n.data?.context ? [n.data.context] : [])),
+    ),
+  )
+
+  /** A domain's colour on the graph. */
+  function contextColor(name: string): string {
+    return domainColor(name, palette.value)
+  }
+
+  // One read-only view per domain with a model in it, in colour order. Read
+  // from the graph rather than domains.json, so it costs nothing and follows
+  // every live update. Models outside the scan have no domain.
+  useViewsStore().deriveDomainViews(() => {
+    const byDomain = new Map<string, string[]>()
+
+    for (const node of nodes.value) {
+      const context = node.data?.context
+      if (context) byDomain.set(context, [...(byDomain.get(context) ?? []), node.id])
+    }
+
+    return palette.value
+      .filter((name) => byDomain.has(name))
+      .map((name) => ({
+        id: DOMAIN_VIEW_PREFIX + name,
+        name,
+        models: byDomain.get(name)!,
+        domain: name,
+      }))
+  })
 
   const externalModels = computed(() =>
     nodes.value.filter((n) => n.data?.external).map((n) => n.id),
@@ -266,6 +309,7 @@ export const useSchemaStore = defineStore('schema', () => {
         columns: normaliseColumns(model?.columns),
         relationCount: relationCounts.get(id) ?? 0,
         external: model === null,
+        context: model?.context ?? null,
       },
     })
 
@@ -283,7 +327,9 @@ export const useSchemaStore = defineStore('schema', () => {
 
     const ordered = slotOrder.map((id) => incoming.get(id)!)
 
-    const nextEdges = schema.edges.map((e) => buildEdge(e))
+    const nextEdges = schema.edges.map((e) =>
+      buildEdge(e, crossesInto(declared.get(e.source)?.context, declared.get(e.target)?.context)),
+    )
 
     // The grid is the fallback; a saved position always wins, so re-exporting
     // the schema never disturbs a layout somebody arranged by hand. Models
@@ -496,6 +542,9 @@ export const useSchemaStore = defineStore('schema', () => {
     generatedAt,
     externalModels,
     labelOf,
+    palette,
+    contextColor,
+    crossesDomains,
     lastUpdated,
     expanded,
     highlighted,
@@ -548,9 +597,17 @@ function normaliseColumns(columns: RawColumn[] | undefined): SchemaColumn[] {
   })
 }
 
-function buildEdge(e: SchemaEdge): Edge {
+/**
+ * One relation as Vue Flow draws it.
+ *
+ * `crosses` is the domain the relation reaches into, when it leaves its own.
+ * Such an edge is drawn thicker and says where it goes on its label, so a
+ * boundary shows without colour: the relation families already use the ramp.
+ */
+function buildEdge(e: SchemaEdge, crosses: string | null = null): Edge {
   const family = familyFor(e.type)
   const selfLoop = e.source === e.target
+  const name = e.keys?.via ? `${e.name} · ${e.keys.via}` : e.name
   return {
     // 12 model pairs share a source+target, so the relation name is required
     // for uniqueness — without it Vue Flow silently drops the duplicates.
@@ -564,12 +621,13 @@ function buildEdge(e: SchemaEdge): Edge {
     targetHandle: NODE_HANDLE.in,
     // A many-to-many's columns are both `id`; the pivot table is the part
     // worth reading, so it rides along on the label.
-    label: e.keys?.via ? `${e.name} · ${e.keys.via}` : e.name,
+    label: crosses ? `${name} → ${crosses}` : name,
     type: selfLoop ? 'smoothstep' : 'default',
-    data: { relationType: e.type, family: family.id, keys: e.keys },
+    class: crosses ? 'crosses-domain' : undefined,
+    data: { relationType: e.type, family: family.id, keys: e.keys, crosses },
     style: {
       stroke: family.color,
-      strokeWidth: 1.5,
+      strokeWidth: crosses ? 3 : 1.5,
       strokeDasharray: family.dashed ? '4 3' : undefined,
       // Read by the .selected glow in vue-flow-theme.css — CSS cannot recover
       // the stroke paint value, so the colour is handed over explicitly.
