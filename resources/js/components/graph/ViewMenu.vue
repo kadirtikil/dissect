@@ -2,14 +2,14 @@
 import { computed, nextTick, ref, useTemplateRef, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { onClickOutside } from '@vueuse/core'
-import { Check, ChevronDown, Layers, Plus, Trash2 } from '@lucide/vue'
+import { Check, ChevronDown, Copy, Layers, Plus, Trash2 } from '@lucide/vue'
 import { Button } from '@/components/ui/button'
 import { useViewsStore } from '@/stores/views'
 import { useSchemaStore } from '@/stores/schema'
 
 const store = useViewsStore()
 const schema = useSchemaStore()
-const { views, activeId, active, selection, draft, saveError } = storeToRefs(store)
+const { views, domainViews, activeId, active, selection, draft, saveError } = storeToRefs(store)
 const { nodes } = storeToRefs(schema)
 
 const open = ref(false)
@@ -24,6 +24,14 @@ const panel = useTemplateRef<HTMLElement>('panel')
 onClickOutside(panel, () => close())
 
 const label = computed(() => active.value?.name ?? 'All models')
+
+/** A domain's view follows its folders, so it is copied to be edited. */
+const readOnly = computed(() => !!active.value?.domain)
+
+async function copyToView() {
+  confirmingDelete.value = null
+  await store.copyToView()
+}
 
 /**
  * Membership the list is editing: the active view's, or the draft for a view
@@ -164,6 +172,12 @@ function isLastMember(id: string): boolean {
       @click="toggle()"
     >
       <Layers class="size-3.5" />
+      <span
+        v-if="active?.domain"
+        class="size-2 rounded-full"
+        :style="{ background: schema.contextColor(active.domain) }"
+        aria-hidden="true"
+      />
       {{ label }}
       <span v-if="active" class="text-muted-foreground tabular-nums">
         · {{ active.models.length }}
@@ -182,7 +196,7 @@ function isLastMember(id: string): boolean {
         role="menuitem"
         @click="choose(null)"
       >
-        <Check class="size-3.5" :class="activeId ? 'opacity-0' : ''" />
+        <Check class="size-3.5" :class="active ? 'opacity-0' : ''" />
         All models
       </button>
 
@@ -215,6 +229,35 @@ function isLastMember(id: string): boolean {
         </button>
       </div>
 
+      <!-- Domains give their views for free: one per domain with a model in
+           it, kept in step with the folders, so they cannot be edited here. -->
+      <template v-if="domainViews.length">
+        <p
+          class="mt-1 border-t px-2 pt-2 pb-1 font-mono text-[10px] tracking-wide text-muted-foreground uppercase"
+        >
+          Domains
+        </p>
+        <button
+          v-for="view in domainViews"
+          :key="view.id"
+          class="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left font-mono text-xs hover:bg-accent"
+          role="menuitem"
+          :data-domain-view="view.domain"
+          @click="choose(view.id)"
+        >
+          <Check class="size-3.5 shrink-0" :class="activeId === view.id ? '' : 'opacity-0'" />
+          <span
+            class="size-2 shrink-0 rounded-full"
+            :style="{ background: schema.contextColor(view.domain!) }"
+            aria-hidden="true"
+          />
+          <span class="truncate">{{ view.name }}</span>
+          <span class="ml-auto shrink-0 text-[10px] text-muted-foreground tabular-nums">
+            {{ view.models.length }}
+          </span>
+        </button>
+      </template>
+
       <p
         v-if="confirmingDelete"
         class="px-2 py-1 font-mono text-[10px] text-destructive"
@@ -229,7 +272,9 @@ function isLastMember(id: string): boolean {
       <div class="mt-1 border-t pt-1">
         <div class="flex items-center gap-2 px-2 py-1">
           <span class="font-mono text-[10px] tracking-wide text-muted-foreground uppercase">
-            {{ active ? `In “${active.name}”` : 'New view' }}
+            {{
+              readOnly ? `Domain “${active!.name}”` : active ? `In “${active.name}”` : 'New view'
+            }}
           </span>
           <span class="ml-auto font-mono text-[10px] text-muted-foreground tabular-nums">
             {{ members.size }} / {{ nodes.length }}
@@ -249,11 +294,13 @@ function isLastMember(id: string): boolean {
               class="flex w-full items-center gap-2 rounded-sm px-2 py-1 text-left font-mono text-xs hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
               role="menuitemcheckbox"
               :aria-checked="members.has(model.id)"
-              :disabled="isLastMember(model.id)"
+              :disabled="readOnly || isLastMember(model.id)"
               :title="
-                isLastMember(model.id)
-                  ? 'A view needs at least one model — delete the view instead'
-                  : undefined
+                readOnly
+                  ? 'A domain’s models are the ones in its folders — copy it to edit'
+                  : isLastMember(model.id)
+                    ? 'A view needs at least one model — delete the view instead'
+                    : undefined
               "
               @click="toggleModel(model.id)"
             >
@@ -294,6 +341,19 @@ function isLastMember(id: string): boolean {
             <Plus class="size-3.5" />
           </Button>
         </form>
+
+        <div v-else-if="readOnly" class="mt-1 px-1">
+          <button
+            class="flex w-full items-center gap-2 rounded-sm px-1 py-1.5 text-left font-mono text-[11px] hover:bg-accent"
+            @click="copyToView()"
+          >
+            <Copy class="size-3.5 shrink-0" />
+            Copy to a saved view
+          </button>
+          <p class="px-1 pb-1 font-mono text-[10px] text-muted-foreground">
+            Follows the domain’s folders. Copy it to add or remove models.
+          </p>
+        </div>
 
         <p v-else class="px-2 py-1 font-mono text-[10px] text-muted-foreground">
           Changes save as you tick. Shift-drag the canvas to select several at once.
