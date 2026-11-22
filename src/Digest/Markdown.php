@@ -756,6 +756,58 @@ final class Markdown
         return $this->join($lines);
     }
 
+    /**
+     * A dissect:check result, written for the agent whose edit it is about:
+     * what broke, where, the rule it broke, and what not to do about it.
+     *
+     * @param  array<string, mixed>  $result  `dissect:check --format=json`
+     */
+    public function check(array $result): string
+    {
+        if ($result['passed'] ?? false) {
+            return $this->join(['dissect: no boundary rule is broken'.(($result['rules'] ?? []) === [] ? ' (there are no rules).' : '.')]);
+        }
+
+        $lines = [];
+        $violations = $result['violations'] ?? [];
+
+        if ($result['problems'] ?? []) {
+            $lines[] = 'dissect: .dissect/domains.json has a problem, so its boundary rules are not all checked:';
+
+            foreach ($result['problems'] as $problem) {
+                $lines[] = '- '.$problem;
+            }
+        }
+
+        if ($violations !== []) {
+            if ($lines !== []) {
+                $lines[] = '';
+            }
+
+            $lines[] = 'dissect: '.(count($violations) === 1 ? 'this breaks a boundary rule' : 'this breaks boundary rules').' in .dissect/domains.json:';
+
+            foreach ($violations as $violation) {
+                $lines[] = '- `'.$violation['file'].':'.($violation['lines'][0] ?? 0).'` '.$violation['message'];
+            }
+
+            $rules = array_column($result['rules'] ?? [], null, 'domain');
+            $broken = array_values(array_unique(array_column($violations, 'domain')));
+
+            $lines[] = '';
+            $lines[] = 'The '.(count($broken) === 1 ? 'rule' : 'rules').':';
+
+            foreach ($broken as $domain) {
+                $lines[] = '- '.(isset($rules[$domain]) ? $this->rule($rules[$domain]) : '**'.$domain.'**');
+            }
+
+            $lines[] = '';
+            $lines[] = 'Change the code so it keeps to the rule. The rule says where this team wants the boundary;'
+                .' only change .dissect/domains.json if you were asked to move it.';
+        }
+
+        return $this->join($lines);
+    }
+
     /** @param  array<string, mixed>  $rule */
     protected function rule(array $rule): string
     {

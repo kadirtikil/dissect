@@ -448,4 +448,11 @@ class MarkdownTest extends TestCase
 
             MD, $out);
     }
+
+    #[Test]
+    public function a_passing_check_says_so_in_one_line(): void
+    {
+        $this->assertSame("dissect: no boundary rule is broken.\n", $this->markdown->check(['passed' => true, 'rules' => [['domain' => 'Sales']]]));
+        $this->assertSame("dissect: no boundary rule is broken (there are no rules).\n", $this->markdown->check(['passed' => true, 'rules' => []]));
+    }
 }
