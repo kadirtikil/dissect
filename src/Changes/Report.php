@@ -1,0 +1,82 @@
+<?php
+
+namespace KdrDev\Dissect\Changes;
+
+use KdrDev\Dissect\Support\ClassNames;
+
+/**
+ * The diff between two snapshots, judged and worded: what `dissect:diff`
+ * prints, what an agent is told, and what the page will show.
+ *
+ * Each change is an item new, gone or changed, with its severity (the worst
+ * of its facts) and a line of text; each fact of a changed item has the same.
+ * The summary counts items, not facts: "2 breaking" is two things somebody
+ * has to look at, however many columns each lost.
+ */
+final class Report
+{
+    /**
+     * @param  array<string, mixed>  $before
+     * @param  array<string, mixed>  $after
+     * @return array{summary: array<string, int>, changes: array<int, array<string, mixed>>}
+     */
+    public static function between(array $before, array $after): array
+    {
+        $names = self::names($before, $after);
+        $changes = [];
+
+        foreach (Diff::between($before, $after) as $change) {
+            $facts = array_map(fn (array $fact) => [
+                ...$fact,
+                'severity' => Severity::ofFact($change['part'], $fact),
+                'text' => Wording::fact($fact),
+            ], $change['facts']);
+
+            $name = $names[$change['part']][$change['id']] ?? $change['id'];
+
+            $changes[] = [
+                'part' => $change['part'],
+                'id' => $change['id'],
+                'name' => $name,
+                'change' => $change['change'],
+                'severity' => $facts === [] ? Severity::ofItem($change['change']) : Severity::worst(array_column($facts, 'severity')),
+                'text' => Wording::item($change['part'], $name, $change['change']),
+                'facts' => $facts,
+            ];
+        }
+
+        // Part by part, as Diff gives them; within a part, worst first.
+        $part = array_flip(array_keys(Snapshot::PARTS));
+        $rank = array_flip(Severity::ORDER);
+        usort($changes, fn (array $a, array $b) => [$part[$a['part']], $rank[$a['severity']], $a['id']] <=> [$part[$b['part']], $rank[$b['severity']], $b['id']]);
+
+        $summary = array_fill_keys(Severity::ORDER, 0);
+
+        foreach ($changes as $change) {
+            $summary[$change['severity']]++;
+        }
+
+        return ['summary' => $summary, 'changes' => $changes];
+    }
+
+    /**
+     * What each item is called: a class by its short name, as on the page;
+     * a route as `GET api/x`.
+     *
+     * @return array<string, array<string, string>>
+     */
+    protected static function names(array $before, array $after): array
+    {
+        $names = [];
+
+        foreach (array_keys(Snapshot::PARTS) as $part) {
+            $ids = array_unique([...array_map('strval', array_keys((array) ($before[$part] ?? []))), ...array_map('strval', array_keys((array) ($after[$part] ?? [])))]);
+
+            $names[$part] = $part === 'routes'
+                ? array_combine($ids, array_map(Wording::route(...), $ids)) ?: []
+                : ClassNames::short($ids);
+        }
+
+        return $names;
+    }
+}
