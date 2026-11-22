@@ -64,6 +64,8 @@ And the parts that make it easy to live with:
   refreshes on its own, with no file watcher to run.
 - 💻 **Works without the page too.** `php artisan dissect:export` prints any of
   it as JSON, a Markdown digest, or a Mermaid diagram of the models.
+- 🤖 **An MCP server for agents.** `php artisan mcp:start dissect` answers
+  questions about one model, route, job or provider at a time.
 
 ## 🚀 Quick start
 
@@ -528,6 +530,63 @@ The command works whether or not the page is enabled. It only reads your code,
 and an Artisan command can't be reached from the web, so it doesn't need the
 `dissect.enabled` switch or the `viewDissect` gate. The queue isn't exported:
 it's runtime state, and a file of it would be stale before anyone opened it.
+
+---
+
+## 🤖 For agents (MCP)
+
+dissect ships an [MCP](https://modelcontextprotocol.io) server, so a coding agent
+can ask about the one model or route it's working on instead of reading the
+whole app into its context. It's built on the official
+[laravel/mcp](https://github.com/laravel/mcp) package and registered for you as
+a local server:
+
+```bash
+php artisan mcp:start dissect
+```
+
+To add it to Claude Code, run this from your project root:
+
+```bash
+claude mcp add dissect -- php artisan mcp:start dissect
+```
+
+Or commit it for the team in `.mcp.json` at the project root, which other MCP
+clients read too:
+
+```json
+{
+  "mcpServers": {
+    "dissect": {
+      "command": "php",
+      "args": ["artisan", "mcp:start", "dissect"]
+    }
+  }
+}
+```
+
+| Tool | Answers |
+| --- | --- |
+| `dissect_search` | Where does a name appear? Models, tables, columns, routes, request fields, jobs, classes anywhere in a provider tree, domains. |
+| `dissect_model` | A model's table, columns, relations with their key columns, and who points at it. |
+| `dissect_route` | A route's action, middleware, request fields and response shape, found by name, URI, verb and URI, or controller. |
+| `dissect_job` | A queued class's queue, retries, payload, and every place that dispatches it. |
+| `dissect_provider` | What a provider binds, what that resolves to, and what those classes need. |
+| `dissect_domain` | The domains, or every class in one. |
+
+Every tool is read-only and answers in the same Markdown as
+`dissect:export --format=md`. Called with no name, a tool lists everything in
+one line each; with a name, short (`Invoice`) or full, it gives the entry. An
+exact name beats a partial one.
+
+Each call reads the app fresh through `dissect:export`, so an answer reflects
+the code as it is now, not as it was when the agent's session started. (A
+long-running PHP process can't forget a class it has already loaded, so asking
+in-process would keep serving a model's old relations after you edit it.) The
+exporters' caches keep that fast when nothing has changed.
+
+Like the export command, the server is a local process and doesn't depend on
+`dissect.enabled` or the `viewDissect` gate. It's never served over HTTP.
 
 ---
 
