@@ -154,6 +154,72 @@ class DiffCommandTest extends TestCase
         [$code, $out] = $this->diff(['--format' => 'xml']);
 
         $this->assertSame(2, $code);
-        $this->assertStringContainsString('Pick one of: text, json.', $out);
+        $this->assertStringContainsString('Pick one of: text, json, md.', $out);
+    }
+
+    #[Test]
+    public function md_is_for_a_pull_request_comment_or_a_prompt(): void
+    {
+        $this->snapshot(function (array &$snapshot) {
+            unset($snapshot['models']['Workbench\\App\\Models\\Post']['relations']['tags']);
+            $snapshot['routes']['PUT|PATCH:api/posts/{post}']['name'] = 'posts.edit';
+        });
+
+        [$code, $out] = $this->diff(['--format' => 'md']);
+
+        $this->assertSame(0, $code);
+        $this->assertSame(implode("\n", [
+            '# Changes since '.$this->file,
+            '',
+            '2 changes: 1 breaking, 1 additive.',
+            '',
+            '## Models',
+            '',
+            '- additive `~ model Post` · `Workbench\\App\\Models\\Post`',
+            '  - additive `+ relation tags (MorphToMany Tag)`',
+            '',
+            '## Routes',
+            '',
+            '- **breaking** `~ route PUT|PATCH api/posts/{post}`',
+            '  - **breaking** `~ name posts.edit → posts.update`',
+            '',
+        ]), $out);
+    }
+
+    #[Test]
+    public function md_with_nothing_changed_says_so(): void
+    {
+        $this->snapshot();
+
+        $this->assertSame("# Changes since {$this->file}\n\nNothing changed.\n", $this->diff(['--format' => 'md'])[1]);
+    }
+
+    #[Test]
+    public function fail_on_exits_1_on_a_change_that_bad_or_worse(): void
+    {
+        // One additive change, one risky one.
+        $this->snapshot(function (array &$snapshot) {
+            unset($snapshot['routes']['POST:api/posts']);
+            $snapshot['routes']['PUT|PATCH:api/posts/{post}']['middleware'][] = 'auth';
+        });
+
+        $this->assertSame(0, $this->diff()[0], 'without --fail-on, a diff is a report');
+        $this->assertSame(0, $this->diff(['--fail-on' => 'breaking'])[0]);
+        $this->assertSame(1, $this->diff(['--fail-on' => 'risky'])[0]);
+        $this->assertSame(1, $this->diff(['--fail-on' => 'any'])[0]);
+        $this->assertSame(1, $this->diff(['--fail-on' => 'any', '--format' => 'json'])[0]);
+
+        $this->snapshot();
+
+        $this->assertSame(0, $this->diff(['--fail-on' => 'any'])[0]);
+    }
+
+    #[Test]
+    public function an_unknown_fail_on_is_refused_with_the_choices(): void
+    {
+        [$code, $out] = $this->diff(['--fail-on' => 'bad']);
+
+        $this->assertSame(2, $code);
+        $this->assertStringContainsString('Pick one of: breaking, risky, any.', $out);
     }
 }

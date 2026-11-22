@@ -60,6 +60,19 @@ final class Report
     }
 
     /**
+     * "3 changes: 1 breaking, 2 additive", or "0 changes".
+     *
+     * @param  array<string, int>  $summary
+     */
+    public static function summary(array $summary): string
+    {
+        $total = array_sum($summary);
+        $counted = array_map(fn (string $severity, int $count) => "{$count} {$severity}", array_keys(array_filter($summary)), array_filter($summary));
+
+        return $total.' '.($total === 1 ? 'change' : 'changes').($counted === [] ? '' : ': '.implode(', ', $counted));
+    }
+
+    /**
      * What each item is called: a class by its short name, as on the page;
      * a route as `GET api/x`.
      *

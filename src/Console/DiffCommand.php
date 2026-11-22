@@ -6,6 +6,7 @@ use Illuminate\Console\Command;
 use KdrDev\Dissect\Changes\Report;
 use KdrDev\Dissect\Changes\Snapshot;
 use KdrDev\Dissect\Changes\UnreadableSnapshot;
+use KdrDev\Dissect\Digest\Markdown;
 use Symfony\Component\Console\Formatter\OutputFormatter;
 use Symfony\Component\Console\Output\OutputInterface;
 use Throwable;
@@ -21,18 +22,26 @@ class DiffCommand extends Command
 {
     protected $signature = 'dissect:diff
         {--against= : The snapshot to compare with, instead of the one in config/dissect.php}
-        {--format=text : text, or json for a script}';
+        {--format=text : text, json for a script, or md for a pull request comment or a prompt}
+        {--fail-on= : Exit 1 on a change this bad or worse: breaking, risky, or any}';
 
     protected $description = 'Show what changed in the models, routes, jobs and providers since the snapshot';
 
     protected const COLORS = ['breaking' => 'red', 'risky' => 'yellow', 'additive' => 'green'];
 
-    public function handle(Snapshot $snapshot): int
+    public function handle(Snapshot $snapshot, Markdown $markdown): int
     {
         $format = (string) $this->option('format');
+        $failOn = $this->option('fail-on');
 
-        if (! in_array($format, ['text', 'json'], true)) {
-            $this->components->error("dissect:diff cannot write \"{$format}\". Pick one of: text, json.");
+        if (! in_array($format, ['text', 'json', 'md'], true)) {
+            $this->components->error("dissect:diff cannot write \"{$format}\". Pick one of: text, json, md.");
+
+            return self::INVALID;
+        }
+
+        if ($failOn !== null && ! in_array($failOn, ['breaking', 'risky', 'any'], true)) {
+            $this->components->error("dissect:diff cannot fail on \"{$failOn}\". Pick one of: breaking, risky, any.");
 
             return self::INVALID;
         }
@@ -58,13 +67,28 @@ class DiffCommand extends Command
 
         $report = Report::between($before, $now);
 
-        if ($format === 'json') {
-            $this->output->write(json_encode(['against' => $shown, ...$report], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR)."\n", false, OutputInterface::OUTPUT_RAW);
-        } else {
-            $this->text($report, $shown);
-        }
+        match ($format) {
+            'json' => $this->output->write(json_encode(['against' => $shown, ...$report], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR)."\n", false, OutputInterface::OUTPUT_RAW),
+            'md' => $this->output->write($markdown->changes($report, $shown), false, OutputInterface::OUTPUT_RAW),
+            default => $this->text($report, $shown),
+        };
 
-        return self::SUCCESS;
+        return $this->fails($report['summary'], $failOn) ? self::FAILURE : self::SUCCESS;
+    }
+
+    /**
+     * Whether a change at least as bad as --fail-on was found.
+     *
+     * @param  array<string, int>  $summary
+     */
+    protected function fails(array $summary, ?string $failOn): bool
+    {
+        return match ($failOn) {
+            'breaking' => $summary['breaking'] > 0,
+            'risky' => $summary['breaking'] + $summary['risky'] > 0,
+            'any' => array_sum($summary) > 0,
+            default => false,
+        };
     }
 
     /** @param  array{summary: array<string, int>, changes: array<int, array<string, mixed>>}  $report */
@@ -87,16 +111,7 @@ class DiffCommand extends Command
         }
 
         $this->newLine();
-        $this->components->info($this->summary($report['summary'])." since {$shown}.");
-    }
-
-    /** @param  array<string, int>  $summary */
-    public static function summary(array $summary): string
-    {
-        $total = array_sum($summary);
-        $counted = array_map(fn (string $severity, int $count) => "{$count} {$severity}", array_keys(array_filter($summary)), array_filter($summary));
-
-        return $total.' '.($total === 1 ? 'change' : 'changes').($counted === [] ? '' : ': '.implode(', ', $counted));
+        $this->components->info(Report::summary($report['summary'])." since {$shown}.");
     }
 
     /** The severity in its colour, padded so every line's text starts in one column. */
