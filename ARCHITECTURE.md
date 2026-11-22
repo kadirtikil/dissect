@@ -204,6 +204,7 @@ DissectServiceProvider    wiring; registers routes only when enabled
   │     └── DomainMap           /domains.json: every domain and its classes, built on demand
   ├── Support\CodeOwnership   app / vendor / framework, for routes and provider trees alike
   ├── Support\Surfaces        every payload by name, for callers that are not the page
+  ├── Support\PayloadCache    one fingerprint-keyed cache for the page, the console and MCP
   ├── Console\ExportCommand   dissect:export — a surface as json, md or mermaid
   │     ├── Digest\Markdown     a payload as one line per thing, per item reusable
   │     ├── Digest\Mermaid      the schema as an erDiagram, inverses folded
@@ -1276,6 +1277,7 @@ Config (`config/dissect.php`): `enabled`, `path`, `middleware`,
 | Change the domain chips on the lists | `resources/js/components/domains/DomainFacet.vue`, and `contexts` in each of `lib/{route,job,provider}Filters.ts` |
 | Change domain colours or how a source is worded | `resources/js/lib/domains.ts` |
 | Add a surface to `dissect:export` | `NAMES` and `export()` in `src/Support/Surfaces.php`, then a method in `src/Digest/Markdown.php` |
+| Change how long a payload is cached, or what invalidates it | `src/Support/PayloadCache.php` (the stamp), and each exporter's `fingerprint()` |
 | Add an export format | `formats()` and the `match` in `src/Console/ExportCommand.php` |
 | Change what the Markdown digest says | `src/Digest/Markdown.php` — one method per surface and one per item |
 | Change the Mermaid diagram | `src/Digest/Mermaid.php` — `CARDINALITY` for line ends, `relations()` for folding |
