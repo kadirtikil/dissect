@@ -32,6 +32,17 @@ class PayloadsTest extends TestCase
     }
 
     #[Test]
+    public function a_check_through_artisan_is_a_verdict_whichever_way_it_goes(): void
+    {
+        // Exit 1 (a rule broken) is an answer, not a failure to run.
+        $check = $this->payloads()->check(['app/Nowhere.php']);
+
+        $this->assertIsBool($check['passed']);
+        $this->assertSame([], $check['violations']);
+        $this->assertArrayHasKey('rules', $check);
+    }
+
+    #[Test]
     public function every_surface_is_one_process(): void
     {
         $this->assertSame(['schema', 'routes', 'jobs', 'providers', 'domains', 'classes', 'boundaries'], array_keys($this->payloads()->all()));

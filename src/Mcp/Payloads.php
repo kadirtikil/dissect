@@ -2,6 +2,7 @@
 
 namespace KdrDev\Dissect\Mcp;
 
+use Illuminate\Support\Facades\Artisan;
 use KdrDev\Dissect\Support\Surfaces;
 use RuntimeException;
 use Symfony\Component\Process\Process;
@@ -66,6 +67,54 @@ final class Payloads
     }
 
     /** @return array<string, mixed> */
+    /**
+     * What `dissect:check --format=json` says, for these files or all of
+     * them. Read fresh like every payload, so the rules and the code are
+     * both as they are now.
+     *
+     * @param  array<int, string>  $files
+     * @return array{passed: bool, rules: array<int, array<string, mixed>>, violations: array<int, array<string, mixed>>, problems: array<int, string>, unchecked: array<int, string>}
+     */
+    public function check(array $files = []): array
+    {
+        $options = array_map(fn (string $file) => '--files='.$file, $files);
+
+        if ($this->surfaces !== null) {
+            Artisan::call('dissect:check', ['--format' => 'json', '--files' => $files]);
+
+            return $this->decode(Artisan::output(), 'dissect:check');
+        }
+
+        $process = new Process(
+            [...(array) $this->artisan, 'dissect:check', '--format=json', ...$options, '--no-ansi', '--no-interaction'],
+            $this->cwd,
+            timeout: $this->timeout,
+        );
+
+        $process->run();
+
+        // 1 is a verdict, not a failure: something broke a rule.
+        if (! in_array($process->getExitCode(), [0, 1], true)) {
+            $said = trim($process->getOutput()."\n".$process->getErrorOutput());
+
+            throw new RuntimeException('dissect:check failed'.($said === '' ? '.' : ': '.$said));
+        }
+
+        return $this->decode($process->getOutput(), 'dissect:check');
+    }
+
+    /** @return array<string, mixed> */
+    protected function decode(string $output, string $command): array
+    {
+        $payload = json_decode($output, true);
+
+        if (! is_array($payload)) {
+            throw new RuntimeException($command.' did not print JSON. Is something in the app writing to the console while it boots?');
+        }
+
+        return $payload;
+    }
+
     protected function run(string $surface): array
     {
         $process = new Process(
@@ -82,12 +131,6 @@ final class Payloads
             throw new RuntimeException('dissect:export '.$surface.' failed'.($said === '' ? '.' : ': '.$said));
         }
 
-        $payload = json_decode($process->getOutput(), true);
-
-        if (! is_array($payload)) {
-            throw new RuntimeException('dissect:export '.$surface.' did not print JSON. Is something in the app writing to the console while it boots?');
-        }
-
-        return $payload;
+        return $this->decode($process->getOutput(), 'dissect:export '.$surface);
     }
 }
