@@ -21,6 +21,7 @@ import { useProviderStore } from '@/stores/provider'
 import { useDomainsStore } from '@/stores/domains'
 import { bootstrap } from '@/lib/bootstrap'
 import { baseName, shortNames } from '@/lib/classNames'
+import { domainColor, domainPalette } from '@/lib/domains'
 
 type Status = 'idle' | 'loading' | 'ready' | 'error'
 
@@ -112,6 +113,22 @@ export const useSchemaStore = defineStore('schema', () => {
   /** A model's on-screen name, including one the graph does not hold. */
   function labelOf(id: string): string {
     return labels.value.get(id) ?? baseName(id)
+  }
+
+  /**
+   * The colour order for the graph: the page's domains first, as on every
+   * other page, then any a model names that the page was not told about.
+   */
+  const palette = computed(() =>
+    domainPalette(
+      useDomainsStore().palette,
+      nodes.value.flatMap((n) => (n.data?.context ? [n.data.context] : [])),
+    ),
+  )
+
+  /** A domain's colour on the graph. */
+  function contextColor(name: string): string {
+    return domainColor(name, palette.value)
   }
 
   const externalModels = computed(() =>
@@ -266,6 +283,7 @@ export const useSchemaStore = defineStore('schema', () => {
         columns: normaliseColumns(model?.columns),
         relationCount: relationCounts.get(id) ?? 0,
         external: model === null,
+        context: model?.context ?? null,
       },
     })
 
@@ -496,6 +514,8 @@ export const useSchemaStore = defineStore('schema', () => {
     generatedAt,
     externalModels,
     labelOf,
+    palette,
+    contextColor,
     lastUpdated,
     expanded,
     highlighted,

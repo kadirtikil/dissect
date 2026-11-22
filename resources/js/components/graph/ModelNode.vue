@@ -28,6 +28,11 @@ const expanded = computed(() => store.expanded.has(props.id))
  */
 const highlighted = computed(() => store.highlighted.has(props.id))
 
+/** The domain's colour, or null for a model in none. */
+const contextColor = computed(() =>
+  props.data.context ? store.contextColor(props.data.context) : null,
+)
+
 const nav = useNavigationStore()
 const jobs = useJobsStore()
 
@@ -175,10 +180,13 @@ function onKeydown(event: KeyboardEvent) {
     @click="onClick"
     @keydown="onKeydown"
   >
-    <!-- Sigil bar: solid for scanned models, muted for external ones. -->
+    <!-- Sigil bar: the domain's colour, so a domain reads as one patch of
+         colour across a big graph; solid for other scanned models, muted for
+         external ones. -->
     <span
       class="absolute inset-y-0 left-0 w-[2px] rounded-l-md"
-      :class="data.external ? 'bg-muted-foreground/40' : 'bg-primary'"
+      :class="contextColor ? '' : data.external ? 'bg-muted-foreground/40' : 'bg-primary'"
+      :style="contextColor ? { background: contextColor } : undefined"
     />
 
     <div class="flex items-baseline justify-between gap-2">
@@ -188,9 +196,23 @@ function onKeydown(event: KeyboardEvent) {
       </span>
     </div>
 
-    <span class="truncate font-mono text-[10px] text-muted-foreground">
-      {{ data.external ? 'not in scan' : data.table }}
-    </span>
+    <!-- The domain shares the table's line, so a card is the same height in
+         an app with domains as without, and the grid needs no new estimate. -->
+    <div class="flex items-baseline justify-between gap-2 font-mono text-[10px]">
+      <span class="truncate text-muted-foreground">
+        {{ data.external ? 'not in scan' : data.table }}
+      </span>
+      <span
+        v-if="data.context && contextColor"
+        class="flex max-w-[50%] shrink-0 items-center gap-1"
+        :style="{ color: contextColor }"
+        :title="`In the ${data.context} domain`"
+        data-testid="model-domain"
+      >
+        <span class="size-1.5 shrink-0 rounded-full" :style="{ background: contextColor }" />
+        <span class="truncate">{{ data.context }}</span>
+      </span>
+    </div>
 
     <!-- The fully qualified class is what you need to go and open the file, but
          it is too long to carry on a collapsed card. -->
