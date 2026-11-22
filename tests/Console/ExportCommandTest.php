@@ -57,6 +57,27 @@ class ExportCommandTest extends TestCase
     }
 
     #[Test]
+    public function mermaid_draws_the_models(): void
+    {
+        $this->assertSame(0, Artisan::call('dissect:export', ['surface' => 'schema', '--format' => 'mermaid']));
+        $diagram = Artisan::output();
+
+        $this->assertStringStartsWith("erDiagram\n", $diagram);
+        $this->assertStringContainsString("    Post {\n", $diagram);
+    }
+
+    #[Test]
+    public function mermaid_is_refused_for_anything_but_the_models(): void
+    {
+        $this->artisan('dissect:export', ['surface' => 'routes', '--format' => 'mermaid'])
+            ->expectsOutputToContain('Mermaid draws the models only.')
+            ->assertExitCode(2);
+
+        // All is the default surface, so a bare --format=mermaid lands here too.
+        $this->artisan('dissect:export', ['--format' => 'mermaid'])->assertExitCode(2);
+    }
+
+    #[Test]
     public function it_writes_to_a_file_when_asked(): void
     {
         $path = sys_get_temp_dir().'/dissect-export-'.uniqid().'/nested/jobs.json';
