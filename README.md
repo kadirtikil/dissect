@@ -744,6 +744,16 @@ a guessed one a client would trust. When dissect only inferred a shape, the
 operation's description says so. When it couldn't work out a response, the
 operation has a `default` response that says that instead.
 
+It passes Redocly's linter with no structural problems. Three of its
+recommended style rules will still flag it, on purpose:
+
+- **`security-defined`** for an operation with no auth middleware. dissect
+  can't tell a public endpoint from one guarded by middleware it doesn't
+  recognise, so it doesn't claim either.
+- **`operation-4xx-response`** for an operation with neither auth nor
+  validation. dissect won't guess a `404` from a route parameter.
+- **`info-license`**, since there's no license to read from the code.
+
 Its title, version, description, servers, and which route stacks it covers
 (`api` by default) are under `openapi` in `config/dissect.php`.
 
@@ -994,7 +1004,7 @@ The rest live in `config/dissect.php`:
 - **`watch_path`**: default `storage_path('dissect/watch.json')`, where watching keeps its snapshot.
 - **`openapi`**: what `--format=openapi` puts around the operations. `title`
   (default: the app's name), `version` (default `1.0.0`), `description`,
-  `servers` (URLs or OpenAPI server objects; none by default), and `stacks`
+  `servers` (URLs or OpenAPI server objects; `/` by default), and `stacks`
   (default `['api']`: `web` routes answer with pages).
 
 </details>

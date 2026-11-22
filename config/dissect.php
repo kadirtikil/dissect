@@ -295,8 +295,8 @@ return [
     |
     | What `php artisan dissect:export routes --format=openapi` puts around the
     | operations it reads from the code. `title` defaults to the app's name.
-    | `servers` are URLs (or OpenAPI server objects); left empty, a client
-    | uses wherever it fetched the document from. `stacks` are the route
+    | `servers` are URLs (or OpenAPI server objects); left empty, the document
+    | says `/`, wherever it is served from. `stacks` are the route
     | stacks described: `api` alone, since `web` routes answer with pages.
     |
     */

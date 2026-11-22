@@ -40,7 +40,9 @@ final class Generator
             'title' => (string) ($config['title'] ?? config('app.name') ?? 'API'),
             'version' => (string) ($config['version'] ?? '1.0.0'),
             'description' => $config['description'] ?? self::DESCRIPTION,
-            'servers' => (array) ($config['servers'] ?? []),
+            // None configured is `/`, wherever the document is served from:
+            // OpenAPI's own default, written out because linters ask for it.
+            'servers' => (array) ($config['servers'] ?? []) ?: ['/'],
             'stacks' => (array) ($config['stacks'] ?? ['api']),
             'guards' => $guards,
             'default_guard' => (string) config('auth.defaults.guard', 'web'),

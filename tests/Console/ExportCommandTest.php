@@ -104,6 +104,11 @@ class ExportCommandTest extends TestCase
         $everything = json_decode(Artisan::output(), true);
 
         $this->assertSame('Everything', $everything['info']['title']);
+
+        // None configured is written out as OpenAPI's default: wherever it is served from.
+        config(['dissect.openapi.servers' => []]);
+        Artisan::call('dissect:export', ['surface' => 'routes', '--format' => 'openapi']);
+        $this->assertSame([['url' => '/']], json_decode(Artisan::output(), true)['servers']);
         $this->assertGreaterThan(count($document['paths']), count($everything['paths']));
     }
 
