@@ -19,6 +19,7 @@ import { useRoutesStore } from '@/stores/routes'
 import { useJobsStore } from '@/stores/jobs'
 import { useProviderStore } from '@/stores/provider'
 import { useDomainsStore } from '@/stores/domains'
+import { useClassesStore } from '@/stores/classes'
 import { bootstrap } from '@/lib/bootstrap'
 import { baseName, shortNames } from '@/lib/classNames'
 import { crossesInto, domainColor, domainPalette } from '@/lib/domains'
@@ -446,6 +447,7 @@ export const useSchemaStore = defineStore('schema', () => {
       const jobs = useJobsStore()
       const providers = useProviderStore()
       const domains = useDomainsStore()
+      const classes = useClassesStore()
 
       try {
         // The derived surfaces all walk a far wider tree than the model signal
@@ -457,6 +459,7 @@ export const useSchemaStore = defineStore('schema', () => {
           jobs.loaded ? 'jobs=1' : null,
           providers.loaded ? 'providers=1' : null,
           domains.loaded ? 'domains=1' : null,
+          classes.loaded ? 'classes=1' : null,
         ].filter((part) => part !== null)
 
         const res = await fetch(asked.length ? `${url!}?${asked.join('&')}` : url!, {
@@ -492,6 +495,12 @@ export const useSchemaStore = defineStore('schema', () => {
         // is edited.
         if (typeof payload?.domains === 'string' && payload.domains !== domains.fingerprint) {
           await domains.refresh()
+        }
+
+        // And the class index, which walks the same folders but moves on far
+        // more: any edit that adds or drops a reference between two classes.
+        if (typeof payload?.classes === 'string' && payload.classes !== classes.fingerprint) {
+          await classes.refresh()
         }
 
         if (typeof next !== 'string' || next === fingerprint.value) return

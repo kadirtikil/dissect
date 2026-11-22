@@ -43,6 +43,12 @@ export interface Bootstrap {
    */
   domainsUrl?: string
   /**
+   * Endpoint returning every app class and the app classes it names. A URL
+   * for the same reason, and the widest read of them all: it parses every
+   * file the one above only lists.
+   */
+  classesUrl?: string
+  /**
    * Every domain the folders and domains.json name, sorted. Only the names:
    * they cost a few directory listings, and they are what keeps a domain the
    * same colour on every page.

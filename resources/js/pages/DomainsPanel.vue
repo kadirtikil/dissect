@@ -1,16 +1,30 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { ChevronRight, TriangleAlert } from '@lucide/vue'
 import DomainCard from '@/components/domains/DomainCard.vue'
 import { PAGE_CONTEXT } from '@/lib/toolbar'
 import { baseName } from '@/lib/classNames'
 import { useDomainsStore } from '@/stores/domains'
+import { useClassesStore } from '@/stores/classes'
+import { dependenciesOf, domainDependencies } from '@/lib/dependencies'
 
 const store = useDomainsStore()
 const { status, error, file, palette, stats } = storeToRefs(store)
 
+const classes = useClassesStore()
+const {
+  status: classesStatus,
+  error: classesError,
+  file: index,
+  stats: classStats,
+} = storeToRefs(classes)
+
 const showUnassigned = ref(false)
+
+const dependencies = computed(() =>
+  classesStatus.value === 'ready' ? domainDependencies(index.value.classes) : null,
+)
 
 /** The layouts dissect reads domains from, for the empty state. */
 const conventions = [
@@ -24,6 +38,16 @@ const conventions = [
 
 // Fetched here rather than at boot: this is the moment somebody asked for it.
 onMounted(() => store.load())
+
+// The class index only once there are domains for it to connect: it parses
+// every source file, and an app with no domains has no boundary to show.
+watch(
+  () => status.value === 'ready' && file.value.domains.length > 0,
+  (wanted) => {
+    if (wanted) void classes.load()
+  },
+  { immediate: true },
+)
 </script>
 
 <template>
@@ -34,6 +58,9 @@ onMounted(() => store.load())
           {{ stats.domains }} {{ stats.domains === 1 ? 'domain' : 'domains' }} ·
           {{ stats.unassigned }} unassigned
           <template v-if="stats.findings"> · {{ stats.findings }} to check</template>
+          <template v-if="classesStatus === 'ready'">
+            · {{ classStats.classes }} {{ classStats.classes === 1 ? 'class' : 'classes' }} read
+          </template>
         </template>
         <template v-else>Bounded contexts</template>
       </span>
@@ -90,12 +117,39 @@ onMounted(() => store.load())
       </div>
 
       <template v-else>
+        <p
+          v-if="classesStatus === 'loading'"
+          class="font-mono text-[11px] text-muted-foreground"
+          data-testid="classes-status"
+        >
+          Reading which class uses which…
+        </p>
+        <p
+          v-else-if="classesStatus === 'error'"
+          class="font-mono text-[11px] text-destructive"
+          data-testid="classes-status"
+        >
+          Could not load classes.json: {{ classesError }}. Domains are listed without their
+          dependencies.
+        </p>
+        <p
+          v-else-if="classStats.unreadable"
+          class="font-mono text-[11px] text-muted-foreground"
+          data-testid="classes-status"
+          :title="index.unreadable.join('\n')"
+        >
+          {{ classStats.unreadable }}
+          {{ classStats.unreadable === 1 ? 'file' : 'files' }} could not be parsed, so what they use
+          is not counted.
+        </p>
+
         <div class="space-y-3">
           <DomainCard
             v-for="domain in file.domains"
             :key="domain.name"
             :domain="domain"
             :names="palette"
+            :dependencies="dependencies && dependenciesOf(dependencies, domain.name)"
           />
         </div>
 
