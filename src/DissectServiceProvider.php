@@ -15,6 +15,7 @@ use KdrDev\Dissect\Mcp\Payloads;
 use KdrDev\Dissect\Architecture\Conventions;
 use KdrDev\Dissect\Architecture\DomainFile;
 use KdrDev\Dissect\Architecture\DomainMap;
+use KdrDev\Dissect\Console\CheckCommand;
 use KdrDev\Dissect\Console\ExportCommand;
 use KdrDev\Dissect\Http\Middleware\Authorize;
 use KdrDev\Dissect\Jobs\DispatchScanner;
@@ -288,7 +289,7 @@ class DissectServiceProvider extends ServiceProvider
         // page served over HTTP. A command is run by whoever already has a
         // shell on the machine, and reads nothing that shell could not.
         if ($this->app->runningInConsole()) {
-            $this->commands([ExportCommand::class]);
+            $this->commands([ExportCommand::class, CheckCommand::class]);
 
             // `php artisan mcp:start dissect`. Local only: a stdio server is
             // a process an agent starts on this machine, never a URL.
