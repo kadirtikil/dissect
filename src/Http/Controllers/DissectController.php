@@ -59,6 +59,7 @@ class DissectController
             'layout' => $this->layout->get(),
             'views' => $this->views->get(),
             'fingerprint' => $this->fingerprint(),
+            'domains' => $this->domains->names(),
             // When set, assets come from a running Vite dev server rather than
             // dist/ — see config('dissect.dev_server').
             'devServer' => $devServer,
