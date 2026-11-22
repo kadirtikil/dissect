@@ -9,6 +9,7 @@ use KdrDev\Dissect\Mcp\Tools\Job;
 use KdrDev\Dissect\Mcp\Tools\Model;
 use KdrDev\Dissect\Mcp\Tools\Provider;
 use KdrDev\Dissect\Mcp\Tools\Route;
+use KdrDev\Dissect\Mcp\Tools\Search;
 use KdrDev\Dissect\Support\Surfaces;
 use KdrDev\Dissect\Tests\TestCase;
 use Laravel\Mcp\Server\Registrar;
@@ -32,7 +33,7 @@ class ToolsTest extends TestCase
     {
         $this->assertNotNull($this->app->make(Registrar::class)->getLocalServer('dissect'));
 
-        DissectServer::tools()->assertRegistered([Model::class, Route::class, Job::class, Provider::class, Domain::class]);
+        DissectServer::tools()->assertRegistered([Search::class, Model::class, Route::class, Job::class, Provider::class, Domain::class]);
     }
 
     #[Test]
@@ -112,6 +113,29 @@ class ToolsTest extends TestCase
         DissectServer::tool(Domain::class)->assertOk()->assertSee('No domains found');
     }
 
+    #[Test]
+    public function search_names_every_surface_it_found_something_in(): void
+    {
+        DissectServer::tool(Search::class, ['query' => 'author'])
+            ->assertOk()
+            ->assertSee([
+                '## Models (dissect_model)',
+                '- Author `authors`',
+                '- Post.author → Author (BelongsTo)',
+                '## Routes (dissect_route)',
+                '- `POST api/posts` → PostController@store (takes author_id)',
+                '## Jobs (dissect_job)',
+                '- SyncAuthorProfile (job) carries Author',
+            ]);
+
+        DissectServer::tool(Search::class, ['query' => 'zzz-nothing'])->assertOk()->assertSee('Nothing dissect reads mentions "zzz-nothing".');
+    }
+
+    #[Test]
+    public function search_needs_a_query(): void
+    {
+        DissectServer::tool(Search::class)->assertHasErrors(['Give a query']);
+    }
 
     #[Test]
     public function an_app_that_cannot_be_read_is_an_error_not_a_crash(): void

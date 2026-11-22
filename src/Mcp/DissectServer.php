@@ -8,6 +8,7 @@ use KdrDev\Dissect\Mcp\Tools\Job;
 use KdrDev\Dissect\Mcp\Tools\Model;
 use KdrDev\Dissect\Mcp\Tools\Provider;
 use KdrDev\Dissect\Mcp\Tools\Route;
+use KdrDev\Dissect\Mcp\Tools\Search;
 use Laravel\Mcp\Server;
 use Laravel\Mcp\Server\ServerContext;
 use Laravel\Mcp\Server\Attributes\Instructions;
@@ -25,13 +26,14 @@ use Laravel\Mcp\Server\Attributes\Name;
 #[Instructions(<<<'MD'
     dissect reads this Laravel app's structure from its source: models and relations, HTTP routes with request and response shapes, queued jobs and where they are dispatched, service provider bindings, and domains. Every answer is read fresh, so it reflects the code as it is now.
 
-    Call dissect_model, dissect_route, dissect_job or dissect_provider without arguments for an index, or with a name for the full entry. Short class names work; when two classes share one, the namespace segments that tell them apart are shown.
+    Start with dissect_search when you have a name but not its kind. Call dissect_model, dissect_route, dissect_job or dissect_provider without arguments for an index, or with a name for the full entry. Short class names work; when two classes share one, the namespace segments that tell them apart are shown.
 
     Lines marked inferred or unknown are dissect's best reading, not a fact; check the source before relying on them. Nothing here runs the app's code.
     MD)]
 class DissectServer extends Server
 {
     protected array $tools = [
+        Search::class,
         Model::class,
         Route::class,
         Job::class,

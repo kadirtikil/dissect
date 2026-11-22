@@ -6,6 +6,7 @@ use KdrDev\Dissect\Mcp\DissectServer;
 use KdrDev\Dissect\Mcp\Payloads;
 use KdrDev\Dissect\Mcp\Tools\Domain;
 use KdrDev\Dissect\Mcp\Tools\Model;
+use KdrDev\Dissect\Mcp\Tools\Search;
 use KdrDev\Dissect\Support\Surfaces;
 use KdrDev\Dissect\Tests\Concerns\UsesDomainFixture;
 use KdrDev\Dissect\Tests\TestCase;
@@ -49,5 +50,13 @@ class DomainToolsTest extends TestCase
             ->assertSee(['· domain Billing', '- customer → Customer (BelongsTo, customer_id → id) — crosses into Sales']);
 
         DissectServer::tool(Model::class)->assertOk()->assertSee('- Invoice `invoices` · domain Billing');
+    }
+
+    #[Test]
+    public function search_finds_the_domain_a_class_is_in(): void
+    {
+        DissectServer::tool(Search::class, ['query' => 'Quote'])
+            ->assertOk()
+            ->assertSee(['## Domains (dissect_domain)', '- Sales holds ']);
     }
 }
