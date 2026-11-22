@@ -2,11 +2,9 @@
 
 namespace KdrDev\Dissect\Http\Controllers;
 
-use Composer\InstalledVersions;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
-use Illuminate\Support\Facades\Cache;
 use KdrDev\Dissect\Architecture\DomainMap;
 use KdrDev\Dissect\Exceptions\StateFileException;
 use KdrDev\Dissect\Jobs\JobExporter;
@@ -15,6 +13,7 @@ use KdrDev\Dissect\ProviderTree\ProviderExporter;
 use KdrDev\Dissect\Queue\QueueSnapshot;
 use KdrDev\Dissect\Routes\RouteExporter;
 use KdrDev\Dissect\SchemaExporter;
+use KdrDev\Dissect\Support\PayloadCache;
 use KdrDev\Dissect\ViewRepository;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Throwable;
@@ -32,8 +31,6 @@ class DissectController
 
     protected ?string $domainFingerprint = null;
 
-    protected ?string $stamp = null;
-
     public function __construct(
         protected SchemaExporter $exporter,
         protected RouteExporter $routes,
@@ -43,6 +40,7 @@ class DissectController
         protected LayoutRepository $layout,
         protected ViewRepository $views,
         protected DomainMap $domains,
+        protected PayloadCache $cache,
     ) {}
 
     /** The single page. Schema and layout are inlined, so it makes no XHR on boot. */
@@ -350,48 +348,6 @@ class DissectController
         return rtrim($url, '/');
     }
 
-    /**
-     * Where a surface's export is cached.
-     *
-     * The fingerprint says whether the *source* moved. It cannot say whether
-     * the package that reads it changed, or how it was told to read it: a
-     * `composer update` that reshapes a payload, or a corrected
-     * `DISSECT_MODELS_NAMESPACE`, leaves every file it stats untouched — and
-     * the export from before would be served for the rest of the hour. The
-     * stamp covers both, and domains.json, which puts a domain on every row
-     * of every surface without being a file any of their signals watch.
-     */
-    protected function cacheKey(string $surface, string $fingerprint): string
-    {
-        return 'dissect.'.$surface.'.'.$this->stamp().'.'.$fingerprint;
-    }
-
-    /** The installed package version and this package's config, hashed. */
-    protected function stamp(): string
-    {
-        return $this->stamp ??= substr(sha1(json_encode([
-            $this->packageVersion(),
-            config('dissect'),
-            $this->domains->fileSignal(),
-        ], JSON_PARTIAL_OUTPUT_ON_ERROR) ?: ''), 0, 12);
-    }
-
-    /**
-     * The commit Composer installed, falling back to the version string.
-     *
-     * A VCS install of a branch keeps the same pretty version across updates
-     * (`dev-main`), so the reference is the part that actually moves.
-     */
-    protected function packageVersion(): string
-    {
-        try {
-            return (InstalledVersions::getReference('kdr-dev/dissect') ?? '')
-                .'@'.(InstalledVersions::getPrettyVersion('kdr-dev/dissect') ?? '');
-        } catch (Throwable) {
-            return 'unknown';
-        }
-    }
-
     /** Memoised: index() renders it and keys the schema cache with it. */
     protected function fingerprint(): string
     {
@@ -411,9 +367,9 @@ class DissectController
         // Dearer to build than the schema — every controller, form request and
         // resource behind the table gets reflected and parsed — so the cache
         // matters more here, not less.
-        return Cache::remember(
-            $this->cacheKey('routes', $this->routeFingerprint()),
-            now()->addHour(),
+        return $this->cache->remember(
+            'routes',
+            $this->routeFingerprint(),
             fn () => $this->routes->export(),
         );
     }
@@ -443,9 +399,9 @@ class DissectController
         // The dearest of the three. Every file under the watched paths is
         // parsed, not just stat'd, so this wants the cache more than either of
         // the others — and gets exactly the same one.
-        return Cache::remember(
-            $this->cacheKey('jobs', $this->jobFingerprint()),
-            now()->addHour(),
+        return $this->cache->remember(
+            'jobs',
+            $this->jobFingerprint(),
             fn () => $this->jobs->export(),
         );
     }
@@ -460,9 +416,9 @@ class DissectController
      */
     protected function domains(): array
     {
-        return Cache::remember(
-            $this->cacheKey('domains', $this->domainFingerprint()),
-            now()->addHour(),
+        return $this->cache->remember(
+            'domains',
+            $this->domainFingerprint(),
             fn () => $this->domains->export(),
         );
     }
@@ -479,9 +435,9 @@ class DissectController
     {
         // Every provider parsed and every constructor down its tree reflected —
         // cached on the signal like the other source-derived surfaces.
-        return Cache::remember(
-            $this->cacheKey('providers', $this->providerFingerprint()),
-            now()->addHour(),
+        return $this->cache->remember(
+            'providers',
+            $this->providerFingerprint(),
             fn () => $this->providers->export(),
         );
     }
@@ -494,9 +450,9 @@ class DissectController
         // Inspecting every model does reflection plus a schema query each; the
         // fingerprint means that work happens once per model edit or applied
         // migration rather than once per request.
-        return Cache::remember(
-            $this->cacheKey('schema', $this->fingerprint()),
-            now()->addHour(),
+        return $this->cache->remember(
+            'schema',
+            $this->fingerprint(),
             fn () => $this->exporter->export(),
         );
     }
