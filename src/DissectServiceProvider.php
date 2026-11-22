@@ -9,6 +9,8 @@ use Illuminate\Database\Eloquent\ModelInspector;
 use Illuminate\Queue\QueueManager;
 use Illuminate\Routing\Router;
 use KdrDev\Dissect\Architecture\ContextResolver;
+use KdrDev\Dissect\Mcp\DissectServer;
+use KdrDev\Dissect\Mcp\Payloads;
 use KdrDev\Dissect\Architecture\Conventions;
 use KdrDev\Dissect\Architecture\DomainFile;
 use KdrDev\Dissect\Architecture\DomainMap;
@@ -42,6 +44,8 @@ use KdrDev\Dissect\Routes\RuleSource;
 use KdrDev\Dissect\Support\CodeOwnership;
 use KdrDev\Dissect\Types\TypeNormalizerManager;
 use Illuminate\Support\Facades\Route;
+use Laravel\Mcp\Facades\Mcp;
+use Laravel\Mcp\Server\McpServiceProvider;
 use Illuminate\Support\ServiceProvider;
 
 class DissectServiceProvider extends ServiceProvider
@@ -49,6 +53,12 @@ class DissectServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->mergeConfigFrom(__DIR__.'/../config/dissect.php', 'dissect');
+
+        // The MCP server needs laravel/mcp's container wiring. Package
+        // discovery usually registers it already; an app that turned that off
+        // would get a server that never sees its arguments. Registering a
+        // provider twice is a no-op.
+        $this->app->register(McpServiceProvider::class);
 
         $this->app->singleton(TypeNormalizerManager::class, fn (Application $app) => new TypeNormalizerManager(
             $app->make(DatabaseManager::class),
@@ -247,6 +257,13 @@ class DissectServiceProvider extends ServiceProvider
             (string) config('dissect.views_path', base_path('.dissect/views.json')),
             $models,
         ));
+
+        // Each MCP call reads through a fresh artisan, with the PHP that is
+        // running the server. See Payloads for why not in process.
+        $this->app->bind(Payloads::class, fn () => Payloads::fresh(
+            [PHP_BINARY, base_path('artisan')],
+            base_path(),
+        ));
     }
 
     public function boot(): void
@@ -266,6 +283,10 @@ class DissectServiceProvider extends ServiceProvider
         // shell on the machine, and reads nothing that shell could not.
         if ($this->app->runningInConsole()) {
             $this->commands([ExportCommand::class]);
+
+            // `php artisan mcp:start dissect`. Local only: a stdio server is
+            // a process an agent starts on this machine, never a URL.
+            Mcp::local('dissect', DissectServer::class);
         }
     }
 
