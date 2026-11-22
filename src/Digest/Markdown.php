@@ -44,6 +44,7 @@ final class Markdown
             'jobs' => $this->jobs($payload),
             'providers' => $this->providers($payload),
             'domains' => $this->domains($payload),
+            'classes' => $this->classes($payload),
         };
     }
 
@@ -540,6 +541,154 @@ final class Markdown
         }
 
         return $this->join($lines);
+    }
+
+    // ── Classes ───────────────────────────────────────────────────────────
+
+    /**
+     * Every class and the app classes it uses, one line each, opened by how
+     * the domains depend on one another when the app has any.
+     *
+     * @param  array<string, mixed>  $payload
+     */
+    public function classes(array $payload): string
+    {
+        $classes = $payload['classes'] ?? [];
+        $names = ClassNames::short(array_column($classes, 'id'));
+        $contexts = array_column($classes, 'context', 'id');
+        $references = array_sum(array_map(fn (array $class) => count($class['uses'] ?? []), $classes));
+
+        $lines = ['# Classes', '', count($classes).' classes, '.$references.' references between them.'];
+
+        if ($payload['unreadable'] ?? []) {
+            $lines[] = count($payload['unreadable']).' '.(count($payload['unreadable']) === 1 ? 'file' : 'files').' could not be parsed: '.implode(', ', $payload['unreadable']).'.';
+        }
+
+        $between = $this->between($classes, $contexts);
+
+        if ($between !== []) {
+            $lines[] = '';
+            $lines[] = '## Between domains';
+            $lines = [...$lines, ...$between];
+            $lines[] = '';
+            $lines[] = '## Every class';
+        }
+
+        $lines[] = '';
+
+        foreach ($classes as $class) {
+            $targets = [];
+
+            foreach ($class['uses'] ?? [] as $use) {
+                $to = $contexts[$use['to']] ?? null;
+                $targets[$use['to']] = $names[$use['to']].($to !== null && $to !== ($class['context'] ?? null) ? ' ['.$to.']' : '');
+            }
+
+            $lines[] = '- **'.$names[$class['id']].'** '.$class['kind']
+                .(($class['context'] ?? null) !== null ? ' · domain '.$class['context'] : '')
+                .($targets === [] ? '' : ' · uses '.implode(', ', $targets));
+        }
+
+        return $this->join($lines);
+    }
+
+    /**
+     * One class: where it is, what it uses, and what uses it.
+     *
+     * @param  array<string, mixed>  $class
+     * @param  array<string, mixed>  $payload  The whole index, for who uses this class.
+     */
+    public function class(array $class, array $payload): string
+    {
+        $all = $payload['classes'] ?? [];
+        $names = ClassNames::short(array_column($all, 'id'));
+        $contexts = array_column($all, 'context', 'id');
+        $context = $class['context'] ?? null;
+
+        $lines = [
+            '## '.$names[$class['id']].' ('.$class['kind'].($class['abstract'] && $class['kind'] === 'class' ? ', abstract' : '').')',
+            $this->meta($class['id'], $context).' · '.$class['file'].':'.$class['line'],
+        ];
+
+        $uses = $this->grouped($class['uses'] ?? []);
+
+        if ($uses === []) {
+            $lines[] = '- uses: no other class in the app';
+        } else {
+            $lines[] = '- uses:';
+
+            foreach ($uses as $to => $kinds) {
+                $other = $contexts[$to] ?? null;
+                $lines[] = '  - '.$names[$to].': '.$kinds.($other !== null && $context !== null && $other !== $context ? ' — crosses into '.$other : '');
+            }
+        }
+
+        $usedBy = [];
+
+        foreach ($all as $other) {
+            $toThis = array_values(array_filter($other['uses'] ?? [], fn (array $use) => $use['to'] === $class['id']));
+
+            if ($toThis !== []) {
+                $from = $other['context'] ?? null;
+                $usedBy[] = '  - '.$names[$other['id']].': '.$this->grouped($toThis)[$class['id']]
+                    .($from !== null && $context !== null && $from !== $context ? ' — from '.$from : '');
+            }
+        }
+
+        $lines[] = $usedBy === [] ? '- used by: no other class in the app' : '- used by:';
+
+        return $this->join([...$lines, ...$usedBy]);
+    }
+
+    /**
+     * References per target, as `relation line 6; type lines 9, 12`.
+     *
+     * @param  array<int, array{to: string, kind: string, lines: array<int, int>}>  $uses
+     * @return array<string, string>
+     */
+    protected function grouped(array $uses): array
+    {
+        $grouped = [];
+
+        foreach ($uses as $use) {
+            $lines = $use['lines'] ?? [];
+            $grouped[$use['to']][] = $use['kind'].' '.(count($lines) === 1 ? 'line ' : 'lines ').implode(', ', $lines);
+        }
+
+        return array_map(fn (array $kinds) => implode('; ', $kinds), $grouped);
+    }
+
+    /**
+     * How often each domain's classes name another's, by kind.
+     *
+     * @param  array<int, array<string, mixed>>  $classes
+     * @param  array<string, ?string>  $contexts
+     * @return array<int, string>
+     */
+    protected function between(array $classes, array $contexts): array
+    {
+        $counts = [];
+
+        foreach ($classes as $class) {
+            $from = $class['context'] ?? null;
+
+            foreach ($class['uses'] ?? [] as $use) {
+                $to = $contexts[$use['to']] ?? null;
+
+                if ($from !== null && $to !== null && $from !== $to) {
+                    $counts[$from.' → '.$to][$use['kind']] = ($counts[$from.' → '.$to][$use['kind']] ?? 0) + 1;
+                }
+            }
+        }
+
+        ksort($counts);
+
+        return array_map(function (string $pair) use ($counts) {
+            arsort($counts[$pair]);
+            $kinds = array_map(fn (string $kind, int $count) => $kind.' '.$count, array_keys($counts[$pair]), $counts[$pair]);
+
+            return '- '.$pair.': '.array_sum($counts[$pair]).' ('.implode(', ', $kinds).')';
+        }, array_keys($counts));
     }
 
     // ── Shared ────────────────────────────────────────────────────────────

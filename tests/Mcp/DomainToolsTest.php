@@ -4,6 +4,7 @@ namespace KdrDev\Dissect\Tests\Mcp;
 
 use KdrDev\Dissect\Mcp\DissectServer;
 use KdrDev\Dissect\Mcp\Payloads;
+use KdrDev\Dissect\Mcp\Tools\ClassReferences;
 use KdrDev\Dissect\Mcp\Tools\Domain;
 use KdrDev\Dissect\Mcp\Tools\Model;
 use KdrDev\Dissect\Mcp\Tools\Search;
@@ -58,5 +59,27 @@ class DomainToolsTest extends TestCase
         DissectServer::tool(Search::class, ['query' => 'Quote'])
             ->assertOk()
             ->assertSee(['## Domains (dissect_domain)', '- Sales holds ']);
+    }
+
+    #[Test]
+    public function a_class_says_what_depends_on_it_and_from_which_domain(): void
+    {
+        DissectServer::tool(ClassReferences::class, ['name' => 'Invoice'])
+            ->assertOk()
+            ->assertSee([
+                '## Invoice (class)',
+                '  - Customer: relation line 15 — crosses into Sales',
+                '- used by:',
+                '  - InvoiceController: static line 12; type line 15',
+                '  - Customer: relation line 19 — from Sales',
+            ]);
+    }
+
+    #[Test]
+    public function without_a_name_the_class_tool_starts_with_the_domains(): void
+    {
+        DissectServer::tool(ClassReferences::class)
+            ->assertOk()
+            ->assertSee(['# Classes', '## Between domains', '- Billing → Sales: 1 (relation 1)']);
     }
 }

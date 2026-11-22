@@ -268,6 +268,40 @@ attribute that names a domain nothing else defines.
 - 📄 **`/dissect/domains.json`** serves the same data as JSON, for scripts and
   agents.
 
+### Which class uses which
+
+dissect also reads every class, interface, trait and enum in your source
+folders, and every other one of them it names. The page doesn't use it yet;
+it's the groundwork for the domain map. You can ask for it from the terminal
+or an agent today:
+
+```bash
+php artisan dissect:export classes --format=md
+```
+
+```
+## Between domains
+- Billing → Sales: 1 (relation 1)
+- Sales → Billing: 1 (relation 1)
+```
+
+Each reference says how one class names the other. Most kinds are what the
+syntax says: `extends`, `implements`, `trait`, `new`, `static`, `type`,
+`instanceof`, `catch` and `attribute`. Four are what the syntax means in a
+Laravel app, which a generic dependency tool can't see:
+
+- **`relation`**: `$this->belongsTo(Customer::class)` and the other relation
+  builders.
+- **`dispatch`**: `SendInvoice::dispatch()`, `dispatch(new SendInvoice)`, `Bus::dispatch(...)`.
+- **`event`**: `event(new InvoicePaid)`, `Event::dispatch(...)`.
+- **`binding`**: `$this->app->bind(Gateway::class, StripeGateway::class)`, and
+  `when()->needs()->give()`.
+
+Each name is counted once, with its most specific kind, so a dispatched job is
+a `dispatch` and not also a `new`. Only references between your own classes
+are listed. Everything is read as syntax, so nothing is loaded or run, and a
+file that doesn't parse is listed as such rather than skipped silently.
+
 > 🚧 **Coming next: the domain map.** A graph with one node per domain and the
 > dependencies between domains as edges, so you can see the shape of the whole
 > app at the domain level and click through to the classes behind each
@@ -502,6 +536,7 @@ a script, for a CI step, and for handing an agent a map of the app.
 ```bash
 php artisan dissect:export                                # every surface, as JSON
 php artisan dissect:export routes                         # one surface
+php artisan dissect:export classes --format=md            # which class uses which
 php artisan dissect:export jobs --format=md               # a digest to read
 php artisan dissect:export schema --format=mermaid        # the models as an ER diagram
 php artisan dissect:export --format=md --output=docs/app.md
@@ -573,6 +608,7 @@ clients read too:
 | `dissect_job` | A queued class's queue, retries, payload, and every place that dispatches it. |
 | `dissect_provider` | What a provider binds, what that resolves to, and what those classes need. |
 | `dissect_domain` | The domains, or every class in one. |
+| `dissect_class` | What a class uses and what uses it, by kind and line, with crossings between domains marked. |
 
 Every tool is read-only and answers in the same Markdown as
 `dissect:export --format=md`. Called with no name, a tool lists everything in
@@ -806,6 +842,7 @@ one but the queue can also be printed with
 | `/dissect/jobs.json` | Queueables, their queues and dispatch sites. |
 | `/dissect/providers.json` | Provider trees. |
 | `/dissect/domains.json` | Domains, their classes, findings and unassigned classes. |
+| `/dissect/classes.json` | Every class and the app classes it uses. |
 | `/dissect/queue.json` | The live queue. |
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for the full design and every payload

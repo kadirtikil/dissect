@@ -5,6 +5,7 @@ namespace KdrDev\Dissect\Http\Controllers;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use KdrDev\Dissect\Architecture\ClassIndex;
 use KdrDev\Dissect\Architecture\DomainMap;
 use KdrDev\Dissect\Exceptions\StateFileException;
 use KdrDev\Dissect\Jobs\JobExporter;
@@ -100,6 +101,13 @@ class DissectController
             $payload['domains'] = $this->domainFingerprint();
         }
 
+        // The class index walks the same folders, so its signal is the same
+        // walk; asked for separately so the domain list alone never pays for
+        // resolving the index.
+        if ($request->boolean('classes')) {
+            $payload['classes'] = app(ClassIndex::class)->fingerprint();
+        }
+
         // The whole point is to see the current value; a cached 200 would make
         // the page believe nothing had changed for as long as the browser
         // decided to hold on to it.
@@ -172,6 +180,22 @@ class DissectController
     {
         return response()
             ->json($this->domains() + ['fingerprint' => $this->domainFingerprint()])
+            ->header('Cache-Control', 'no-store');
+    }
+
+    /**
+     * Every class in the application and the others it names.
+     *
+     * Fetched when asked for, never inlined: it parses every PHP file under
+     * the application's source folders. Resolved here rather than in the
+     * constructor so no other request builds one.
+     */
+    public function classesJson(ClassIndex $index): JsonResponse
+    {
+        $fingerprint = $index->fingerprint();
+
+        return response()
+            ->json($this->cache->remember('classes', $fingerprint, fn () => $index->export()) + ['fingerprint' => $fingerprint])
             ->header('Cache-Control', 'no-store');
     }
 

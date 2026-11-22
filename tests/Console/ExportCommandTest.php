@@ -30,7 +30,7 @@ class ExportCommandTest extends TestCase
     {
         $exported = $this->exported([]);
 
-        $this->assertSame(['schema', 'routes', 'jobs', 'providers', 'domains'], array_keys($exported));
+        $this->assertSame(['schema', 'routes', 'jobs', 'providers', 'domains', 'classes'], array_keys($exported));
         $this->assertContains('Workbench\\App\\Models\\Post', array_column($exported['schema']['nodes'], 'id'));
     }
 
@@ -53,7 +53,7 @@ class ExportCommandTest extends TestCase
 
         $headings = array_values(array_filter(explode("\n", $digest), fn (string $line) => str_starts_with($line, '# ')));
 
-        $this->assertSame(['# Models', '# Routes', '# Jobs', '# Service providers', '# Domains'], $headings);
+        $this->assertSame(['# Models', '# Routes', '# Jobs', '# Service providers', '# Domains', '# Classes'], $headings);
     }
 
     #[Test]
@@ -99,7 +99,7 @@ class ExportCommandTest extends TestCase
     public function an_unknown_surface_or_format_is_refused_with_the_choices(): void
     {
         $this->artisan('dissect:export', ['surface' => 'queue'])
-            ->expectsOutputToContain('Pick one of: schema, routes, jobs, providers, domains, all.')
+            ->expectsOutputToContain('Pick one of: schema, routes, jobs, providers, domains, classes, all.')
             ->assertExitCode(2);
 
         $this->artisan('dissect:export', ['surface' => 'routes', '--format' => 'yaml'])

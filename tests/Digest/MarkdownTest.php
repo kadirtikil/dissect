@@ -333,4 +333,70 @@ class MarkdownTest extends TestCase
         $this->assertStringContainsString('No domains found', $this->markdown->render('domains', ['enabled' => true, 'domains' => [], 'unassigned' => ['A']]));
         $this->assertStringNotContainsString('in no domain', $this->markdown->render('domains', ['enabled' => true, 'domains' => [], 'unassigned' => ['A']]));
     }
+
+    // ── Classes ───────────────────────────────────────────────────────────
+
+    /** @return array<string, mixed> */
+    protected function index(): array
+    {
+        $class = fn (string $id, ?string $context, array $uses = [], string $kind = 'class') => [
+            'id' => $id, 'kind' => $kind, 'abstract' => $kind === 'interface', 'file' => 'app/'.basename(str_replace('\\', '/', $id)).'.php', 'line' => 5, 'context' => $context, 'uses' => $uses,
+        ];
+
+        return [
+            'classes' => [
+                $class('App\Billing\Invoice', 'Billing', [
+                    ['to' => 'App\Billing\Payment', 'kind' => 'relation', 'lines' => [9]],
+                    ['to' => 'App\Sales\Customer', 'kind' => 'relation', 'lines' => [8]],
+                    ['to' => 'App\Sales\Customer', 'kind' => 'type', 'lines' => [12, 14]],
+                ]),
+                $class('App\Billing\Payment', 'Billing', [['to' => 'App\Billing\Invoice', 'kind' => 'relation', 'lines' => [7]]]),
+                $class('App\Sales\Customer', 'Sales', [['to' => 'App\Billing\Invoice', 'kind' => 'relation', 'lines' => [6]]]),
+                $class('App\Sales\Invoice', 'Sales'),
+                $class('App\Support\Clock', null, [], 'interface'),
+            ],
+            'unreadable' => ['app/Broken.php'],
+        ];
+    }
+
+    #[Test]
+    public function the_class_list_opens_with_how_domains_depend_on_each_other(): void
+    {
+        $out = $this->markdown->render('classes', $this->index());
+
+        $this->assertStringStartsWith("# Classes\n\n5 classes, 5 references between them.\n1 file could not be parsed: app/Broken.php.\n", $out);
+        $this->assertStringContainsString("## Between domains\n- Billing → Sales: 2 (relation 1, type 1)\n- Sales → Billing: 1 (relation 1)\n", $out);
+        // A target in another domain says which; shared names keep their namespace.
+        $this->assertStringContainsString('- **Billing\Invoice** class · domain Billing · uses Payment, Customer [Sales]', $out);
+        $this->assertStringContainsString('- **Clock** interface', $out);
+    }
+
+    #[Test]
+    public function an_app_without_domains_has_no_between_section(): void
+    {
+        $index = $this->index();
+        $index['classes'] = array_map(fn (array $class) => array_replace($class, ['context' => null]), $index['classes']);
+
+        $this->assertStringNotContainsString('Between domains', $this->markdown->render('classes', $index));
+    }
+
+    #[Test]
+    public function one_class_says_what_it_uses_and_what_uses_it(): void
+    {
+        $index = $this->index();
+
+        $this->assertSame(implode("\n", [
+            '## Billing\Invoice (class)',
+            '`App\Billing\Invoice` · domain Billing · app/Invoice.php:5',
+            '- uses:',
+            '  - Payment: relation line 9',
+            '  - Customer: relation line 8; type lines 12, 14 — crosses into Sales',
+            '- used by:',
+            '  - Payment: relation line 7',
+            '  - Customer: relation line 6 — from Sales',
+        ])."\n", $this->markdown->class($index['classes'][0], $index));
+
+        $this->assertStringContainsString("- uses: no other class in the app\n- used by: no other class in the app", $this->markdown->class($index['classes'][3], $index));
+        $this->assertStringStartsWith('## Clock (interface)', $this->markdown->class($index['classes'][4], $index));
+    }
 }

@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\ModelInspector;
 use Illuminate\Queue\QueueManager;
 use Illuminate\Routing\Router;
 use KdrDev\Dissect\Architecture\ContextResolver;
+use KdrDev\Dissect\Architecture\SourceFiles;
 use KdrDev\Dissect\Mcp\DissectServer;
 use KdrDev\Dissect\Mcp\Payloads;
 use KdrDev\Dissect\Architecture\Conventions;
@@ -92,10 +93,15 @@ class DissectServiceProvider extends ServiceProvider
             new Conventions,
         ));
 
+        $this->app->singleton(SourceFiles::class, fn (Application $app) => new SourceFiles(
+            $app->make(ContextResolver::class),
+            (array) config('dissect.domains.paths', ['app', 'src', 'Modules', 'app-modules', 'packages']),
+        ));
+
         $this->app->singleton(DomainMap::class, fn (Application $app) => new DomainMap(
             $app->make(ContextResolver::class),
             $app->make(DomainFile::class),
-            (array) config('dissect.domains.paths', ['app', 'src', 'Modules', 'app-modules', 'packages']),
+            $app->make(SourceFiles::class),
         ));
 
         $this->app->singleton(RouteCollector::class, fn (Application $app) => new RouteCollector(

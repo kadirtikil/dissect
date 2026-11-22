@@ -32,11 +32,15 @@ class NoDomainsTest extends TestCase
     #[Test]
     public function no_row_of_a_plain_app_has_a_domain(): void
     {
+        // The class index walks the source folders under the domain root.
+        config()->set('dissect.domains.root', realpath(__DIR__.'/../../workbench'));
+
         $surfaces = [
             'schema.json' => 'nodes',
             'routes.json' => 'routes',
             'jobs.json' => 'jobs',
             'providers.json' => 'providers',
+            'classes.json' => 'classes',
         ];
 
         foreach ($surfaces as $surface => $key) {

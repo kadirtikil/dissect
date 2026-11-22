@@ -201,7 +201,10 @@ DissectServiceProvider    wiring; registers routes only when enabled
   │     ├── Conventions         the folder layouts the ecosystem already uses
   │     ├── DomainFile          .dissect/domains.json, read only, problems reported in words
   │     ├── DomainAttribute     #[Domain('…')] read from tokens, never by loading the class
-  │     └── DomainMap           /domains.json: every domain and its classes, built on demand
+  │     ├── DomainMap           /domains.json: every domain and its classes, built on demand
+  │     ├── SourceFiles         the one walk of the app's own PHP files, shared by both
+  │     ├── ClassIndex          /classes.json: every class and the app classes it names
+  │     └── References          php-parser visitor: each name a declaration uses, and how
   ├── Support\CodeOwnership   app / vendor / framework, for routes and provider trees alike
   ├── Support\Surfaces        every payload by name, for callers that are not the page
   ├── Support\PayloadCache    one fingerprint-keyed cache for the page, the console and MCP
@@ -1053,6 +1056,34 @@ domain found two ways lists both. `findings` are `override-disagrees` and
 `unknown-domain`. `problems` are what is wrong with `.dissect/domains.json`, in
 words; the file being broken never makes the endpoint fail.
 
+### `classes.json` (generated — never hand-edited, never written)
+
+Served at `/dissect/classes.json` and fetched only when asked for: building it
+parses every PHP file under `domains.paths`. On Laravel's own source (1,757
+files) a cold build takes about 3 seconds and 55 MB; after that it is cached
+until a file changes.
+
+```json
+{
+  "classes": [
+    { "id": "App\\Domain\\Billing\\Models\\Invoice", "kind": "class", "abstract": false,
+      "file": "app/Domain/Billing/Models/Invoice.php", "line": 10, "context": "Billing",
+      "uses": [
+        { "to": "App\\Domain\\Sales\\Models\\Customer", "kind": "relation", "lines": [15] }
+      ] }
+  ],
+  "unreadable": ["app/Support/Broken.php"],
+  "fingerprint": "9c1d0e7a52b4f310"
+}
+```
+
+`kind` on a class is `class`, `interface`, `trait` or `enum`. `kind` on a
+reference is one of `References::KINDS`; a name has exactly one, the most
+specific. `uses` lists only classes that are themselves in `classes`; framework
+and package references are read too, and kept by `ClassIndex::declarations()`
+for checks that need them, but are not sent. `unreadable` is every file that
+did not parse.
+
 ### `.dissect/domains.json` (authored — safe to commit and review)
 
 ```json
@@ -1198,6 +1229,10 @@ are running. `tests/StateVersioningTest.php` pins all of it.
 | **MCP tools read through a fresh `dissect:export`, not in process** | The server lives as long as the agent's session, and PHP cannot unload a class. A model reflected once would keep its old relations after every edit. A process per call costs a boot, and the exporters' fingerprint caches make the rest cheap |
 | **One tool per kind of entry, Markdown out, names in** | An agent asks about the model it is editing, not the app. Returning the JSON payload would spend its context on fields it did not ask for; the digest is the same reading at a tenth the size |
 | **dissect registers laravel/mcp's provider itself** | Without it, `Mcp::local()` lands in a throwaway registrar and tools never see their arguments. Discovery usually registers it; an app that turned discovery off should not get a server that half works |
+| **The class index parses each file once and keeps none of the trees** | The route analyzers' `ClassSource` keeps every tree it parses, which is right for the few classes behind a route and wrong for every file in the app. The index keeps only what it found |
+| **A reference is a name in the syntax, not a resolved call** | `$invoice->customer->notify()` reaches three classes through variables whose types are only known by running the code or by a type checker's inference. Names are what a boundary rule can be checked against without guessing, and what an agent edits |
+| **Laravel-aware kinds win over syntax kinds** | `dispatch(new SendInvoice)` is a `new` to a parser and a dispatch to anyone reading it. A rule like "Sales may dispatch Billing's jobs but not build its models" needs the difference, and a name counted twice would inflate every number built on it |
+| **Only app-to-app references go on the wire** | Most of every file is framework. Sending it would multiply the payload for a page that only draws the app, and the checks that need it run on the server |
 | **Highlight is not selection** | Canvas selection is a gesture that feeds view membership; opening an endpoint must not quietly change what a new view would contain |
 
 ---
@@ -1245,6 +1280,8 @@ Config (`config/dissect.php`): `enabled`, `path`, `middleware`,
 | Support another response type | `src/Routes/ResponseAnalyzer.php` |
 | Change how a rule string is read | `src/Routes/RuleNormalizer.php` (no Illuminate imports) |
 | Change how a name resolves to a node id (jobs only) | `src/Routes/ModelLinker.php` |
+| Recognise another kind of reference | `src/Architecture/References.php` — `classify()` for a call that means more than its syntax, `collect()` for a new syntax |
+| Change which files are read for domains and classes | `domains.paths` in config, then `src/Architecture/SourceFiles.php` |
 | Recognise another folder layout as domains | `src/Architecture/Conventions.php` |
 | Change which domain wins for a class | `src/Architecture/ContextResolver.php` |
 | Change what the domain list reports | `src/Architecture/DomainMap.php` |
