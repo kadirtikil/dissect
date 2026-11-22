@@ -62,6 +62,8 @@ And the parts that make it easy to live with:
   picture.
 - ♻️ **Live updates.** Edit a model, controller, job or provider and the page
   refreshes on its own, with no file watcher to run.
+- 💻 **Works without the page too.** `php artisan dissect:export` prints any of
+  it as JSON, a Markdown digest, or a Mermaid diagram of the models.
 
 ## 🚀 Quick start
 
@@ -490,6 +492,45 @@ those packages register run into the hundreds and are almost all vendor code.
 
 ---
 
+## 💻 From the terminal
+
+Everything the page shows can be printed without opening it. That's useful for
+a script, for a CI step, and for handing an agent a map of the app.
+
+```bash
+php artisan dissect:export                                # every surface, as JSON
+php artisan dissect:export routes                         # one surface
+php artisan dissect:export jobs --format=md               # a digest to read
+php artisan dissect:export schema --format=mermaid        # the models as an ER diagram
+php artisan dissect:export --format=md --output=docs/app.md
+```
+
+- **`json`** is exactly the payload the page reads (see the endpoints under
+  [How it works](#-how-it-works)), so anything built on one works on the other.
+- **`md`** is a digest of the same payload: one line per model, route, job or
+  binding, with the details people look them up for underneath. It comes out
+  at about a tenth the size of the JSON, which matters when it goes into a
+  prompt. Anything dissect only inferred is marked as inferred, and a
+  long field list ends in `+N more` instead of stopping silently.
+- **`mermaid`** draws the models as an `erDiagram`, which GitHub, GitLab and
+  most docs sites render as-is. Keys are marked `PK`, `FK` and `UK`, and a
+  relation and its inverse are one line named by both ends (`invoices /
+  customer`). It's for the schema only.
+
+```
+- `POST api/documents` documents.store → DocumentController@store · api
+  - middleware: api, auth:sanctum
+  - request (form-request StoreDocumentRequest): title* string; document_type_id* integer; tags[].name* string
+  - response 201 (resource DocumentResource): id; title
+```
+
+The command works whether or not the page is enabled. It only reads your code,
+and an Artisan command can't be reached from the web, so it doesn't need the
+`dissect.enabled` switch or the `viewDissect` gate. The queue isn't exported:
+it's runtime state, and a file of it would be stale before anyone opened it.
+
+---
+
 ## 🤝 Files you commit
 
 dissect keeps the things people author in a `.dissect/` folder at your project
@@ -695,8 +736,9 @@ Anyone who passes the gate sees:
 - **Assets** are served from the package's `dist/` by a route with an
   allow-list, so there's nothing to publish or re-publish after an upgrade.
 
-Every page is backed by a JSON endpoint under your `DISSECT_PATH`, handy for
-scripts or for giving an agent a map of the app:
+Every page is backed by a JSON endpoint under your `DISSECT_PATH`, and every
+one but the queue can also be printed with
+[`dissect:export`](#-from-the-terminal):
 
 | Endpoint | Contents |
 | --- | --- |
