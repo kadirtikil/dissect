@@ -2,6 +2,8 @@
 import { computed, ref } from 'vue'
 import { ChevronRight } from '@lucide/vue'
 import type { Domain } from '@/types/domains'
+import type { DomainDependencies } from '@/lib/dependencies'
+import DomainLinks from '@/components/domains/DomainLinks.vue'
 import { baseName } from '@/lib/classNames'
 import { domainColor, namespaceOf, sourceLabel } from '@/lib/domains'
 
@@ -9,6 +11,8 @@ const props = defineProps<{
   domain: Domain
   /** Every domain name, so colours stay put however the list is filtered. */
   names: readonly string[]
+  /** What it depends on and what depends on it; null until the class index is in. */
+  dependencies?: DomainDependencies | null
 }>()
 
 const open = ref(false)
@@ -58,6 +62,8 @@ const groups = computed(() => {
     >
       <li v-for="root in domain.roots" :key="root" class="truncate" :title="root">{{ root }}</li>
     </ul>
+
+    <DomainLinks v-if="dependencies" :dependencies="dependencies" :names="names" />
 
     <div v-if="domain.classes.length" class="border-t">
       <button
