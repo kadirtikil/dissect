@@ -29,17 +29,27 @@ final class Payloads
         protected ?Surfaces $surfaces,
         protected string $cwd,
         protected float $timeout,
+        protected array $env = [],
     ) {}
 
-    /** @param  array<int, string>  $artisan */
-    public static function fresh(array $artisan, string $cwd, float $timeout = 120): self
+    /**
+     * @param  array<int, string>  $artisan
+     * @param  array<string, string|false>  $env  Over the inherited environment; false leaves one out. See LoadedEnvironment.
+     */
+    public static function fresh(array $artisan, string $cwd, float $timeout = 120, array $env = []): self
     {
-        return new self($artisan, null, $cwd, $timeout);
+        return new self($artisan, null, $cwd, $timeout, $env);
     }
 
     public static function inProcess(Surfaces $surfaces): self
     {
         return new self(null, $surfaces, '', 0);
+    }
+
+    /** @param  array<int, string>  $arguments */
+    protected function process(array $arguments): Process
+    {
+        return new Process([...(array) $this->artisan, ...$arguments, '--no-ansi', '--no-interaction'], $this->cwd, $this->env, timeout: $this->timeout);
     }
 
     /** @return array<string, mixed> */
@@ -85,11 +95,7 @@ final class Payloads
             return $this->decode(Artisan::output(), 'dissect:check');
         }
 
-        $process = new Process(
-            [...(array) $this->artisan, 'dissect:check', '--format=json', ...$options, '--no-ansi', '--no-interaction'],
-            $this->cwd,
-            timeout: $this->timeout,
-        );
+        $process = $this->process(['dissect:check', '--format=json', ...$options]);
 
         $process->run();
 
@@ -115,11 +121,7 @@ final class Payloads
             $code = Artisan::call('dissect:diff', ['--format' => 'json', '--against' => $against]);
             $output = Artisan::output();
         } else {
-            $process = new Process(
-                [...(array) $this->artisan, 'dissect:diff', '--format=json', '--against='.$against, '--no-ansi', '--no-interaction'],
-                $this->cwd,
-                timeout: $this->timeout,
-            );
+            $process = $this->process(['dissect:diff', '--format=json', '--against='.$against]);
 
             $process->run();
             $code = $process->getExitCode();
@@ -148,11 +150,7 @@ final class Payloads
 
     protected function run(string $surface): array
     {
-        $process = new Process(
-            [...(array) $this->artisan, 'dissect:export', $surface, '--no-ansi', '--no-interaction'],
-            $this->cwd,
-            timeout: $this->timeout,
-        );
+        $process = $this->process(['dissect:export', $surface]);
 
         $process->run();
 

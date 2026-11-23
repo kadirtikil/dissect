@@ -11,6 +11,7 @@ use Illuminate\Routing\Router;
 use KdrDev\Dissect\Architecture\ContextResolver;
 use KdrDev\Dissect\Architecture\SourceFiles;
 use KdrDev\Dissect\Mcp\DissectServer;
+use KdrDev\Dissect\Mcp\LoadedEnvironment;
 use KdrDev\Dissect\Mcp\Payloads;
 use KdrDev\Dissect\Architecture\Conventions;
 use KdrDev\Dissect\Architecture\DomainFile;
@@ -267,11 +268,18 @@ class DissectServiceProvider extends ServiceProvider
             $models,
         ));
 
+        // What .env said as this process booted, for the MCP server's fresh
+        // artisans to read it again. A cached config never read the file.
+        if ($this->app->runningInConsole() && ! $this->app->configurationIsCached()) {
+            $this->app->instance(LoadedEnvironment::class, LoadedEnvironment::read($this->app->environmentFilePath()));
+        }
+
         // Each MCP call reads through a fresh artisan, with the PHP that is
         // running the server. See Payloads for why not in process.
         $this->app->bind(Payloads::class, fn () => Payloads::fresh(
             [PHP_BINARY, base_path('artisan')],
             base_path(),
+            env: $this->app->bound(LoadedEnvironment::class) ? $this->app->make(LoadedEnvironment::class)->stale() : [],
         ));
     }
 
