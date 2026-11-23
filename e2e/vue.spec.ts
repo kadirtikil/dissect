@@ -304,16 +304,18 @@ test('a relation runs from its foreign key to the key it points at', async ({ pa
   await openGraph(page)
   await expect(page.locator('.vue-flow__node')).toHaveCount(22)
 
-  // Document belongs to Folder: from documents.folder_id to folders.id.
-  const offsets = await edgeOffsets(
-    page,
-    { source: 'Document', name: 'folder', target: 'Folder' },
-    { source: 'col-out:folder_id', target: 'col-in:id' },
-  )
-
-  expect(offsets).not.toBeNull()
-  expect(offsets!.source).toBeLessThan(3)
-  expect(offsets!.target).toBeLessThan(3)
+  // Document belongs to Folder: from documents.folder_id to folders.id. Polled:
+  // the canvas may still be fitting itself to the page when the nodes appear.
+  await expect
+    .poll(async () => {
+      const offsets = await edgeOffsets(
+        page,
+        { source: 'Document', name: 'folder', target: 'Folder' },
+        { source: 'col-out:folder_id', target: 'col-in:id' },
+      )
+      return offsets ? Math.max(offsets.source, offsets.target) : null
+    })
+    .toBeLessThan(3)
 })
 
 test('a key folded into "+N more" is stood in for until the card opens', async ({ page }) => {
@@ -323,9 +325,12 @@ test('a key folded into "+N more" is stood in for until the card opens', async (
   // documents.workspace_id is past what a collapsed card lists.
   const edge = { source: 'Document', name: 'workspace', target: 'Workspace' }
 
-  const folded = await edgeOffsets(page, edge, { source: 'more-out', target: 'col-in:id' })
-  expect(folded).not.toBeNull()
-  expect(folded!.source).toBeLessThan(3)
+  await expect
+    .poll(
+      async () =>
+        (await edgeOffsets(page, edge, { source: 'more-out', target: 'col-in:id' }))?.source,
+    )
+    .toBeLessThan(3)
 
   await node(page, 'Document').locator('.model-node').click()
   await expect(node(page, 'Document').locator('.model-node')).toHaveAttribute(
