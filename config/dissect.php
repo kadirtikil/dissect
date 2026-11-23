@@ -34,6 +34,17 @@ return [
     'middleware' => ['web'],
 
     /*
+    | In local, the page answers without a gate only to this machine's own
+    | names: loopback addresses, `*.localhost`, `*.test` and APP_URL's host.
+    | A request for any other name goes to the `viewDissect` gate, so a page
+    | elsewhere cannot point its own name at 127.0.0.1 and read this one from
+    | your browser. List other names here to open it from them, such as a LAN
+    | address for a phone.
+    */
+
+    'local_hosts' => [],
+
+    /*
     |--------------------------------------------------------------------------
     | Models
     |--------------------------------------------------------------------------

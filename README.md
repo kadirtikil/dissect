@@ -1001,6 +1001,10 @@ The rest live in `config/dissect.php`:
 - **`middleware`**: default `['web']`. Add your auth middleware here if you
   enable the page outside local. The `viewDissect` gate check is always added
   after this list.
+- **`local_hosts`**: default `[]`. Extra names the page answers to without the
+  gate in `local`, on top of `localhost`, `*.localhost`, `*.test`, loopback
+  addresses and `APP_URL`'s host. See
+  [Security](#-security-what-keeps-this-off-production).
 - **`layout_path`**: default `base_path('.dissect/layout.json')`.
 - **`views_path`**: default `base_path('.dissect/views.json')`.
 - **`snapshot_path`**: default `base_path('.dissect/snapshot.json')`, where `dissect:snapshot` writes.
@@ -1103,6 +1107,19 @@ enforce:
 Break either (a staging box left at `APP_ENV=local`, a deploy that installs dev
 dependencies) and the routes are live. That's why registering them isn't the
 same as letting anybody in.
+
+**In `local`, only your machine's own names skip the gate**: `localhost`,
+`*.localhost`, `*.test`, loopback addresses (`127.x`, `[::1]`) and the host in
+`APP_URL`. A request for any other name goes to the `viewDissect` gate like
+everywhere else. That also covers DNS rebinding, where a page on some other
+site points its own name at `127.0.0.1` to read dissect from your browser: the
+browser reaches your server, but the request still carries the other site's
+name. To open the page from a phone or another machine, list the name or
+address it uses:
+
+```php
+'local_hosts' => ['192.168.1.20'],
+```
 
 **Outside `local`, every dissect route checks the `viewDissect` gate**, the way
 Telescope checks `viewTelescope`. No gate defined means a 403. The check is
