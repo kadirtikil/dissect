@@ -495,9 +495,20 @@ Response  resource · 201                 lines[].sku  string   req
 ### 🎯 Where the shapes come from
 
 Requests are read from a `FormRequest`'s `rules()` when one is type-hinted, and
-from an inline `$request->validate([…])` otherwise. Responses are read from the
-return type and the `toArray()` of whatever `JsonResource` it names, nested
-resources included.
+from inline validation otherwise: `$request->validate([…])`,
+`$this->validate($request, […])`, `Validator::make($data, […])` or
+`validator($data, […])`. Responses are read from the return type and the
+`toArray()` of whatever `JsonResource` it names, nested resources included. A
+`Resource::collection(…)` in the body is a list even when the method declares no
+return type.
+
+- ❔ **`sometimes|required`** is optional: the field may be left out, and only
+  has to be filled when it's sent.
+- 🙈 **A key behind `when()`, `whenLoaded()`, `whenCounted()` and the rest** is
+  marked as only sometimes present.
+- 🧾 **Validation whose rules are built elsewhere**, such as
+  `$request->validate($this->rules())`, is shown as validation dissect couldn't
+  read, not as an endpoint that accepts anything.
 
 Nothing in Laravel can be *asked* what an endpoint returns, so some of this is
 read from your source rather than run. Each shape says which:
@@ -539,6 +550,9 @@ Response  JSON:API document  201           type        string  req
   actually sits, at `data.attributes.title`.
 - 🩹 Update fields stay optional, because a JSON:API update is a patch: the rules
   say what a value must look like *if you send it*.
+- 🛠️ A **custom action** (`$actions->withId()->post('publish')`) runs your own
+  method, so it's read from that method like any other route, not described as
+  a post document.
 
 ---
 
@@ -732,7 +746,8 @@ Postman, or a client generator.
 | Each verb of an `api` route | An operation, with the route name as its summary and `operationId`. |
 | `{post}`, `{post:slug}`, `where('id', '[0-9]+')` | A path parameter, with the constraint as a pattern. |
 | `{category?}` | Two paths, with it and without: OpenAPI has no optional path parameter. |
-| A form request or `$request->validate()` | The body (or the query string, for a GET), each field with its type, bounds, `in:` values and `nullable`, and its rules as written. A form request becomes a component. A `file` field makes the body `multipart/form-data`. |
+| `Route::domain('{account}.example.com')` | The operation's own `servers`, with `account` as a variable. The same path on two domains can't be two operations in OpenAPI, so the first keeps it and its description names the other. |
+| A form request or `$request->validate()` | The body (or the query string, for a GET), each field with its type, bounds, `in:` values and `nullable`, and its rules as written. A form request becomes a component. A file (`file`, `image`, `mimes:`, `File::types()`) makes the body `multipart/form-data`. |
 | An API resource | A component, wrapped in `data` the way Laravel wraps it (or not, after `withoutWrapping()`). A collection is a list under `data`. |
 | `auth:sanctum`, `auth`, `auth.basic` | A security scheme per guard, of the kind its driver takes, plus a `401`. |
 | Validation | A `422` in Laravel's `{message, errors}` shape. |
