@@ -61,9 +61,7 @@ jobs:
 
   # The frontend half. dist/ is what users install, and dist.yml only checks it
   # was rebuilt, not that what it was built from type-checks, lints or passes
-  # its own tests. Playwright is not here: the preview build CI would serve has
-  # no fixture data (public/ is not copied into dist/), so it needs its own
-  # setup first.
+  # its own tests. The browser tests are the e2e job below.
   frontend:
     runs-on: ubuntu-latest
     name: frontend · types, lint, unit tests
@@ -101,3 +99,40 @@ jobs:
 
       - name: Unit tests
         run: pnpm exec vitest run
+
+  # The Playwright suite, against the Vite dev server: the fixtures it reads are
+  # in public/, and the layout and views endpoints exist only under `vite dev`.
+  # Chromium only. Firefox and WebKit stay a local run (`pnpm test:e2e`); three
+  # browsers would triple the time for what is mostly the same page logic.
+  e2e:
+    runs-on: ubuntu-latest
+    name: frontend · browser tests
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 12
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Chromium
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Browser tests
+        run: pnpm exec playwright test --project=chromium
+
+      - name: Upload the report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7

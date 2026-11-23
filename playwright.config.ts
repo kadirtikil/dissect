@@ -37,13 +37,15 @@ export default defineConfig({
   /* Opt out of parallel tests on CI. */
   workers: process.env.CI ? 1 : undefined,
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
-  reporter: 'html',
+  // In CI: failures as annotations on the pull request, and the HTML report
+  // (with traces of retried tests) uploaded as an artifact.
+  reporter: process.env.CI ? [['github'], ['html', { open: 'never' }]] : 'html',
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
     /* Maximum time each action such as `click()` can take. Defaults to 0 (no limit). */
     actionTimeout: 0,
     /* Base URL to use in actions like `await page.goto('/')`. */
-    baseURL: process.env.CI ? 'http://localhost:4173' : `http://localhost:${DEV_PORT}`,
+    baseURL: `http://localhost:${DEV_PORT}`,
 
     /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
     trace: 'on-first-retry',
@@ -108,13 +110,16 @@ export default defineConfig({
   /* Run your local dev server before starting the tests */
   webServer: {
     /**
-     * Use the dev server by default for faster feedback loop.
-     * Use the preview server on CI for more realistic testing.
-     * Playwright will re-use the local server if there is already a dev-server running.
+     * The dev server, in CI too. The fixtures the suite reads live in public/,
+     * which the build does not copy into dist/, and the layout and views save
+     * endpoints exist only under `vite dev`. What the build itself produces is
+     * covered by ViewerTest, which serves dist/ through the package.
+     *
+     * Playwright re-uses a dev server that is already running, except in CI.
      */
     // pnpm, like the rest of the repo: npm would ignore pnpm-lock.yaml.
-    command: process.env.CI ? 'pnpm preview' : `pnpm dev --port ${DEV_PORT} --strictPort`,
-    port: process.env.CI ? 4173 : DEV_PORT,
+    command: `pnpm dev --port ${DEV_PORT} --strictPort`,
+    port: DEV_PORT,
     reuseExistingServer: !process.env.CI,
   },
 })
