@@ -80,12 +80,29 @@ final class Document
         $this->name($routes);
 
         $paths = [];
+        $also = [];
 
         foreach ($routes as $route) {
             foreach (self::variants($route) as $path => $dropped) {
                 foreach ($this->methods($route) as $index => $method) {
+                    // OpenAPI keys an operation by path and verb alone, so a
+                    // second route there — the same path on another domain —
+                    // cannot be listed beside the first. It is named on the
+                    // first rather than written over it.
+                    if (isset($paths[$path][$method])) {
+                        $also[$path][$method][] = $route;
+
+                        continue;
+                    }
+
                     $paths[$path][$method] = $this->operation($route, $method, $index, $path, $dropped);
                 }
+            }
+        }
+
+        foreach ($also as $path => $methods) {
+            foreach ($methods as $method => $others) {
+                $paths[$path][$method]['description'] = ltrim(($paths[$path][$method]['description'] ?? '')."\n\n".self::alsoAnswered($others));
             }
         }
 
@@ -171,9 +188,17 @@ final class Document
             // An operation's security: a list of requirements, each naming
             // schemes with their scopes, which are lists and stay lists. A
             // field called "security" is a schema, never a list.
-            $value[$key] = $key === 'security' && is_array($child) && $child !== [] && array_is_list($child)
-                ? $child
-                : self::objects($child);
+            if ($key === 'security' && is_array($child) && $child !== [] && array_is_list($child)) {
+                continue;
+            }
+
+            $value[$key] = self::objects($child);
+
+            // Properties named `0`, `1`… (`coords.0`) are still a map. PHP
+            // keys them as a list, which json_encode would write as an array.
+            if ($key === 'properties' && is_array($value[$key]) && array_is_list($value[$key])) {
+                $value[$key] = (object) $value[$key];
+            }
         }
 
         return $value;
@@ -281,6 +306,12 @@ final class Document
 
         $operation['operationId'] = $this->operationId($route, $method, $index, $dropped);
 
+        // A route bound to a domain answers there, whatever the document's
+        // servers say.
+        if (is_string($route['domain'] ?? null) && $route['domain'] !== '') {
+            $operation['servers'] = [self::domainServer($route['domain'])];
+        }
+
         $request = $route['request'] ?? null;
         $fields = $request['fields'] ?? [];
         $parameters = self::pathParameters($route, $path);
@@ -361,6 +392,46 @@ final class Document
         }
 
         return $lines === [] ? null : implode("\n\n", $lines);
+    }
+
+    /**
+     * The routes left out at an operation's path and verb, by where they
+     * answer and what handles them.
+     *
+     * @param  array<int, array<string, mixed>>  $routes
+     */
+    protected static function alsoAnswered(array $routes): string
+    {
+        $names = array_map(function (array $route) {
+            $where = is_string($route['domain'] ?? null) && $route['domain'] !== '' ? ' on `'.$route['domain'].'`' : '';
+            $label = is_string($route['action']['label'] ?? null) ? ' by `'.$route['action']['label'].'`' : '';
+
+            return 'also answered'.$where.$label;
+        }, $routes);
+
+        return 'This path is '.implode(', and ', $names).', which OpenAPI cannot list apart: it keys an operation by path and verb, not by host.';
+    }
+
+    /**
+     * `{account}.example.com` as a server, its placeholders as variables.
+     *
+     * The URL starts at the host (`//…`) because the route says nothing
+     * about the scheme it is reached over.
+     *
+     * @return array<string, mixed>
+     */
+    protected static function domainServer(string $domain): array
+    {
+        $url = (string) preg_replace('#\{([^}:?]+)(:[^}?]+)?\??\}#', '{$1}', $domain);
+        $server = ['url' => '//'.$url];
+
+        preg_match_all('#\{([^}]+)\}#', $url, $matches);
+
+        foreach ($matches[1] as $name) {
+            $server['variables'][$name] = ['default' => $name];
+        }
+
+        return $server;
     }
 
     /**
