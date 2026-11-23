@@ -36,6 +36,8 @@ class SnapshotCommand extends Command
             return self::FAILURE;
         }
 
+        $this->warnUnread($taken);
+
         $json = Snapshot::encode($taken);
         $shown = $baselines->shown($path);
         $watching = (bool) $this->option('watch');
@@ -70,6 +72,29 @@ class SnapshotCommand extends Command
         }
 
         return $baselines->path($this->option('watch') ? Baselines::WATCH : Baselines::SNAPSHOT);
+    }
+
+    /**
+     * Models whose columns could not be read are written down without them,
+     * and compared without them. Said, because a snapshot taken against an
+     * empty database looks like any other.
+     */
+    protected function warnUnread(array $taken): void
+    {
+        $unread = array_keys(array_filter((array) ($taken['models'] ?? []), fn (array $model) => isset($model['unreadable'])));
+
+        if ($unread === []) {
+            return;
+        }
+
+        $names = array_map(class_basename(...), array_slice($unread, 0, 5));
+        $more = count($unread) - count($names);
+
+        $this->components->warn(
+            (count($unread) === 1 ? 'One model\'s columns' : count($unread).' models\' columns').' could not be read: '
+            .implode(', ', $names).($more > 0 ? " and {$more} more" : '')
+            .'. Their columns are left out and not compared. Is the database there and migrated?'
+        );
     }
 
     /** @param  array<string, int>  $counts */
