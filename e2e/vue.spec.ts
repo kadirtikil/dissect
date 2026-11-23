@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test'
+import { keepViewsInMemory } from './memoryViews'
 
 /**
  * A graph node, by model. Node ids are full class names, and a backslash
@@ -101,6 +102,7 @@ test('a card works from the keyboard', async ({ page }) => {
 })
 
 test('saves a selection as a view, switches to it and deletes it', async ({ page }) => {
+  await keepViewsInMemory(page)
   await page.setViewportSize({ width: 1400, height: 900 })
   await openGraph(page)
   await expect(page.locator('.vue-flow__node')).toHaveCount(22)
@@ -145,14 +147,15 @@ test('saves a selection as a view, switches to it and deletes it', async ({ page
   await page.getByRole('menuitem', { name: 'All models' }).click()
   await expect(page.locator('.vue-flow__node')).toHaveCount(22)
 
-  // Deleting is two-step, and leaves views.json as the suite found it. The menu
-  // stays open across a switch, so there is nothing to reopen here.
+  // Deleting is two-step. The menu stays open across a switch, so there is
+  // nothing to reopen here.
   await page.getByRole('button', { name: 'Delete Grants' }).click()
   await page.getByRole('button', { name: 'Confirm deleting Grants' }).click()
   await expect(page.getByRole('menuitem', { name: /Grants/ })).toHaveCount(0)
 })
 
 test('builds a view from the model list and extends it afterwards', async ({ page }) => {
+  await keepViewsInMemory(page)
   await openGraph(page)
   await expect(page.locator('.vue-flow__node')).toHaveCount(22)
 
