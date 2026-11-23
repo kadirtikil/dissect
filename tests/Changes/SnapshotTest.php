@@ -72,6 +72,8 @@ class SnapshotTest extends TestCase
                     'dispatched_by' => [
                         ['file' => '/home/someone/app/Http/Controllers/InvoiceController.php', 'line' => 30, 'label' => 'InvoiceController@send'],
                         ['file' => '/home/someone/app/Http/Controllers/InvoiceController.php', 'line' => 41, 'label' => 'InvoiceController@send'],
+                        // In a route-file closure, named by where it sits.
+                        ['file' => 'routes/api.php', 'line' => 25, 'label' => 'api.php:25'],
                     ],
                 ]],
             ],
@@ -141,11 +143,12 @@ class SnapshotTest extends TestCase
         $this->assertStringNotContainsString('/home/someone', $json);
         $this->assertStringNotContainsString('confidence', $json);
         $this->assertSame('closure', $snapshot['routes']['GET:up']['action']);
-        $this->assertSame(['InvoiceController@send'], $snapshot['jobs']['App\\Jobs\\SendInvoice']['dispatched_by']);
+        $this->assertSame(['InvoiceController@send', 'api.php'], $snapshot['jobs']['App\\Jobs\\SendInvoice']['dispatched_by']);
 
         $payloads['schema']['generated_at'] = '2027-01-01T00:00:00+00:00';
         $payloads['routes']['routes'][1]['action']['label'] = 'web.php:40';
         $payloads['jobs']['jobs'][0]['dispatched_by'][0]['line'] = 99;
+        $payloads['jobs']['jobs'][0]['dispatched_by'][2] = ['file' => 'routes/api.php', 'line' => 31, 'label' => 'api.php:31'];
 
         $this->assertSame($json, Snapshot::encode(Snapshot::of($payloads)));
     }

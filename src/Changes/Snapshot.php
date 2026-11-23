@@ -264,9 +264,14 @@ final class Snapshot
     /** @return array<string, mixed> */
     protected static function job(array $job): array
     {
-        // Where it is dispatched from, by name: the file a dispatch sits in
-        // is an absolute path, and its line moves with every edit above it.
-        $dispatchedBy = array_values(array_unique(array_map(fn (array $site) => (string) ($site['label'] ?? '?'), $job['dispatched_by'] ?? [])));
+        // Where it is dispatched from, by name, never by line: a line moves
+        // with every edit above it. A controller site is its action. One in
+        // route-file code is labelled `api.php:25`, and is kept as the file
+        // alone: its path can be absolute, and so differ between machines.
+        $dispatchedBy = array_values(array_unique(array_map(
+            fn (array $site) => (string) preg_replace('/\.php:\d+$/', '.php', (string) ($site['label'] ?? '?')),
+            $job['dispatched_by'] ?? [],
+        )));
         sort($dispatchedBy);
 
         return self::compact([
