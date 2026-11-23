@@ -2,6 +2,7 @@
 
 namespace KdrDev\Dissect\Changes;
 
+use Illuminate\Support\Str;
 use KdrDev\Dissect\Support\Surfaces;
 
 /**
@@ -39,19 +40,20 @@ final class Snapshot
             $payloads[$surface] = $this->surfaces->export($surface);
         }
 
-        return self::of($payloads);
+        return self::of($payloads, (array) config('dissect.snapshot_ignore_routes', []));
     }
 
     /**
      * @param  array<string, array<string, mixed>>  $payloads  Keyed by surface name.
+     * @param  array<int, string>  $ignoreRoutes  Patterns for routes to leave out. See leftOut().
      * @return array<string, mixed>
      */
-    public static function of(array $payloads): array
+    public static function of(array $payloads, array $ignoreRoutes = []): array
     {
         return [
             'version' => self::VERSION,
             'models' => self::models($payloads['schema'] ?? []),
-            'routes' => self::keyed(array_filter($payloads['routes']['routes'] ?? [], fn (array $route) => ! self::ours($route)), self::route(...)),
+            'routes' => self::keyed(array_filter($payloads['routes']['routes'] ?? [], fn (array $route) => ! self::leftOut($route, $ignoreRoutes)), self::route(...)),
             'jobs' => self::keyed($payloads['jobs']['jobs'] ?? [], self::job(...)),
             'providers' => self::keyed($payloads['providers']['providers'] ?? [], self::provider(...)),
         ];
@@ -201,13 +203,38 @@ final class Snapshot
     }
 
     /**
-     * dissect's own page and endpoints. They are registered only where the
-     * page is switched on, so a snapshot taken locally would have them and
-     * CI's would not, and every one would read as a route removed.
+     * Routes registered on some machines and not others: a snapshot taken
+     * locally would have them and CI's would not, and every one would read
+     * as a route removed.
+     *
+     * dissect's own page and endpoints, which are there only where the page
+     * is switched on, and whatever `dissect.snapshot_ignore_routes` names:
+     * by default the tools a laptop runs and CI does not, such as Telescope
+     * and Debugbar. A pattern is matched against the route's controller
+     * class, its name and its URI, with `*` for anything.
+     *
+     * Not every route a package registers. The app's own JSON:API routes run
+     * on the package's controller, and they are as much its API as any.
+     *
+     * @param  array<int, string>  $ignore
      */
-    protected static function ours(array $route): bool
+    protected static function leftOut(array $route, array $ignore): bool
     {
-        return str_starts_with(ltrim((string) ($route['action']['class'] ?? ''), '\\'), 'KdrDev\\Dissect\\');
+        $class = ltrim((string) ($route['action']['class'] ?? ''), '\\');
+
+        if (str_starts_with($class, 'KdrDev\\Dissect\\')) {
+            return true;
+        }
+
+        $names = array_filter([$class, $route['name'] ?? null, $route['uri'] ?? null], fn (mixed $name) => is_string($name) && $name !== '');
+
+        foreach ($ignore as $pattern) {
+            if (is_string($pattern) && $pattern !== '' && array_filter($names, fn (string $name) => Str::is($pattern, $name)) !== []) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /** @return array<string, mixed> */

@@ -286,6 +286,24 @@ return [
     'snapshot_path' => base_path('.dissect/snapshot.json'),
 
     /*
+    | Routes a snapshot leaves out, because they are registered on some
+    | machines and not others: a snapshot committed from a laptop that has
+    | them would see every one removed in CI. Each pattern is matched against
+    | the route's controller class, its name and its URI, with `*` for
+    | anything. The defaults are the tools a laptop runs and CI does not.
+    */
+
+    'snapshot_ignore_routes' => [
+        'Laravel\\Telescope\\*',
+        'Laravel\\Horizon\\*',
+        'Laravel\\Pulse\\*',
+        'Laravel\\Boost\\*',
+        'Barryvdh\\Debugbar\\*',
+        'Spatie\\LaravelIgnition\\*',
+        'Orchestra\\Workbench\\*',
+    ],
+
+    /*
     |--------------------------------------------------------------------------
     | Watch file
     |--------------------------------------------------------------------------

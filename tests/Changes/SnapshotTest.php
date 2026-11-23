@@ -289,4 +289,30 @@ class SnapshotTest extends TestCase
         $this->assertSame(['edges', 'App\\Providers\\MailServiceProvider -> ? $this->app->make($a)'], $facts[0]['path']);
         $this->assertSame('removed', $facts[0]['change']);
     }
+
+    #[Test]
+    public function routes_only_some_machines_register_are_left_out(): void
+    {
+        $route = fn (string $id, ?string $class, ?string $name = null) => [
+            'id' => $id, 'uri' => substr($id, strpos($id, ':') + 1), 'name' => $name,
+            'action' => ['type' => $class === null ? 'closure' : 'controller', 'class' => $class, 'method' => 'index', 'label' => 'x'],
+        ];
+
+        $routes = Snapshot::of(['routes' => ['routes' => [
+            $route('GET:telescope/{view?}', 'Laravel\\Telescope\\Http\\Controllers\\HomeController', 'telescope'),
+            $route('GET:_debugbar/open', 'Barryvdh\\Debugbar\\Controllers\\OpenHandlerController', 'debugbar.openhandler'),
+            $route('GET:admin/tools/phpinfo', null),
+            $route('GET:tools.cache', null, 'tools.cache'),
+            $route('GET:v1/posts', 'LaravelJsonApi\\Laravel\\Http\\Controllers\\JsonApiController'),
+        ]]], [...config('dissect.snapshot_ignore_routes'), 'admin/tools/*', 'tools.*'])['routes'];
+
+        // A package's controller alone is no reason: these are the app's API.
+        $this->assertSame(['GET:v1/posts'], array_keys($routes));
+    }
+
+    #[Test]
+    public function the_workbench_snapshot_keeps_its_json_api_routes(): void
+    {
+        $this->assertContains('GET:v1/posts', array_keys($this->app->make(Snapshot::class)->take()['routes']));
+    }
 }
