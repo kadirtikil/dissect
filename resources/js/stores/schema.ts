@@ -53,6 +53,16 @@ export const useSchemaStore = defineStore('schema', () => {
   /** Timestamp of the last live update, so the header can acknowledge one. */
   const lastUpdated = ref<number | null>(null)
 
+  /**
+   * Pages whose payload moved on the server and could not be read again. They
+   * keep what they last read, and are asked again on every check, so this
+   * says what is on screen out of date until one succeeds.
+   */
+  const stale = ref<string[]>([])
+
+  /** Why the last check could not ask the server at all, or null. */
+  const unreachable = ref<string | null>(null)
+
   // shallowRef: these arrays are replaced wholesale, never mutated in place,
   // and deep-reactivity over hundreds of nodes is wasted work.
   const nodes = shallowRef<Node<ModelNodeData>[]>([])
@@ -453,6 +463,22 @@ export const useSchemaStore = defineStore('schema', () => {
       const boundaries = useBoundariesStore()
       const changes = useChangesStore()
 
+      // What moved and could not be read again, by page: what this check
+      // leaves on screen out of date.
+      const failed: string[] = []
+
+      // Follows one surface: re-read when its signal has moved. Its store
+      // only takes the new signal with the payload behind it, so one that
+      // fails is asked again on the next check.
+      async function follow(
+        label: string,
+        signal: unknown,
+        store: { fingerprint: string | null; refresh: () => Promise<boolean> },
+      ) {
+        if (typeof signal !== 'string' || signal === store.fingerprint) return
+        if (!(await store.refresh())) failed.push(label)
+      }
+
       try {
         // The derived surfaces all walk a far wider tree than the model signal
         // does, so each is asked for only once somebody has actually opened
@@ -471,66 +497,50 @@ export const useSchemaStore = defineStore('schema', () => {
         const res = await fetch(asked.length ? `${url!}?${asked.join('&')}` : url!, {
           cache: 'no-store',
         })
-        if (!res.ok) return
+        if (!res.ok) {
+          unreachable.value = `the server answered ${res.status} ${res.statusText}`.trim()
+          return
+        }
+        unreachable.value = null
 
         const payload = await res.json()
         const next = payload?.fingerprint
 
-        if (typeof payload?.routes === 'string' && payload.routes !== routes.fingerprint) {
-          // Independent of the schema half: a controller can change without any
-          // model or migration moving, and the reverse is just as common.
-          await routes.refresh()
-        }
-
-        // Independent again, and of the route half too: adding a dispatch to a
-        // controller moves this signal and the route one, while adding a
-        // property to a job moves only this one.
-        if (typeof payload?.jobs === 'string' && payload.jobs !== jobs.fingerprint) {
-          await jobs.refresh()
-        }
-
-        // And the provider trees, which move when a provider does or when any
-        // constructor down a tree gains or loses a parameter — neither of which
-        // need touch a model, a route or a job.
-        if (typeof payload?.providers === 'string' && payload.providers !== providers.fingerprint) {
-          await providers.refresh()
-        }
-
-        // And the domain list, which moves when a class is added, moved or
-        // re-attributed anywhere under the source folders, or domains.json
-        // is edited.
-        if (typeof payload?.domains === 'string' && payload.domains !== domains.fingerprint) {
-          await domains.refresh()
-        }
-
-        // And the class index, which walks the same folders but moves on far
-        // more: any edit that adds or drops a reference between two classes.
-        if (typeof payload?.classes === 'string' && payload.classes !== classes.fingerprint) {
-          await classes.refresh()
-        }
-
-        // And the boundary check, which also moves when a rule is edited.
-        if (
-          typeof payload?.boundaries === 'string' &&
-          payload.boundaries !== boundaries.fingerprint
-        ) {
-          await boundaries.refresh()
-        }
-
-        // And what changed since a baseline: it moves with any of the four
-        // surfaces a snapshot is made of, or when watching starts or stops.
-        if (typeof payload?.changes === 'string' && payload.changes !== changes.fingerprint) {
-          await changes.refresh()
-        }
-
-        if (typeof next !== 'string' || next === fingerprint.value) return
+        // Each signal is independent of the others:
+        // - routes: a controller can change without any model or migration
+        //   moving, and the reverse is just as common;
+        // - jobs: adding a dispatch to a controller moves this signal and the
+        //   route one, while adding a property to a job moves only this one;
+        // - providers: move when a provider does or when any constructor down
+        //   a tree gains or loses a parameter;
+        // - domains: move when a class is added, moved or re-attributed
+        //   anywhere under the source folders, or domains.json is edited;
+        // - classes: walk the same folders but move on far more, any edit
+        //   that adds or drops a reference between two classes;
+        // - boundaries: also move when a rule is edited;
+        // - changes: move with any of the four surfaces a snapshot is made
+        //   of, or when watching starts or stops.
+        await follow('Routes', payload?.routes, routes)
+        await follow('Jobs', payload?.jobs, jobs)
+        await follow('Provider trees', payload?.providers, providers)
+        await follow('Domains', payload?.domains, domains)
+        await follow('Classes', payload?.classes, classes)
+        await follow('Boundaries', payload?.boundaries, boundaries)
+        await follow('Changes', payload?.changes, changes)
 
         // Only adopt the new signal once the payload behind it is actually in
         // hand — otherwise a failed fetch would look like a successful update
         // and the change would never be picked up again.
-        if (await refresh()) fingerprint.value = next
+        if (typeof next === 'string' && next !== fingerprint.value) {
+          if (await refresh()) fingerprint.value = next
+          else failed.push('Models')
+        }
+
+        stale.value = failed
       } catch {
-        // Server restarting, tunnel dropped, laptop asleep. Try again later.
+        // Server restarting, tunnel dropped, laptop asleep. Try again later,
+        // and say meanwhile that nothing is being kept up to date.
+        unreachable.value = 'the server did not answer'
       } finally {
         checking = false
       }
@@ -575,6 +585,8 @@ export const useSchemaStore = defineStore('schema', () => {
     contextColor,
     crossesDomains,
     lastUpdated,
+    stale,
+    unreachable,
     expanded,
     highlighted,
     focusRequest,

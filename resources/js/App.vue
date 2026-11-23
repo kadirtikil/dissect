@@ -13,7 +13,7 @@ import { useNavigationStore } from '@/stores/navigation'
 const schema = useSchemaStore()
 const layout = useLayoutStore()
 const nav = useNavigationStore()
-const { lastUpdated } = storeToRefs(schema)
+const { lastUpdated, stale, unreachable } = storeToRefs(schema)
 const { saveError } = storeToRefs(layout)
 const { saveError: viewsError } = storeToRefs(useViewsStore())
 const { current: page } = storeToRefs(nav)
@@ -45,6 +45,20 @@ const pageLabel = computed(() => pages.find((entry) => entry.id === page.value)?
 //
 // Not a graph-page control despite coming from the schema: the poller runs for
 // the whole session, so the news can arrive while another surface is open.
+// And when it cannot: a page whose payload keeps failing is asked again on
+// every check, and until then shows what it read before as if it were current.
+const outOfDate = computed(() => {
+  if (unreachable.value) {
+    return `Not following changes: ${unreachable.value}. What is on screen is as it was last read; asking again every few seconds.`
+  }
+
+  if (stale.value.length) {
+    return `${stale.value.join(', ')} changed on the server and could not be read again. Showing what was read before; asking again every few seconds.`
+  }
+
+  return null
+})
+
 const justUpdated = ref(false)
 let updateTimer: ReturnType<typeof setTimeout> | undefined
 
@@ -69,7 +83,17 @@ watch(lastUpdated, (at) => {
 
         <div class="ml-auto flex items-center gap-2">
           <span
-            v-if="justUpdated"
+            v-if="outOfDate"
+            class="font-mono text-[10px] text-destructive"
+            role="status"
+            data-testid="out-of-date"
+            :title="outOfDate"
+          >
+            out of date
+          </span>
+
+          <span
+            v-else-if="justUpdated"
             class="font-mono text-[10px] text-accent-foreground"
             role="status"
             title="Models or migrations changed — the graph was re-exported"
