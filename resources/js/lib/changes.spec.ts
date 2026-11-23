@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   canOpen,
+  factKey,
   groupByPart,
   headline,
   severityColor,
@@ -111,5 +112,21 @@ describe('the rest', () => {
     })
     expect(splitMark('~ status 200 → 201')).toEqual({ mark: '~', rest: 'status 200 → 201' })
     expect(splitMark('plain')).toEqual({ mark: '', rest: 'plain' })
+  })
+})
+
+describe('factKey', () => {
+  it('tells apart two values added to one list', () => {
+    const fact = (after: string) => ({
+      path: ['middleware'],
+      change: 'added' as const,
+      before: null,
+      after,
+      severity: 'risky' as const,
+      text: `+ middleware ${after}`,
+    })
+
+    expect(factKey(fact('auth'))).not.toBe(factKey(fact('throttle')))
+    expect(factKey(fact('auth'))).toBe(factKey(fact('auth')))
   })
 })
