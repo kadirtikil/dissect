@@ -2,7 +2,8 @@ import { defineStore } from 'pinia'
 import { computed, ref, shallowRef } from 'vue'
 import type { GraphView, ViewsFile } from '@/types/schema'
 import { bootstrap } from '@/lib/bootstrap'
-import { persist, revisionOf, STATE_VERSION, type Revision } from '@/lib/persist'
+import { persistAnswering, revisionOf, STATE_VERSION, type Revision } from '@/lib/persist'
+import { keptViews, lostInSave } from '@/lib/views'
 
 /** Standalone dev-server fallback; the package injects its own route. */
 const DEV_ENDPOINT = '/__views'
@@ -240,12 +241,28 @@ export const useViewsStore = defineStore('views', () => {
     saving.value = true
     saveError.value = null
 
+    const sent = views.value
+
     try {
-      revision = await persist(
+      const saved = await persistAnswering(
         bootstrap().saveViewsUrl ?? DEV_ENDPOINT,
-        { version: STATE_VERSION, views: views.value },
+        { version: STATE_VERSION, views: sent },
         revision,
       )
+      revision = saved.revision
+
+      // Past the host's caps a view is dropped or cut short. The page shows
+      // the file as it is, and says what did not fit, rather than keeping
+      // something on screen that a reload would take away.
+      const kept = keptViews(saved.answer)
+      const lost = kept && lostInSave(sent, kept)
+
+      if (kept && lost) {
+        views.value = kept
+        if (activeId.value && !activeId.value.startsWith(DOMAIN_VIEW_PREFIX))
+          setActive(activeId.value)
+        saveError.value = lost
+      }
     } catch (e) {
       // The edit stays on screen: it is applied in memory either way, and
       // saying so is more useful than reverting what somebody just did.

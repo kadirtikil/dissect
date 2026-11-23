@@ -367,7 +367,10 @@ class DissectController
         try {
             $saved = $this->views->put($views, $revision, $this->format($request, ViewRepository::VERSION));
 
-            return response()->json(['ok' => true, 'saved' => $saved, 'revision' => $this->views->revision()]);
+            // What was kept, as well as how many: past the caps a view is
+            // dropped or cut short, and the page has to show the file as it
+            // is rather than what it sent.
+            return response()->json(['ok' => true, 'saved' => $saved, 'views' => $this->views->get()['views'], 'revision' => $this->views->revision()]);
         } catch (StateFileException $e) {
             return $this->refused($e);
         }

@@ -7,6 +7,7 @@ import { computed, defineAsyncComponent, markRaw, ref, watch } from 'vue'
 import { pages } from '@/pages/registry'
 import { useSchemaStore } from '@/stores/schema'
 import { useLayoutStore } from '@/stores/layout'
+import { useViewsStore } from '@/stores/views'
 import { useNavigationStore } from '@/stores/navigation'
 
 const schema = useSchemaStore()
@@ -14,6 +15,7 @@ const layout = useLayoutStore()
 const nav = useNavigationStore()
 const { lastUpdated } = storeToRefs(schema)
 const { saveError } = storeToRefs(layout)
+const { saveError: viewsError } = storeToRefs(useViewsStore())
 const { current: page } = storeToRefs(nav)
 
 /**
@@ -82,7 +84,19 @@ watch(lastUpdated, (at) => {
             class="font-mono text-[10px] text-destructive"
             :title="`Layout not saved: ${saveError}`"
           >
-            not saved
+            layout not saved
+          </span>
+
+          <!-- The same for views: a refused write, or one the file only took
+               part of, which a reload would otherwise reveal. -->
+          <span
+            v-if="viewsError"
+            class="font-mono text-[10px] text-destructive"
+            role="status"
+            data-testid="views-not-saved"
+            :title="`Views not saved: ${viewsError}`"
+          >
+            views not saved
           </span>
 
           <div id="dissect-page-actions" class="contents"></div>

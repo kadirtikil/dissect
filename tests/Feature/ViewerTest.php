@@ -193,6 +193,21 @@ class ViewerTest extends TestCase
     }
 
     #[Test]
+    public function saving_views_answers_with_what_was_kept(): void
+    {
+        $views = array_map(fn (int $i) => ['id' => "view-{$i}", 'name' => "View {$i}", 'models' => ['Workbench\\App\\Models\\Post']], range(1, 101));
+        $views[0]['models'] = array_map(fn (int $i) => "App\\Models\\M{$i}", range(1, 501));
+
+        $answer = $this->postJson('/dissect/views', ['views' => $views])->assertOk();
+
+        // One view past the cap, and one model past it in the first.
+        $this->assertSame(100, $answer->json('saved'));
+        $this->assertCount(100, $answer->json('views'));
+        $this->assertSame('view-100', $answer->json('views.99.id'));
+        $this->assertCount(500, $answer->json('views.0.models'));
+    }
+
+    #[Test]
     public function views_carry_a_revision_both_ways(): void
     {
         $this->getJson('/dissect/views.json')->assertOk()->assertJsonPath('revision', null);
