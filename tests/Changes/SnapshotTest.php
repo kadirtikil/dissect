@@ -110,7 +110,7 @@ class SnapshotTest extends TestCase
 
         $this->assertSame(['id', 'total'], array_keys($model['columns']));
         $this->assertSame(
-            ['type' => 'integer', 'nullable' => false, 'unique' => false, 'increments' => false, 'fillable' => true, 'hidden' => false, 'cast' => null, 'virtual' => false],
+            ['type' => 'integer', 'kind' => 'integer', 'nullable' => false, 'unique' => false, 'increments' => false, 'fillable' => true, 'hidden' => false, 'cast' => null, 'virtual' => false],
             $model['columns']['total'],
         );
         $this->assertSame(['type' => 'BelongsTo', 'target' => 'App\\Models\\Customer', 'keys' => ['source' => 'customer_id', 'target' => 'id', 'via' => null]], $model['relations']['customer']);
@@ -182,7 +182,7 @@ class SnapshotTest extends TestCase
         $json = Snapshot::encode(Snapshot::of($this->payloads()));
 
         $this->assertStringContainsString(
-            "\n                \"total\": {\"type\": \"integer\", \"nullable\": false, \"unique\": false, \"increments\": false, \"fillable\": true, \"hidden\": false, \"cast\": null, \"virtual\": false}\n",
+            "\n                \"total\": {\"type\": \"integer\", \"kind\": \"integer\", \"nullable\": false, \"unique\": false, \"increments\": false, \"fillable\": true, \"hidden\": false, \"cast\": null, \"virtual\": false}\n",
             $json,
         );
         $this->assertStringContainsString("\n            \"middleware\": [\"api\", \"auth:sanctum\"],\n", $json);

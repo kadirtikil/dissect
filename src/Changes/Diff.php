@@ -46,13 +46,56 @@ final class Diff
                     $changes[] = ['part' => $part, 'id' => $id, 'change' => 'added', 'facts' => []];
                 } elseif (! array_key_exists($id, $new)) {
                     $changes[] = ['part' => $part, 'id' => $id, 'change' => 'removed', 'facts' => []];
-                } elseif (($facts = self::facts($old[$id], $new[$id], [])) !== []) {
+                } elseif (($facts = self::facts(...self::comparable($part, $old[$id], $new[$id]))) !== []) {
                     $changes[] = ['part' => $part, 'id' => $id, 'change' => 'changed', 'facts' => $facts];
                 }
             }
         }
 
         return $changes;
+    }
+
+    /**
+     * Two readings of one item, reduced to what the code decides in both.
+     *
+     * A model's columns are read from whichever database the machine has. Its
+     * driver says which, and is not itself a change. On the same driver the
+     * native types are compared (`int` to `bigint` is a migration); across
+     * drivers only their kind is, since MySQL's `bigint unsigned` and
+     * SQLite's `integer` are the same column. A model whose columns could not
+     * be read on one side has its columns left out on both: nothing is known
+     * about them, which is not the same as all of them being gone.
+     *
+     * @return array{0: mixed, 1: mixed, 2: array<int, string>}
+     */
+    protected static function comparable(string $part, mixed $before, mixed $after): array
+    {
+        if ($part !== 'models' || ! is_array($before) || ! is_array($after)) {
+            return [$before, $after, []];
+        }
+
+        $sameDriver = ($before['driver'] ?? null) === ($after['driver'] ?? null);
+        $unread = isset($before['unreadable']) || isset($after['unreadable']);
+
+        $reduce = function (array $model) use ($sameDriver, $unread): array {
+            unset($model['driver'], $model['unreadable']);
+
+            if ($unread) {
+                unset($model['columns']);
+            } else {
+                $model['columns'] = array_map(function (mixed $column) use ($sameDriver) {
+                    if (is_array($column)) {
+                        unset($column[$sameDriver ? 'kind' : 'type']);
+                    }
+
+                    return $column;
+                }, (array) ($model['columns'] ?? []));
+            }
+
+            return $model;
+        };
+
+        return [$reduce($before), $reduce($after), []];
     }
 
     /**

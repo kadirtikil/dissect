@@ -23,7 +23,7 @@ use KdrDev\Dissect\Support\Surfaces;
 final class Snapshot
 {
     /** Bumped whenever a fact is added, removed or reshaped. */
-    public const VERSION = 1;
+    public const VERSION = 2;
 
     /** Each part of a snapshot, and the surface it is read from. */
     public const PARTS = ['models' => 'schema', 'routes' => 'routes', 'jobs' => 'jobs', 'providers' => 'providers'];
@@ -169,12 +169,20 @@ final class Snapshot
 
         return self::keyed($schema['nodes'] ?? [], fn (array $node) => self::compact([
             'table' => $node['table'] ?? null,
+            // Only the connection the model names: which one is the default
+            // is the machine's business, and differs between a laptop and CI.
             'connection' => $node['connection'] ?? null,
+            // Not compared itself. It says which database the native column
+            // types below were read from, so the diff knows whether they can
+            // be compared at all. See Diff::comparable().
+            'driver' => $node['driver'] ?? null,
             'context' => $node['context'] ?? null,
             'columns' => self::sorted(array_column(array_map(fn (array $column) => [
                 'name' => $column['name'],
                 'facts' => [
                     'type' => $column['type'] ?? null,
+                    // The same type said the same way on every database.
+                    'kind' => $column['kind'] ?? null,
                     'nullable' => $column['nullable'] ?? null,
                     'unique' => $column['unique'] ?? null,
                     'increments' => $column['increments'] ?? null,
@@ -185,7 +193,11 @@ final class Snapshot
                 ],
             ], $node['columns'] ?? []), 'facts', 'name')),
             'relations' => self::sorted($relations[$node['id']] ?? []),
-        ]));
+        ]) + (isset($node['unreadable']) ? [
+            // Its columns could not be read, so it has none here: the diff
+            // leaves its columns alone rather than calling every one removed.
+            'unreadable' => true,
+        ] : []));
     }
 
     /**
