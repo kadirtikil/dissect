@@ -131,7 +131,7 @@ class JobExporter
      * somewhere else.
      *
      * Two sites naming two different queues is reported as `mixed` rather than
-     * resolved. Picking one would be inventing a fact, and "this job goes to
+     * resolved, and so is a site naming one beside a site naming none. Picking one would be inventing a fact, and "this job goes to
      * different queues depending on who dispatches it" is worth knowing on its
      * own.
      *
@@ -148,11 +148,17 @@ class JobExporter
             return ['queue' => $job['queue'], 'queue_source' => $job['queue_source']];
         }
 
-        $named = array_values(array_unique(array_filter(array_column($sites, 'queue'))));
+        $queues = array_map(fn (array $site) => $site['queue'] ?? null, $sites);
+        $named = array_values(array_unique(array_filter($queues, 'is_string')));
 
-        return match (count($named)) {
-            0 => ['queue' => null, 'queue_source' => 'default'],
-            1 => ['queue' => $named[0], 'queue_source' => 'dispatch'],
+        // A site that names no queue sends the job to the connection's
+        // default, so one `->onQueue('mail')` beside a plain `dispatch()` is
+        // two queues, not one.
+        $unnamed = in_array(null, $queues, true);
+
+        return match (true) {
+            $named === [] => ['queue' => null, 'queue_source' => 'default'],
+            count($named) === 1 && ! $unnamed => ['queue' => $named[0], 'queue_source' => 'dispatch'],
             default => ['queue' => null, 'queue_source' => 'mixed'],
         };
     }
