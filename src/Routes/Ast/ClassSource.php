@@ -89,28 +89,22 @@ class ClassSource
      *
      * Route files are full of closures, and a small application may put its
      * validation in one. Reflection gives the file and start line; that pair
-     * addresses the node as precisely as a name addresses a method.
+     * addresses the node as precisely as a name addresses a method. An arrow
+     * function (`fn (Request $r) => …`) is a closure to reflection too.
      */
-    public function closure(string $file, int $line): ?Node\Expr\Closure
+    public function closure(string $file, int $line): Node\Expr\Closure|Node\Expr\ArrowFunction|null
     {
-        if (! is_file($file)) {
-            return null;
-        }
-
-        $statements = $this->files[$file] ??= $this->parse($file);
+        $statements = $this->file($file);
 
         if ($statements === null) {
             return null;
         }
 
-        foreach ((new NodeFinder)->findInstanceOf($statements, Node\Expr\Closure::class) as $closure) {
-            /** @var Node\Expr\Closure $closure */
-            if ($closure->getStartLine() === $line) {
-                return $closure;
-            }
-        }
+        $finder = new NodeFinder;
+        $found = $finder->findFirst($statements, fn (Node $node) => ($node instanceof Node\Expr\Closure || $node instanceof Node\Expr\ArrowFunction)
+            && $node->getStartLine() === $line);
 
-        return null;
+        return $found instanceof Node\Expr\Closure || $found instanceof Node\Expr\ArrowFunction ? $found : null;
     }
 
     /**

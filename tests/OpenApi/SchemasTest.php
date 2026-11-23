@@ -46,6 +46,9 @@ class SchemasTest extends TestCase
         $this->assertSame(['public', 'unlisted', 'private'], Schemas::fromRules(null, ['in:"public","unlisted","private"'])['enum']);
         $this->assertSame([1, 2, 3], Schemas::fromRules('integer', ['integer', 'in:1,2,3'])['enum']);
         $this->assertSame(['1', '2'], Schemas::fromRules('string', ['string', 'in:1,2'])['enum']);
+
+        // An `in` naming no values says nothing, rather than allowing only "".
+        $this->assertArrayNotHasKey('enum', Schemas::fromRules('integer', ['integer', 'in']));
     }
 
     #[Test]

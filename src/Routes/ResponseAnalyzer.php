@@ -70,6 +70,12 @@ class ResponseAnalyzer
     /** @return array<string, mixed> */
     protected function describe(ReflectionFunctionAbstract $action): array
     {
+        // `Route::view()` runs the framework's own controller, whose return
+        // type is a plain Response. The route itself says it renders a view.
+        if ($action instanceof ReflectionMethod && $this->isA($action->class, 'Illuminate\Routing\ViewController')) {
+            return $this->shape('view', null, 'certain', []);
+        }
+
         $returns = $this->returnClass($action);
         $body = $this->bodyOf($action);
 
@@ -84,12 +90,12 @@ class ResponseAnalyzer
         }
 
         // A resource named directly by the return type is the clearest case.
-        $resource = $this->resourceFrom($returns, $body);
+        $found = $this->resourceFrom($returns, $body);
 
-        if ($resource !== null) {
-            $collection = $returns !== null && $this->isCollection($returns);
+        if ($found !== null) {
+            [$resource, $collection] = $found;
 
-            return $this->fromResource($resource, $collection, $body);
+            return $this->fromResource($resource, $collection || ($returns !== null && $this->isCollection($returns)), $body);
         }
 
         if ($body !== null) {
@@ -206,12 +212,17 @@ class ResponseAnalyzer
 
     /**
      * The resource class this endpoint hands back, from the return type or,
-     * failing that, from the body.
+     * failing that, from the body, and whether it is handed back as a list.
+     *
+     * The body says so as plainly as a return type would:
+     * `PostResource::collection(...)` is a list whatever the method declares.
+     *
+     * @return array{0: string, 1: bool}|null
      */
-    protected function resourceFrom(?string $returns, ?Node $body): ?string
+    protected function resourceFrom(?string $returns, ?Node $body): ?array
     {
         if ($returns !== null && $this->isA($returns, JsonResource::class) && ! $this->isCollection($returns)) {
-            return $returns;
+            return [$returns, false];
         }
 
         if ($body === null) {
@@ -234,7 +245,7 @@ class ResponseAnalyzer
             $class = $call->class instanceof Node\Name ? $call->class->toString() : null;
 
             if ($class !== null && $this->isA($class, JsonResource::class)) {
-                return $class;
+                return [$class, $call->name->toString() === 'collection' || $this->isCollection($class)];
             }
         }
 
@@ -243,7 +254,7 @@ class ResponseAnalyzer
             $class = $new->class instanceof Node\Name ? $new->class->toString() : null;
 
             if ($class !== null && $this->isA($class, JsonResource::class)) {
-                return $class;
+                return [$class, $this->isCollection($class)];
             }
         }
 
@@ -283,6 +294,16 @@ class ResponseAnalyzer
     }
 
     /**
+     * The helpers on a resource that leave a key out of the payload when their
+     * condition does not hold: every `when…`, `unless` and the merges.
+     */
+    protected const CONDITIONAL = [
+        'when', 'unless', 'mergeWhen', 'mergeUnless', 'whenHas', 'whenNull',
+        'whenNotNull', 'whenAppended', 'whenLoaded', 'whenCounted',
+        'whenAggregated', 'whenExistsLoaded', 'whenPivotLoaded', 'whenPivotLoadedAs',
+    ];
+
+    /**
      * Wrapped in one of the "maybe" helpers, so the key is not always in the
      * payload — which a consumer reading this as a contract needs to know.
      */
@@ -296,7 +317,7 @@ class ResponseAnalyzer
 
             $name = $call->name->toString();
 
-            if (in_array($name, ['when', 'whenLoaded', 'whenNotNull', 'mergeWhen', 'whenHas'], true)) {
+            if (in_array($name, self::CONDITIONAL, true)) {
                 return true;
             }
         }
@@ -325,7 +346,10 @@ class ResponseAnalyzer
      * An explicit status code, from either spelling.
      *
      * Only a literal counts. A computed status is a status this cannot state,
-     * and guessing 200 would be wrong precisely where it matters.
+     * and guessing 200 would be wrong precisely where it matters. `json()` is
+     * only a response's when it is called on one — `$request->json('limit',
+     * 50)` is a default value, not a status — and only a number HTTP has a
+     * status for is one.
      */
     protected function status(Node $body): ?int
     {
@@ -335,20 +359,27 @@ class ResponseAnalyzer
                 continue;
             }
 
-            $name = $call->name->toString();
-
-            $argument = match ($name) {
+            $argument = match ($call->name->toString()) {
                 'setStatusCode' => $call->args[0] ?? null,
-                'json' => $call->args[1] ?? null,
+                'json' => $this->isResponse($call->var) ? ($call->args[1] ?? null) : null,
                 default => null,
             };
 
-            if ($argument instanceof Node\Arg && $argument->value instanceof Int_) {
+            if ($argument instanceof Node\Arg && $argument->value instanceof Int_
+                && $argument->value->value >= 100 && $argument->value->value <= 599) {
                 return $argument->value->value;
             }
         }
 
         return null;
+    }
+
+    /** `response()`, the helper every `->json(...)` worth reading hangs off. */
+    protected function isResponse(Expr $expr): bool
+    {
+        return $expr instanceof Node\Expr\FuncCall
+            && $expr->name instanceof Node\Name
+            && $expr->name->toLowerString() === 'response';
     }
 
     /**

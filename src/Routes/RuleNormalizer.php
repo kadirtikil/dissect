@@ -42,7 +42,7 @@ class RuleNormalizer
         return [
             'path' => $this->path($path),
             'type' => $this->type($list),
-            'required' => in_array('required', $list, true),
+            'required' => $this->required($list),
             'rules' => $list,
             'table' => $reference['table'],
             'class' => $reference['class'],
@@ -120,6 +120,20 @@ class RuleNormalizer
         return null;
     }
 
+    /**
+     * Whether a request must carry the field.
+     *
+     * `sometimes|required` is the pattern Laravel documents for updates: the
+     * field may be left out, and is only required to be filled when sent. So
+     * `required` alone does not make a field required.
+     *
+     * @param  array<int, string>  $rules
+     */
+    protected function required(array $rules): bool
+    {
+        return in_array('required', $rules, true) && ! in_array('sometimes', $rules, true);
+    }
+
     /** The first rule that names a type, without its arguments. */
     protected function type(array $rules): ?string
     {
@@ -132,6 +146,12 @@ class RuleNormalizer
             $name = match ($name) {
                 'int' => 'integer',
                 'bool' => 'boolean',
+                // A list is an array whose keys run 0, 1, 2…
+                'list' => 'array',
+                // What the upload may be called or contain says it is one.
+                'mimes', 'mimetypes', 'extensions' => 'file',
+                // The `File` rule objects, which render as their class names.
+                'imagefile' => 'image',
                 default => $name,
             };
 

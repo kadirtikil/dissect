@@ -133,7 +133,15 @@ class ServerRegistry
 
         $request = substr($class, 0, -strlen('Schema')).'Request';
 
-        return class_exists($request) ? $request : null;
+        // Constructed and asked for its rules later, so only a request class
+        // that is one: a class that merely shares the name is not.
+        try {
+            return class_exists($request) && is_subclass_of($request, \Illuminate\Foundation\Http\FormRequest::class)
+                ? $request
+                : null;
+        } catch (Throwable) {
+            return null;
+        }
     }
 
     protected function resolve(string $server, string $resource): ?Schema

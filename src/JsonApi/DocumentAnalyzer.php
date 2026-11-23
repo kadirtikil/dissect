@@ -49,6 +49,12 @@ class DocumentAnalyzer
     /** Actions that send a document rather than only receiving one. */
     protected const WRITES = ['store', 'update'];
 
+    /** The actions the package's controller implements, and so describes. */
+    protected const KNOWN = [
+        'index', 'store', 'show', 'update', 'destroy', 'showRelated',
+        ...self::IDENTIFIERS,
+    ];
+
     public function __construct(
         protected ServerRegistry $registry,
         protected RuleSource $reader,
@@ -304,6 +310,15 @@ class DocumentAnalyzer
         }
 
         $action = $route->getActionMethod();
+
+        // A custom action (`$actions->withId()->post('publish')`) runs the
+        // application's own method, and what it returns is whatever that
+        // method returns — a 204, a job id, anything. Only the actions the
+        // package itself implements answer with a known document; the rest
+        // are left to the analyzers that read the method.
+        if (! in_array($action, self::KNOWN, true)) {
+            return null;
+        }
 
         // `showRelated` answers with the *other* end of the relation, so the
         // schema that describes the response is the inverse one.

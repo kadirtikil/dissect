@@ -4,6 +4,7 @@ namespace KdrDev\Dissect\Routes;
 
 use Illuminate\Routing\Route;
 use Illuminate\Routing\Router;
+use Throwable;
 
 /**
  * Reads the router's own table and reports the transport half of each route:
@@ -137,13 +138,28 @@ class RouteCollector
      * The alias is what somebody reading the route file recognises, and it is
      * what they would search the list for.
      *
+     * Reading a controller's own middleware constructs the controller when
+     * it is the older kind that registers them in its constructor. One whose
+     * constructor throws, or needs something that is not bound, would cost the
+     * whole route; falling back to the route's own middleware costs only the
+     * controller's share.
+     *
      * @return array<int, string>
      */
     protected function middleware(Route $route): array
     {
+        try {
+            $gathered = $route->gatherMiddleware();
+        } catch (Throwable) {
+            // The router marks the list computed before it builds it, so a
+            // failed build would read as "no middleware" from then on.
+            $route->computedMiddleware = null;
+            $gathered = $route->middleware();
+        }
+
         $middleware = [];
 
-        foreach ($route->gatherMiddleware() as $entry) {
+        foreach ($gathered as $entry) {
             // A closure middleware has no name to show. Naming it after its
             // class would be noise, so it is reported as what it is.
             $middleware[] = is_string($entry) ? $entry : 'Closure';

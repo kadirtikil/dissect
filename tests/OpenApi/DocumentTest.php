@@ -317,6 +317,54 @@ class DocumentTest extends TestCase
         $this->assertSame(json_encode($document), json_encode(Document::of($routes, ['title' => 'Workbench'])));
     }
 
+    #[Test]
+    public function a_route_bound_to_a_domain_answers_on_that_domain(): void
+    {
+        $document = Document::of([
+            $this->route('GET:dash', ['domain' => '{account}.example.com']),
+        ]);
+
+        $this->assertSame(
+            [['url' => '//{account}.example.com', 'variables' => ['account' => ['default' => 'account']]]],
+            json_decode(Document::encode($document), true)['paths']['/dash']['get']['servers'],
+        );
+    }
+
+    #[Test]
+    public function the_same_path_on_two_domains_is_named_not_written_over(): void
+    {
+        $document = json_decode(Document::encode(Document::of([
+            $this->route('GET:dash', ['domain' => 'a.example.com', 'action' => ['type' => 'controller', 'class' => 'A', 'method' => 'show', 'label' => 'A@show']]),
+            $this->route('GET:dash', ['domain' => 'b.example.com', 'action' => ['type' => 'controller', 'class' => 'B', 'method' => 'show', 'label' => 'B@show']]),
+        ])), true);
+
+        $operation = $document['paths']['/dash']['get'];
+
+        // The first keeps the operation; the second is not lost without a word.
+        $this->assertSame('//a.example.com', $operation['servers'][0]['url']);
+        $this->assertStringContainsString('Handled by `A@show`.', $operation['description']);
+        $this->assertStringContainsString('also answered on `b.example.com` by `B@show`', $operation['description']);
+    }
+
+    #[Test]
+    public function numbered_fields_are_still_an_object(): void
+    {
+        $document = Document::of([
+            $this->route('POST:api/places', ['request' => ['source' => 'form-request', 'class' => null, 'confidence' => 'certain', 'fields' => [
+                ['path' => 'coords', 'type' => 'array', 'required' => true, 'rules' => ['required', 'array']],
+                ['path' => 'coords.0', 'type' => 'numeric', 'required' => true, 'rules' => ['required', 'numeric']],
+                ['path' => 'coords.1', 'type' => 'numeric', 'required' => true, 'rules' => ['required', 'numeric']],
+            ]]]),
+        ]);
+
+        $json = Document::encode($document);
+        $schema = json_decode($json)->paths->{'/api/places'}->post->requestBody->content->{'application/json'}->schema;
+
+        $this->assertIsObject($schema->properties->coords->properties);
+        $this->assertTrue(property_exists($schema->properties->coords->properties, '0') && property_exists($schema->properties->coords->properties, '1'));
+        $this->assertDoesNotMatchRegularExpression('/"properties":\s*\[/', $json);
+    }
+
     /**
      * What the OpenAPI specification requires of a document, checked without
      * a validator: every reference resolves, every operation has responses

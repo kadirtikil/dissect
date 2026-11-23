@@ -141,7 +141,12 @@ final class Schemas
                     $schema += self::bounds($bounded, $low, $high);
                     break;
                 case 'in':
-                    $schema['enum'] = self::values((string) $arguments, $json);
+                    // `in` with nothing after it names no values, and an
+                    // enum of one empty string would reject every real one.
+                    if ($arguments !== null && $arguments !== '') {
+                        $schema['enum'] = self::values($arguments, $json);
+                    }
+
                     break;
                 case 'regex':
                     $pattern = self::pattern((string) $arguments);
