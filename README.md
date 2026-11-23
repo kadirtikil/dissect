@@ -566,7 +566,7 @@ Carries                                  app/Http/…/InvoiceController.php:61
 - 🧭 **Grouped by queue**, because the queue is what you point a worker at.
 - ⌀ **Never dispatched?** A job nothing dispatches is flagged: it is either
   dead code or dispatched dynamically. That's something `queue:work` can't tell
-  you.
+  you. A queued listener isn't flagged, since its event is what queues it.
 - 🔎 **Filter** by name, class, queue or dispatcher, and narrow by kind, queue
   and domain.
 
@@ -580,8 +580,8 @@ somewhere else. dissect reads all of those places and says which one answered:
 | --- | --- |
 | `property` | A declared `$queue`. The usual form for a queued listener. |
 | `constructor` | `$this->onQueue('…')` among the constructor's own statements. One inside an `if` doesn't count, since it depends on the arguments. |
-| `dispatch` | The class named none, and exactly one dispatch site chained `->onQueue('…')`. |
-| `mixed` | Two dispatch sites named two different queues. Picking one would invent a fact. |
+| `dispatch` | The class named none, and every dispatch site chained the same `->onQueue('…')`, including onto `dispatch(new …)` or `Bus::batch([…])`. |
+| `mixed` | Dispatch sites name different queues, or one names a queue and another names none (which is the default queue). Picking one would invent a fact. |
 | `default` | Nothing named one. |
 
 Nothing is executed to find this out. `backoff()` and `middleware()` are read
