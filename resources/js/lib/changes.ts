@@ -77,6 +77,13 @@ export function since(name: BaselineName | null): string {
  * anybody needs to look.
  */
 export function headline(file: ChangesFile): string {
+  // No changes here means nothing was compared, not that nothing changed.
+  if (file.problem) {
+    return file.against === 'watch'
+      ? 'Could not read where watching started'
+      : 'Could not read the snapshot'
+  }
+
   if (!file.against) return 'What changed'
 
   const count = file.changes.length

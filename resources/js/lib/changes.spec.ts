@@ -78,6 +78,15 @@ describe('headline', () => {
     expect(headline(file([]))).toBe('Nothing changed since the snapshot')
     expect(headline(file([], null))).toBe('What changed')
   })
+
+  it('does not say nothing changed when the baseline could not be read', () => {
+    const problem = 'The snapshot at .dissect/snapshot.json is in snapshot format 1.'
+
+    expect(headline({ ...file([]), problem })).toBe('Could not read the snapshot')
+    expect(headline({ ...file([], 'watch'), problem })).toBe(
+      'Could not read where watching started',
+    )
+  })
 })
 
 describe('the rest', () => {
