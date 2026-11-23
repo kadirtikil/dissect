@@ -90,23 +90,30 @@ final class Payloads
         $options = array_map(fn (string $file) => '--files='.$file, $files);
 
         if ($this->surfaces !== null) {
-            Artisan::call('dissect:check', ['--format' => 'json', '--files' => $files]);
-
-            return $this->decode(Artisan::output(), 'dissect:check');
+            $code = Artisan::call('dissect:check', ['--format' => 'json', '--files' => $files]);
+            $output = Artisan::output();
+            $errors = '';
+        } else {
+            $process = $this->process(['dissect:check', '--format=json', ...$options]);
+            $process->run();
+            $code = (int) $process->getExitCode();
+            $output = $process->getOutput();
+            $errors = $process->getErrorOutput();
         }
 
-        $process = $this->process(['dissect:check', '--format=json', ...$options]);
+        // 1 is a verdict when it comes with one: something broke a rule. It
+        // is also what the command exits with when it could not check at
+        // all, and then what it said is the answer, not a guess at why there
+        // is no JSON.
+        $verdict = $code === 1 ? json_decode($output, true) : null;
 
-        $process->run();
-
-        // 1 is a verdict, not a failure: something broke a rule.
-        if (! in_array($process->getExitCode(), [0, 1], true)) {
-            $said = trim($process->getOutput()."\n".$process->getErrorOutput());
+        if ($code !== 0 && ! is_array($verdict)) {
+            $said = trim(preg_replace('/^\s*ERROR\s+/m', '', $output."\n".$errors) ?? '');
 
             throw new RuntimeException('dissect:check failed'.($said === '' ? '.' : ': '.$said));
         }
 
-        return $this->decode($process->getOutput(), 'dissect:check');
+        return $this->decode($output, 'dissect:check');
     }
 
     /**
