@@ -300,12 +300,28 @@ final class Snapshot
     protected static function provider(array $provider): array
     {
         // What it binds, as "abstract -> concrete": the tree's own edges,
-        // without the node details (a node's file is an absolute path).
-        $edges = [];
+        // without the node details (a node's file is an absolute path). A
+        // contextual binding adds who it is for, so `when(ReportMailer)` and
+        // a plain bind of the same pair are two bindings, and moving the
+        // first to InvoiceMailer is a change.
+        $names = self::unresolvedNames($provider['nodes'] ?? []);
+        $name = fn (string $id) => $names[$id] ?? $id;
+        $kinds = [];
 
         foreach ($provider['edges'] ?? [] as $edge) {
-            $edges[$edge['source'].' -> '.$edge['target']] = ['kind' => $edge['kind']];
+            $key = $name((string) $edge['source']).' -> '.$name((string) $edge['target'])
+                .(isset($edge['consumer']) ? ' when '.$edge['consumer'] : '');
+            $kinds[$key][] = (string) $edge['kind'];
         }
+
+        // Two kinds of binding between one pair, for one consumer, stay
+        // one entry that says both.
+        $edges = array_map(function (array $kinds) {
+            $kinds = array_values(array_unique($kinds));
+            sort($kinds);
+
+            return ['kind' => implode(', ', $kinds)];
+        }, $kinds);
 
         return self::compact([
             'context' => $provider['context'] ?? null,
@@ -314,6 +330,33 @@ final class Snapshot
             'side_effects' => self::sorted($provider['side_effects'] ?? []),
             'edges' => self::sorted($edges),
         ]);
+    }
+
+    /**
+     * Something a provider binds that could not be named is `unresolved:0`,
+     * `unresolved:1`, … in the order it was met, so removing the first would
+     * read as the second changing. It is named by what it says instead, and
+     * counted only among those that say the same.
+     *
+     * @param  array<int, array<string, mixed>>  $nodes
+     * @return array<string, string>
+     */
+    protected static function unresolvedNames(array $nodes): array
+    {
+        $names = [];
+        $seen = [];
+
+        foreach ($nodes as $node) {
+            $id = (string) ($node['id'] ?? '');
+
+            if (str_starts_with($id, 'unresolved:')) {
+                $label = '? '.($node['label'] ?? '');
+                $seen[$label] = ($seen[$label] ?? 0) + 1;
+                $names[$id] = $seen[$label] === 1 ? $label : $label.' #'.$seen[$label];
+            }
+        }
+
+        return $names;
     }
 
     /**

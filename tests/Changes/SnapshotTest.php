@@ -2,6 +2,7 @@
 
 namespace KdrDev\Dissect\Tests\Changes;
 
+use KdrDev\Dissect\Changes\Report;
 use KdrDev\Dissect\Changes\Snapshot;
 use KdrDev\Dissect\Tests\TestCase;
 use PHPUnit\Framework\Attributes\Test;
@@ -234,5 +235,58 @@ class SnapshotTest extends TestCase
         $this->assertStringContainsString('"Workbench\\\\App\\\\Models\\\\Post": {', $first);
         $this->assertStringNotContainsString(base_path(), $first);
         $this->assertStringNotContainsString(dirname(__DIR__, 2), $first);
+    }
+
+    /** @param  array<int, string>  $unread  What each binding that could not be named says. */
+    protected function mailProvider(string $consumer, array $unread = []): array
+    {
+        $provider = 'App\\Providers\\MailServiceProvider';
+
+        return Snapshot::of(['providers' => ['providers' => [[
+            'id' => $provider,
+            'nodes' => array_map(fn (string $label, int $i) => ['id' => 'unresolved:'.$i, 'label' => $label], $unread, array_keys($unread)),
+            'edges' => [
+                ['source' => 'App\\Contracts\\Mailer', 'target' => 'App\\Mail\\SmtpMailer', 'kind' => 'bind', 'consumer' => null],
+                ['source' => 'App\\Contracts\\Mailer', 'target' => 'App\\Mail\\SmtpMailer', 'kind' => 'contextual', 'consumer' => $consumer],
+                ...array_map(fn (int $i) => ['source' => $provider, 'target' => 'unresolved:'.$i, 'kind' => 'bind', 'consumer' => null], array_keys($unread)),
+            ],
+        ]]]]);
+    }
+
+    #[Test]
+    public function a_binding_for_one_consumer_is_its_own_entry(): void
+    {
+        $edges = $this->mailProvider('App\\Mail\\ReportMailer')['providers']['App\\Providers\\MailServiceProvider']['edges'];
+
+        $this->assertSame([
+            'App\\Contracts\\Mailer -> App\\Mail\\SmtpMailer' => ['kind' => 'bind'],
+            'App\\Contracts\\Mailer -> App\\Mail\\SmtpMailer when App\\Mail\\ReportMailer' => ['kind' => 'contextual'],
+        ], $edges);
+
+        // Given to another consumer: one binding gone, one new.
+        $changes = Report::between($this->mailProvider('App\\Mail\\ReportMailer'), $this->mailProvider('App\\Mail\\InvoiceMailer'))['changes'];
+
+        $this->assertSame([
+            [['edges', 'App\\Contracts\\Mailer -> App\\Mail\\SmtpMailer when App\\Mail\\InvoiceMailer'], 'added'],
+            [['edges', 'App\\Contracts\\Mailer -> App\\Mail\\SmtpMailer when App\\Mail\\ReportMailer'], 'removed'],
+        ], array_map(fn (array $fact) => [$fact['path'], $fact['change']], $changes[0]['facts']));
+    }
+
+    #[Test]
+    public function a_binding_that_could_not_be_named_is_named_by_what_it_says(): void
+    {
+        $both = $this->mailProvider('App\\Mail\\ReportMailer', ['$this->app->make($a)', '$this->app->make($b)', '$this->app->make($b)']);
+        $edges = array_keys($both['providers']['App\\Providers\\MailServiceProvider']['edges']);
+
+        $this->assertContains('App\\Providers\\MailServiceProvider -> ? $this->app->make($a)', $edges);
+        $this->assertContains('App\\Providers\\MailServiceProvider -> ? $this->app->make($b) #2', $edges);
+
+        // Taking the first one out is that one gone, not the others renamed.
+        $later = $this->mailProvider('App\\Mail\\ReportMailer', ['$this->app->make($b)', '$this->app->make($b)']);
+        $facts = Report::between($both, $later)['changes'][0]['facts'];
+
+        $this->assertCount(1, $facts);
+        $this->assertSame(['edges', 'App\\Providers\\MailServiceProvider -> ? $this->app->make($a)'], $facts[0]['path']);
+        $this->assertSame('removed', $facts[0]['change']);
     }
 }
