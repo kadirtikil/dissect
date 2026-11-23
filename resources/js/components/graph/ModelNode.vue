@@ -153,10 +153,22 @@ function onClick(event: MouseEvent) {
 }
 
 function onKeydown(event: KeyboardEvent) {
-  if (event.key === 'Enter' || event.key === ' ') {
+  const activates = event.key === 'Enter' || event.key === ' '
+
+  // Vue Flow's node wrapper selects on Enter and Space, which a click here
+  // avoids (see onClick) and a key press has to as well: a card opened from
+  // the keyboard should not land in the new view's draft.
+  if (activates) event.stopPropagation()
+
+  // A key pressed on a control inside the card is that control's: Enter on
+  // "Jobs ↗" follows it rather than collapsing the card around it.
+  if (event.target !== event.currentTarget) return
+
+  if (activates) {
     event.preventDefault()
     store.toggleExpanded(props.id)
   } else if (event.key === 'Escape' && expanded.value) {
+    event.stopPropagation()
     store.toggleExpanded(props.id)
   }
 }
@@ -341,6 +353,12 @@ function onKeydown(event: KeyboardEvent) {
   /* Vue Flow's .selected styling targets its own node wrapper, which this
      custom node replaces, so selection is styled here instead. */
   outline: none;
+}
+
+/* Reached from the keyboard: the card is a button, and has to look focused. */
+.model-node:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
 }
 
 /* Arrived at from an endpoint. Deliberately a different colour from selection:
