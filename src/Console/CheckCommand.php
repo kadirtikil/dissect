@@ -62,8 +62,13 @@ class CheckCommand extends Command
             $payload = $surfaces->export('boundaries');
         } catch (Throwable $e) {
             // A hook that cannot run must not stop the agent: exit 1 shows
-            // the user what went wrong and leaves the edit alone.
-            $this->components->error("Could not check the boundaries: {$e->getMessage()}");
+            // the user what went wrong and leaves the edit alone. Claude
+            // Code shows a hook's stderr, so as a hook it is said there.
+            $message = "Could not check the boundaries: {$e->getMessage()}";
+
+            $hook
+                ? $this->output->getErrorStyle()->writeln($message, OutputInterface::OUTPUT_RAW)
+                : $this->components->error($message);
 
             return self::FAILURE;
         }
