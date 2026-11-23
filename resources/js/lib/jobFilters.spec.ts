@@ -72,6 +72,12 @@ describe('isUndispatched', () => {
     expect(isUndispatched(job())).toBe(true)
     expect(isUndispatched(job({ dispatched_by: [site()] }))).toBe(false)
   })
+
+  it('is false for a listener, which its event queues', () => {
+    expect(
+      isUndispatched(job({ kind: 'listener', events: ['App\\Events\\MembershipRevoked'] })),
+    ).toBe(false)
+  })
 })
 
 describe('matchesSearch', () => {

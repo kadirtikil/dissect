@@ -59,9 +59,14 @@ export function queueKey(job: QueueJob): string {
   return job.queue_source === 'mixed' ? MIXED_QUEUE : DEFAULT_QUEUE
 }
 
-/** A job nothing was found to dispatch — dead code, or dispatched dynamically. */
+/**
+ * A job nothing was found to dispatch — dead code, or dispatched dynamically.
+ *
+ * A listener registered for an event is not one of those: the event is what
+ * queues it, so it has no dispatch site and needs none.
+ */
 export function isUndispatched(job: QueueJob): boolean {
-  return job.dispatched_by.length === 0
+  return job.dispatched_by.length === 0 && job.events.length === 0
 }
 
 export function matchesSearch(job: QueueJob, search: string): boolean {

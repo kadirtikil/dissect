@@ -206,7 +206,10 @@ const retry = computed(() => {
         v-if="!selected.dispatched_by.length"
         class="mt-1 font-mono text-[11px] text-muted-foreground/70 italic"
       >
-        No dispatch site found — dead code, or dispatched dynamically.
+        <template v-if="selected.events.length">
+          Queued when one of the events above fires, not dispatched directly.
+        </template>
+        <template v-else>No dispatch site found — dead code, or dispatched dynamically.</template>
       </p>
 
       <ul v-else class="mt-1 flex flex-col gap-1.5">
