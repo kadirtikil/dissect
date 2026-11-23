@@ -6,6 +6,7 @@ use Illuminate\Console\Command;
 use KdrDev\Dissect\Architecture\ContextResolver;
 use KdrDev\Dissect\Architecture\DomainFile;
 use KdrDev\Dissect\Architecture\SourceFiles;
+use KdrDev\Dissect\Support\Path;
 use KdrDev\Dissect\Support\Surfaces;
 use KdrDev\Dissect\Digest\Markdown;
 use Symfony\Component\Console\Formatter\OutputFormatter;
@@ -259,7 +260,7 @@ class CheckCommand extends Command
         $only = [];
 
         foreach ($given as $path) {
-            $absolute = str_starts_with($path, DIRECTORY_SEPARATOR) ? $path : rtrim($root, DIRECTORY_SEPARATOR).DIRECTORY_SEPARATOR.$path;
+            $absolute = Path::isAbsolute($path) ? $path : rtrim($root, DIRECTORY_SEPARATOR).DIRECTORY_SEPARATOR.$path;
 
             // A file just deleted has no real path; it still names itself.
             $only[$sources->relative(realpath($absolute) ?: $absolute)] = true;

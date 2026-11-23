@@ -8,6 +8,7 @@ use KdrDev\Dissect\Changes\Report;
 use KdrDev\Dissect\Changes\Snapshot;
 use KdrDev\Dissect\Changes\UnreadableSnapshot;
 use KdrDev\Dissect\Digest\Markdown;
+use KdrDev\Dissect\Support\Path;
 use Symfony\Component\Console\Formatter\OutputFormatter;
 use Symfony\Component\Console\Output\OutputInterface;
 use Throwable;
@@ -132,6 +133,6 @@ class DiffCommand extends Command
             return $baselines->path($against);
         }
 
-        return str_starts_with($against, DIRECTORY_SEPARATOR) ? $against : getcwd().DIRECTORY_SEPARATOR.$against;
+        return Path::isAbsolute($against) ? $against : getcwd().DIRECTORY_SEPARATOR.$against;
     }
 }

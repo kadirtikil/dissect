@@ -2,6 +2,8 @@
 
 namespace KdrDev\Dissect\Jobs;
 
+use KdrDev\Dissect\Support\Path;
+
 /**
  * The two directions a path is written in, in one place.
  *
@@ -25,7 +27,7 @@ class ProjectPath
      */
     public static function absolute(string $path): string
     {
-        $path = str_starts_with($path, DIRECTORY_SEPARATOR)
+        $path = Path::isAbsolute($path)
             ? rtrim($path, DIRECTORY_SEPARATOR)
             : rtrim(base_path($path), DIRECTORY_SEPARATOR);
 

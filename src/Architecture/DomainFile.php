@@ -3,6 +3,7 @@
 namespace KdrDev\Dissect\Architecture;
 
 use JsonException;
+use KdrDev\Dissect\Support\Path;
 
 /**
  * `.dissect/domains.json`: domains written down by hand.
@@ -286,7 +287,7 @@ final class DomainFile
      */
     protected function expand(string $path): array
     {
-        $absolute = str_starts_with($path, DIRECTORY_SEPARATOR)
+        $absolute = Path::isAbsolute($path)
             ? rtrim($path, DIRECTORY_SEPARATOR)
             : rtrim($this->root, DIRECTORY_SEPARATOR).DIRECTORY_SEPARATOR.rtrim($path, DIRECTORY_SEPARATOR);
 

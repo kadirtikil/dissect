@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Str;
 use KdrDev\Dissect\Architecture\ContextResolver;
 use KdrDev\Dissect\Support\ClassFile;
+use KdrDev\Dissect\Support\Path;
 use ReflectionClass;
 use SplFileInfo;
 use Symfony\Component\Finder\Finder;
@@ -258,7 +259,7 @@ class SchemaExporter
             // Absolute paths are used as-is; anything else is relative to the
             // app root, so models can live anywhere — a Domain folder, a
             // package, or the workbench app used to develop this package.
-            $path = str_starts_with($path, DIRECTORY_SEPARATOR)
+            $path = Path::isAbsolute($path)
                 ? rtrim($path, DIRECTORY_SEPARATOR)
                 : rtrim(base_path($path), DIRECTORY_SEPARATOR);
 

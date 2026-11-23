@@ -6,6 +6,7 @@ use Illuminate\Console\Command;
 use Illuminate\Filesystem\Filesystem;
 use KdrDev\Dissect\Changes\Baselines;
 use KdrDev\Dissect\Changes\Snapshot;
+use KdrDev\Dissect\Support\Path;
 use Throwable;
 
 /**
@@ -68,7 +69,7 @@ class SnapshotCommand extends Command
         $output = $this->option('output');
 
         if (is_string($output) && $output !== '') {
-            return str_starts_with($output, DIRECTORY_SEPARATOR) ? $output : getcwd().DIRECTORY_SEPARATOR.$output;
+            return Path::isAbsolute($output) ? $output : getcwd().DIRECTORY_SEPARATOR.$output;
         }
 
         return $baselines->path($this->option('watch') ? Baselines::WATCH : Baselines::SNAPSHOT);
