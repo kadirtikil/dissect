@@ -220,7 +220,7 @@ DissectServiceProvider    wiring; registers routes only when enabled
   │     ├── OpenApi\Schemas     request and response fields as JSON Schema, folded back into a tree by path
   │     └── Support\ClassNames  short class names, the rule classNames.ts uses
   ├── Console\SnapshotCommand dissect:snapshot — write .dissect/snapshot.json, atomically
-  │     └── Changes\Snapshot    every model, route, job and provider, reduced to what code moves
+  │     └── Changes\Snapshot    every model, route, job and provider, reduced to what code moves, not the machine
   ├── Console\DiffCommand     dissect:diff — what changed since the snapshot: text, json or md
   │     ├── Changes\Diff        two snapshots → each item new, gone, or changed fact by fact
   │     ├── Changes\Severity    breaking / risky / additive, for whoever depends on it
@@ -229,6 +229,7 @@ DissectServiceProvider    wiring; registers routes only when enabled
   ├── Changes\Baselines       the committed snapshot and the watch baseline: where, read, write
   ├── Mcp\DissectServer       mcp:start dissect — read-only tools, one entry at a time
   │     ├── Mcp\Payloads        each call's payloads from a fresh dissect:export
+  │     ├── Mcp\LoadedEnvironment what .env gave the server, left out of each fresh artisan
   │     ├── Mcp\Lookup          an entry by any name, exact before partial
   │     └── Mcp\Tools\*         search, model, route, job, provider, domain, class, check, changes
   ├── QueueSnapshot           what is on the queue *right now* — never cached
