@@ -2,6 +2,8 @@
 
 namespace KdrDev\Dissect\Tests\Feature;
 
+use Illuminate\Http\Response;
+use Illuminate\Support\Facades\Route;
 use KdrDev\Dissect\Routes\RouteExporter;
 use KdrDev\Dissect\Tests\TestCase;
 use PHPUnit\Framework\Attributes\Test;
@@ -246,6 +248,22 @@ class JsonApiTest extends TestCase
     }
 
     #[Test]
+    public function it_leaves_a_custom_action_to_the_method_that_handles_it(): void
+    {
+        // Named the way the package names `$actions->withId()->post('publish')`.
+        // What it returns is the application's own method's business, not a
+        // post document.
+        Route::post('api/v1/posts/{post}/-actions/publish', [PublishPostController::class, 'publish'])
+            ->name('v1.posts.publish');
+
+        $route = $this->routes()['POST:api/v1/posts/{post}/-actions/publish'];
+
+        $this->assertNotSame('json-api', $route['response']['source']);
+        $this->assertSame([], $route['response']['fields']);
+        $this->assertNotSame('json-api', $route['request']['source'] ?? null);
+    }
+
+    #[Test]
     public function it_puts_the_json_api_surface_in_the_api_half(): void
     {
         $this->assertSame('api', $this->routes()['GET:v1/posts']['stack']);
@@ -279,5 +297,13 @@ class JsonApiTest extends TestCase
         }
 
         return $routes;
+    }
+}
+
+class PublishPostController
+{
+    public function publish(): Response
+    {
+        return response()->noContent();
     }
 }
