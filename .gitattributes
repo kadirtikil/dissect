@@ -20,6 +20,7 @@
 /.gitignore             export-ignore
 /.oxlintrc.json         export-ignore
 /.prettierrc.json       export-ignore
+/.prettierignore        export-ignore
 /eslint.config.ts       export-ignore
 /playwright.config.ts   export-ignore
 /vite.config.ts         export-ignore
@@ -38,3 +39,8 @@
 /phpunit.xml            export-ignore
 /testbench.yaml         export-ignore
 /PROJECT-LOG.md         export-ignore
+/PROVIDER-TREES-PLAN.md  export-ignore
+
+# Vite builds it from index.html above, and the package serves only the
+# entry, its chunks, the stylesheet and its fonts out of dist/.
+/dist/index.html        export-ignore
