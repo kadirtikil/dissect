@@ -9,14 +9,7 @@ import { layoutPersistence, viewsPersistence } from './vite-plugin-persistence'
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [
-    vue(),
-    vueJsx(),
-    vueDevTools(),
-    tailwindcss(),
-    layoutPersistence(),
-    viewsPersistence(),
-  ],
+  plugins: [vue(), vueJsx(), vueDevTools(), tailwindcss(), layoutPersistence(), viewsPersistence()],
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./resources/js', import.meta.url)),
@@ -28,6 +21,16 @@ export default defineConfig({
     // config('dissect.dev_server')), which is a cross-origin request:
     // Laravel serves the page, Vite serves the scripts.
     cors: true,
+  },
+
+  experimental: {
+    // The bundle is served from wherever the package mounts its assets
+    // (/dissect/assets/ by default), so what a file loads, the stylesheet
+    // its fonts and the entry its chunks, is named relative to that file,
+    // not to the site's root.
+    renderBuiltUrl(_filename, { hostType }) {
+      return hostType === 'css' || hostType === 'js' ? { relative: true } : undefined
+    },
   },
 
   build: {
@@ -51,7 +54,13 @@ export default defineConfig({
         // can move a browser off the old chunk after an update.
         entryFileNames: 'dissect.js',
         chunkFileNames: 'dissect-[name]-[hash].js',
-        assetFileNames: 'dissect.[ext]',
+        // The stylesheet is named by the view, like the entry. Anything else
+        // it pulls in, which is the font files, is hashed like a chunk: a
+        // fixed name would give every font file the same one.
+        assetFileNames: (asset) =>
+          asset.names.some((name) => name.endsWith('.css'))
+            ? 'dissect.[ext]'
+            : 'dissect-[name]-[hash][extname]',
       },
     },
   },
