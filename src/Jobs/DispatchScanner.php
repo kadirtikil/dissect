@@ -140,7 +140,7 @@ class DispatchScanner
                 continue;
             }
 
-            $sites[$class][] = $this->describe($new, $path, $this->callAround($new) ?? 'new');
+            $sites[$class][] = $this->describe($new, $path, $this->callAround($new) ?? 'new', $this->pending($new));
         }
 
         return $sites;
@@ -151,10 +151,10 @@ class DispatchScanner
      *
      * @return array<string, mixed>
      */
-    protected function describe(Node $node, string $path, string $method): array
+    protected function describe(Node $node, string $path, string $method, ?Node $pending = null): array
     {
         $context = $this->contextOf($node, $path);
-        $modifiers = $this->modifiers($node);
+        $modifiers = $this->modifiers($pending ?? $node);
 
         return [
             'file' => $this->relative($path),
@@ -268,6 +268,26 @@ class DispatchScanner
     }
 
     /**
+     * The call a `new` is handed to, when that call is what the modifiers
+     * chain onto: `dispatch(new Foo)->onQueue('mail')` queues the job the
+     * `new` made, and so does `Bus::batch([new A, new B])->onQueue('mail')`.
+     */
+    protected function pending(Node $node): ?Node
+    {
+        $call = $this->enclosingCall($node);
+
+        if ($call instanceof FuncCall && $call->name instanceof Name && $call->name->toLowerString() === 'dispatch') {
+            return $call;
+        }
+
+        if ($call instanceof StaticCall && $call->name instanceof Node\Identifier && in_array($call->name->toString(), ['batch', 'chain'], true)) {
+            return $call;
+        }
+
+        return null;
+    }
+
+    /**
      * The name of the call a `new` is an argument to — `queue`, `notify`,
      * `batch`, `chain`, `send`.
      *
@@ -275,6 +295,16 @@ class DispatchScanner
      * it is, without this class having to know the API it came from.
      */
     protected function callAround(Node $node): ?string
+    {
+        $name = $this->enclosingCall($node)?->name;
+
+        return $name instanceof Node\Identifier || $name instanceof Name
+            ? class_basename($name->toString())
+            : null;
+    }
+
+    /** The call a node is an argument to, directly or as an array item. */
+    protected function enclosingCall(Node $node): MethodCall|StaticCall|FuncCall|null
     {
         $argument = $node->getAttribute('parent');
 
@@ -286,11 +316,7 @@ class DispatchScanner
         // is one level further up.
         for ($current = $argument; $current !== null; $current = $current->getAttribute('parent')) {
             if ($current instanceof MethodCall || $current instanceof StaticCall || $current instanceof FuncCall) {
-                $name = $current->name;
-
-                return $name instanceof Node\Identifier || $name instanceof Name
-                    ? class_basename($name->toString())
-                    : null;
+                return $current;
             }
 
             if ($current instanceof ClassMethod || $current instanceof Closure) {
@@ -329,7 +355,22 @@ class DispatchScanner
             return [];
         }
 
-        return (new Finder)->in($directories)->files()->name('*.php');
+        // `['app', 'app/Http']` reaches every controller twice, and Finder
+        // walks each directory it is given without asking whether another
+        // already covers it. One file is one set of sites.
+        $seen = [];
+
+        foreach ((new Finder)->in($directories)->files()->name('*.php') as $file) {
+            $key = $file->getRealPath() ?: $file->getPathname();
+
+            if (isset($seen[$key])) {
+                continue;
+            }
+
+            $seen[$key] = true;
+
+            yield $file;
+        }
     }
 
     /** Shared with {@see RouteMap}, which has to spell a closure's address identically. */
