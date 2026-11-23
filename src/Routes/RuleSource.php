@@ -81,6 +81,13 @@ class RuleSource
     public function quietly(callable $callback): mixed
     {
         set_error_handler(static function (int $severity, string $message, string $file, int $line): bool {
+            // A deprecation in somebody's vendor code says nothing about the
+            // rules being built, and one silenced with `@` was meant to be.
+            // Neither is a reason to give up on running `rules()`.
+            if (in_array($severity, [E_DEPRECATED, E_USER_DEPRECATED], true) || ! (error_reporting() & $severity)) {
+                return true;
+            }
+
             throw new ErrorException($message, 0, $severity, $file, $line);
         });
 
@@ -150,19 +157,7 @@ class RuleSource
         }
 
         if ($expr instanceof StaticCall && $expr->name instanceof Node\Identifier) {
-            $arguments = [];
-
-            foreach ($expr->args as $argument) {
-                $text = $argument instanceof Node\Arg ? $this->argumentText($argument->value) : null;
-
-                if ($text !== null && $text !== '') {
-                    $arguments[] = $text;
-                }
-            }
-
-            $name = $expr->name->toString();
-
-            return $arguments === [] ? $name : $name.':'.implode(',', $arguments);
+            return $this->staticRule($expr);
         }
 
         try {
@@ -174,10 +169,82 @@ class RuleSource
         }
     }
 
+    /**
+     * A rule built by a static call, in the form the same rule renders to when
+     * it is run, so both paths describe it alike.
+     *
+     * Only `Rule::…` maps onto a rule name: `Rule::exists('authors', 'id')`
+     * is `exists:authors,id`. Any other class's method is that class's own
+     * vocabulary — `Password::min(8)` is not the `min` rule, and `File::types`
+     * is not a rule called `types` — so it is named after its class, which is
+     * also how those objects render.
+     */
+    protected function staticRule(StaticCall $call): string
+    {
+        $class = $call->class instanceof Node\Name ? $call->class->getLast() : null;
+
+        if ($class !== null && $class !== 'Rule') {
+            return $class;
+        }
+
+        $name = $call->name instanceof Node\Identifier ? $call->name->toString() : '';
+
+        if ($name === 'enum' && ($cases = $this->enumCases($call)) !== null) {
+            return $cases;
+        }
+
+        $arguments = [];
+
+        foreach ($call->args as $argument) {
+            $text = $argument instanceof Node\Arg ? $this->argumentText($argument->value) : null;
+
+            if ($text !== null && $text !== '') {
+                $arguments[] = $text;
+            }
+        }
+
+        return $arguments === [] ? $name : $name.':'.implode(',', $arguments);
+    }
+
+    /**
+     * `Rule::enum(Status::class)` as the `in:"a","b"` it renders to when run.
+     *
+     * Loading an enum runs nothing of the application's: it has no
+     * constructor. A pure enum has no values to send, and one that cannot be
+     * found is left as written.
+     */
+    protected function enumCases(StaticCall $call): ?string
+    {
+        $argument = $call->args[0] ?? null;
+
+        if (! $argument instanceof Node\Arg || ! $argument->value instanceof ClassConstFetch || ! $argument->value->class instanceof Node\Name) {
+            return null;
+        }
+
+        $enum = $argument->value->class->toString();
+
+        try {
+            if (! enum_exists($enum) || ! is_subclass_of($enum, \BackedEnum::class)) {
+                return null;
+            }
+        } catch (Throwable) {
+            return null;
+        }
+
+        $values = array_map(fn (\BackedEnum $case) => '"'.$case->value.'"', $enum::cases());
+
+        return 'in:'.implode(',', $values);
+    }
+
     protected function argumentText(Expr $expr): ?string
     {
         if ($expr instanceof String_) {
             return $expr->value;
+        }
+
+        // `Rule::in([1, 2, 3])` and `Rule::between(1, 50)`.
+        if ($expr instanceof Node\Scalar\Int_ || $expr instanceof Node\Scalar\Float_) {
+            return (string) $expr->value;
         }
 
         // `PostVisibility::class`, already resolved to its full name by the

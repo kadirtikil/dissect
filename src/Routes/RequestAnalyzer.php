@@ -66,6 +66,11 @@ class RequestAnalyzer
     /**
      * A `validate()` call in the action's own body.
      *
+     * A call whose rules are not written out where it is made, such as
+     * `$request->validate($this->rules())`, still says the endpoint validates
+     * something. It is reported as that, unread, rather than falling through
+     * to "validates nothing", which would be the one answer known to be false.
+     *
      * @return array<string, mixed>|null
      */
     protected function fromInlineValidation(ReflectionFunctionAbstract $action): ?array
@@ -76,14 +81,18 @@ class RequestAnalyzer
             return null;
         }
 
-        $array = $this->validationArgument($node);
+        $found = $this->validationArgument($node);
 
-        if ($array === null) {
+        if ($found === false) {
             return null;
         }
 
+        if ($found === null) {
+            return $this->shape('inline-validate', null, 'unknown', []);
+        }
+
         // Always inferred: this was read off the page, never evaluated.
-        return $this->shape('inline-validate', null, 'inferred', $this->reader->literal($array));
+        return $this->shape('inline-validate', null, 'inferred', $this->reader->literal($found));
     }
 
     /**
@@ -188,27 +197,43 @@ class RequestAnalyzer
     }
 
     /**
-     * The rules array handed to whichever validation call the body makes.
+     * The rules array handed to whichever validation call the body makes:
+     * the array when it is written there, null when there is a call but its
+     * rules are built elsewhere, false when there is no call at all.
      *
-     * Three spellings, all common enough to be worth recognising:
-     * `$request->validate([…])`, `$this->validate($request, […])` and
-     * `Validator::make($request->all(), […])`.
+     * The spellings recognised, all common enough to be worth it:
+     * `$request->validate([…])`, `$request->validateWithBag('bag', […])`,
+     * the controller helper `$this->validate($request, […])`,
+     * `Validator::make($data, […])` and `validator($data, […])`.
      */
-    protected function validationArgument(Node $node): ?Array_
+    protected function validationArgument(Node $node): Array_|null|false
     {
+        $found = false;
+
         foreach ($this->source->find($node, MethodCall::class) as $call) {
             /** @var MethodCall $call */
-            if (! $call->name instanceof Node\Identifier || $call->name->toString() !== 'validate') {
+            $name = $call->name instanceof Node\Identifier ? $call->name->toString() : null;
+
+            // On a request the rules come first; the controller helper takes
+            // the request first, and a bag's name comes before its rules.
+            $position = match (true) {
+                $name === 'validateWithBag' => 1,
+                $name !== 'validate' => null,
+                $call->var instanceof Node\Expr\Variable && $call->var->name === 'this' => 1,
+                default => 0,
+            };
+
+            if ($position === null) {
                 continue;
             }
 
-            // $request->validate([…]) puts the rules first; the controller
-            // helper $this->validate($request, […]) puts the request there.
-            foreach (array_slice($call->args, 0, 2) as $argument) {
-                if ($argument instanceof Node\Arg && $argument->value instanceof Array_) {
-                    return $argument->value;
-                }
+            $array = $this->arrayAt($call->args, $position);
+
+            if ($array !== null) {
+                return $array;
             }
+
+            $found = null;
         }
 
         foreach ($this->source->find($node, StaticCall::class) as $call) {
@@ -217,11 +242,43 @@ class RequestAnalyzer
                 continue;
             }
 
-            if (($call->args[1] ?? null) instanceof Node\Arg && $call->args[1]->value instanceof Array_) {
-                return $call->args[1]->value;
+            // `PostResource::make($post)` is a make() too.
+            if (! $call->class instanceof Node\Name || $call->class->getLast() !== 'Validator') {
+                continue;
             }
+
+            $array = $this->arrayAt($call->args, 1);
+
+            if ($array !== null) {
+                return $array;
+            }
+
+            $found = null;
         }
 
-        return null;
+        foreach ($this->source->find($node, Node\Expr\FuncCall::class) as $call) {
+            /** @var Node\Expr\FuncCall $call */
+            if (! $call->name instanceof Node\Name || $call->name->toLowerString() !== 'validator' || $call->args === []) {
+                continue;
+            }
+
+            $array = $this->arrayAt($call->args, 1);
+
+            if ($array !== null) {
+                return $array;
+            }
+
+            $found = null;
+        }
+
+        return $found;
+    }
+
+    /** @param  array<int, Node\Arg|Node\VariadicPlaceholder>  $arguments */
+    protected function arrayAt(array $arguments, int $position): ?Array_
+    {
+        $argument = $arguments[$position] ?? null;
+
+        return $argument instanceof Node\Arg && $argument->value instanceof Array_ ? $argument->value : null;
     }
 }
