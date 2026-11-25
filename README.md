@@ -804,9 +804,28 @@ what was accepted:
 
 Taking a snapshot twice gives the same bytes, and a run that finds nothing new
 leaves the file alone. Nothing in it moves unless the code does: there's no
-timestamp, no absolute path, no line a closure happens to start on. Each
-column, field or setting is one line, so the file's diff is one line per
+timestamp, no absolute path, no line a closure or a dispatch happens to sit on.
+Each column, field or setting is one line, so the file's diff is one line per
 changed thing. `--output=` writes it somewhere else.
+
+A snapshot taken on your laptop is compared in CI, on another machine, so what
+the machine decides is kept out of the comparison:
+
+- **The database.** Each model records the driver its columns were read from.
+  On the same driver the native types are compared, so `int` to `bigint` shows.
+  Across two, only each column's kind is (string, integer, datetime, …), so
+  MySQL's `bigint unsigned` and SQLite's `integer` are the same column. A
+  model's `connection` is the one it names, not this machine's default.
+- **Columns that couldn't be read.** If a model's table isn't there or its
+  connection is down, its columns are left out and not compared, rather than
+  read as every column removed. `dissect:snapshot` names those models. Run
+  your migrations before taking a snapshot or diffing in CI.
+- **Local-only tools.** Telescope, Horizon, Pulse, Boost, Debugbar, Ignition
+  and Testbench's workbench register routes on a laptop that CI doesn't
+  have. `snapshot_ignore_routes` lists the patterns left out: each is matched
+  against a route's controller class, name and URI. Other package routes stay
+  in. An app's JSON:API routes run on the package's controller, and they're
+  its API.
 
 #### What changed since
 
@@ -954,7 +973,10 @@ Each call reads the app fresh through `dissect:export`, so an answer reflects
 the code as it is now, not as it was when the agent's session started. (A
 long-running PHP process can't forget a class it has already loaded, so asking
 in-process would keep serving a model's old relations after you edit it.) The
-exporters' caches keep that fast when nothing has changed.
+exporters' caches keep that fast when nothing has changed. `.env` is read fresh
+too: an edit to `DB_DATABASE` or a `DISSECT_` setting applies to the next call.
+Anything set in the server's real environment, such as `env` in `.mcp.json`,
+still wins over the file.
 
 Like the export command, the server is a local process and doesn't depend on
 `dissect.enabled` or the `viewDissect` gate. It's never served over HTTP.
@@ -1023,6 +1045,10 @@ The rest live in `config/dissect.php`:
 - **`layout_path`**: default `base_path('.dissect/layout.json')`.
 - **`views_path`**: default `base_path('.dissect/views.json')`.
 - **`snapshot_path`**: default `base_path('.dissect/snapshot.json')`, where `dissect:snapshot` writes.
+- **`snapshot_ignore_routes`**: routes a snapshot leaves out, as patterns
+  matched against the controller class, name and URI (`*` for anything). It
+  defaults to the tools a laptop runs and CI doesn't, such as
+  `Laravel\Telescope\*` and `Barryvdh\Debugbar\*`.
 - **`watch_path`**: default `storage_path('dissect/watch.json')`, where watching keeps its snapshot.
 - **`openapi`**: what `--format=openapi` puts around the operations. `title`
   (default: the app's name), `version` (default `1.0.0`), `description`,

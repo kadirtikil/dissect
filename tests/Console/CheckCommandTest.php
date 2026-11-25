@@ -333,4 +333,17 @@ class CheckCommandTest extends TestCase
         $this->assertSame(2, $code);
         $this->assertStringContainsString("domains.json has a problem, so its boundary rules are not all checked:\n- rules.Sales: unknown key \"may_uses\"", $stderr);
     }
+
+    #[Test]
+    public function a_hook_that_cannot_check_says_why_on_stderr(): void
+    {
+        $this->app->bind(\KdrDev\Dissect\Architecture\Boundaries::class, fn () => throw new \RuntimeException('the database is down'));
+
+        [$code, $stdout, $stderr] = $this->hook($this->edit($this->domainFixture().'/app/Domain/Sales/Models/Quote.php'));
+
+        // 1 shows the user what went wrong and leaves the edit alone.
+        $this->assertSame(1, $code);
+        $this->assertSame('', $stdout);
+        $this->assertSame("Could not check the boundaries: the database is down\n", $stderr);
+    }
 }

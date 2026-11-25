@@ -56,4 +56,10 @@ class ColumnNormalizer
 
         return $columns;
     }
+
+    /** The driver the columns of a connection are read with. */
+    public function driver(?string $connection): string
+    {
+        return $this->types->driver($connection);
+    }
 }

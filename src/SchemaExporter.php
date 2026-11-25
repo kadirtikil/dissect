@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Str;
 use KdrDev\Dissect\Architecture\ContextResolver;
 use KdrDev\Dissect\Support\ClassFile;
+use KdrDev\Dissect\Support\Path;
 use ReflectionClass;
 use SplFileInfo;
 use Symfony\Component\Finder\Finder;
@@ -66,33 +67,51 @@ class SchemaExporter
                 // would fall into the catch below and render columnless.
                 $inspected = $this->inspector->inspect($class);
                 $info = is_array($inspected) ? $inspected : $inspected->toArray();
-            } catch (Throwable) {
+            } catch (Throwable $e) {
                 // A model whose table is missing, or whose connection is down,
-                // must not take down the whole page — show it without columns.
+                // must not take down the whole page — show it without columns,
+                // and say so: no columns read is not the same as no columns.
                 $nodes[] = [
                     'id' => $id,
                     'class' => $class,
                     'table' => $this->tableFor($class),
+                    'connection' => $this->connectionFor($class),
                     'columns' => [],
+                    'unreadable' => $e->getMessage(),
                     'context' => $this->contexts?->forClass($class),
                 ];
 
                 continue;
             }
 
+            $columns = $this->columns->normalize($info['attributes'], $info['database']);
+
             $nodes[] = [
                 'id' => $id,
                 'class' => $class,
                 'table' => $info['table'],
-                'connection' => $info['database'],
+                // The connection the model names, or null for the default:
+                // what the code says, not which database this machine has.
+                'connection' => $this->connectionFor($class),
+                // What the columns' native types are written in, so the same
+                // model read on MySQL here and on SQLite in CI is known to be
+                // the same model read twice, not one whose every type moved.
+                'driver' => $this->columns->driver($info['database']),
                 // The connection is passed through so columns are read with the
                 // normalizer for that model's driver, not the default one.
-                'columns' => $this->columns->normalize($info['attributes'], $info['database']),
+                'columns' => $columns,
                 // The domain the model belongs to, or null. Named `context`
                 // on every payload because routes already use `domain` for
                 // the host.
                 'context' => $this->contexts?->forClass($class),
             ];
+
+            // A table that exists has a column. None read means it is not
+            // there, on this database at least: not migrated yet, or a CI
+            // run that never migrates.
+            if (array_filter($columns, fn (array $column) => ! $column['virtual']) === []) {
+                $nodes[array_key_last($nodes)]['unreadable'] = "The table {$info['table']} is not in the database.";
+            }
 
             foreach ($this->normaliseRelations($class, $info['relations']) as $relation) {
                 $edges[] = $relation + ['source' => $id];
@@ -240,7 +259,7 @@ class SchemaExporter
             // Absolute paths are used as-is; anything else is relative to the
             // app root, so models can live anywhere — a Domain folder, a
             // package, or the workbench app used to develop this package.
-            $path = str_starts_with($path, DIRECTORY_SEPARATOR)
+            $path = Path::isAbsolute($path)
                 ? rtrim($path, DIRECTORY_SEPARATOR)
                 : rtrim(base_path($path), DIRECTORY_SEPARATOR);
 
@@ -254,6 +273,16 @@ class SchemaExporter
         }
 
         return array_keys($directories);
+    }
+
+    /** The connection a model names, or null when it uses the default. */
+    protected function connectionFor(string $class): ?string
+    {
+        try {
+            return (new $class)->getConnectionName();
+        } catch (Throwable) {
+            return null;
+        }
     }
 
     protected function tableFor(string $class): string

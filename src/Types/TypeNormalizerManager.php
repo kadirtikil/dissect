@@ -41,7 +41,7 @@ class TypeNormalizerManager
 
     public function for(?string $connection = null): TypeNormalizer
     {
-        $driver = $this->driverFor($connection);
+        $driver = $this->driver($connection);
 
         return $this->resolved[$driver] ??= $this->make($driver);
     }
@@ -62,7 +62,8 @@ class TypeNormalizerManager
         };
     }
 
-    protected function driverFor(?string $connection): string
+    /** The driver behind a connection, lowercased, or `unknown` when it cannot be reached. */
+    public function driver(?string $connection = null): string
     {
         try {
             return strtolower($this->db->connection($connection)->getDriverName());

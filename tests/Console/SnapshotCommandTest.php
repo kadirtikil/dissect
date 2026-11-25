@@ -137,4 +137,14 @@ class SnapshotCommandTest extends TestCase
             chmod($this->directory.'/.dissect', 0777);
         }
     }
+
+    #[Test]
+    public function it_says_when_models_columns_could_not_be_read(): void
+    {
+        // Nothing is migrated here, so no workbench table is there.
+        [$code, $out] = $this->snapshot();
+
+        $this->assertSame(0, $code);
+        $this->assertMatchesRegularExpression("/\\d+ models' columns could not be read: .*Post.*Is the database there and migrated\\?/s", $out);
+    }
 }

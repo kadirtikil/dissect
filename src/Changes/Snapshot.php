@@ -2,6 +2,7 @@
 
 namespace KdrDev\Dissect\Changes;
 
+use Illuminate\Support\Str;
 use KdrDev\Dissect\Support\Surfaces;
 
 /**
@@ -23,7 +24,7 @@ use KdrDev\Dissect\Support\Surfaces;
 final class Snapshot
 {
     /** Bumped whenever a fact is added, removed or reshaped. */
-    public const VERSION = 1;
+    public const VERSION = 2;
 
     /** Each part of a snapshot, and the surface it is read from. */
     public const PARTS = ['models' => 'schema', 'routes' => 'routes', 'jobs' => 'jobs', 'providers' => 'providers'];
@@ -39,19 +40,20 @@ final class Snapshot
             $payloads[$surface] = $this->surfaces->export($surface);
         }
 
-        return self::of($payloads);
+        return self::of($payloads, (array) config('dissect.snapshot_ignore_routes', []));
     }
 
     /**
      * @param  array<string, array<string, mixed>>  $payloads  Keyed by surface name.
+     * @param  array<int, string>  $ignoreRoutes  Patterns for routes to leave out. See leftOut().
      * @return array<string, mixed>
      */
-    public static function of(array $payloads): array
+    public static function of(array $payloads, array $ignoreRoutes = []): array
     {
         return [
             'version' => self::VERSION,
             'models' => self::models($payloads['schema'] ?? []),
-            'routes' => self::keyed(array_filter($payloads['routes']['routes'] ?? [], fn (array $route) => ! self::ours($route)), self::route(...)),
+            'routes' => self::keyed(array_filter($payloads['routes']['routes'] ?? [], fn (array $route) => ! self::leftOut($route, $ignoreRoutes)), self::route(...)),
             'jobs' => self::keyed($payloads['jobs']['jobs'] ?? [], self::job(...)),
             'providers' => self::keyed($payloads['providers']['providers'] ?? [], self::provider(...)),
         ];
@@ -169,12 +171,20 @@ final class Snapshot
 
         return self::keyed($schema['nodes'] ?? [], fn (array $node) => self::compact([
             'table' => $node['table'] ?? null,
+            // Only the connection the model names: which one is the default
+            // is the machine's business, and differs between a laptop and CI.
             'connection' => $node['connection'] ?? null,
+            // Not compared itself. It says which database the native column
+            // types below were read from, so the diff knows whether they can
+            // be compared at all. See Diff::comparable().
+            'driver' => $node['driver'] ?? null,
             'context' => $node['context'] ?? null,
             'columns' => self::sorted(array_column(array_map(fn (array $column) => [
                 'name' => $column['name'],
                 'facts' => [
                     'type' => $column['type'] ?? null,
+                    // The same type said the same way on every database.
+                    'kind' => $column['kind'] ?? null,
                     'nullable' => $column['nullable'] ?? null,
                     'unique' => $column['unique'] ?? null,
                     'increments' => $column['increments'] ?? null,
@@ -185,17 +195,46 @@ final class Snapshot
                 ],
             ], $node['columns'] ?? []), 'facts', 'name')),
             'relations' => self::sorted($relations[$node['id']] ?? []),
-        ]));
+        ]) + (isset($node['unreadable']) ? [
+            // Its columns could not be read, so it has none here: the diff
+            // leaves its columns alone rather than calling every one removed.
+            'unreadable' => true,
+        ] : []));
     }
 
     /**
-     * dissect's own page and endpoints. They are registered only where the
-     * page is switched on, so a snapshot taken locally would have them and
-     * CI's would not, and every one would read as a route removed.
+     * Routes registered on some machines and not others: a snapshot taken
+     * locally would have them and CI's would not, and every one would read
+     * as a route removed.
+     *
+     * dissect's own page and endpoints, which are there only where the page
+     * is switched on, and whatever `dissect.snapshot_ignore_routes` names:
+     * by default the tools a laptop runs and CI does not, such as Telescope
+     * and Debugbar. A pattern is matched against the route's controller
+     * class, its name and its URI, with `*` for anything.
+     *
+     * Not every route a package registers. The app's own JSON:API routes run
+     * on the package's controller, and they are as much its API as any.
+     *
+     * @param  array<int, string>  $ignore
      */
-    protected static function ours(array $route): bool
+    protected static function leftOut(array $route, array $ignore): bool
     {
-        return str_starts_with(ltrim((string) ($route['action']['class'] ?? ''), '\\'), 'KdrDev\\Dissect\\');
+        $class = ltrim((string) ($route['action']['class'] ?? ''), '\\');
+
+        if (str_starts_with($class, 'KdrDev\\Dissect\\')) {
+            return true;
+        }
+
+        $names = array_filter([$class, $route['name'] ?? null, $route['uri'] ?? null], fn (mixed $name) => is_string($name) && $name !== '');
+
+        foreach ($ignore as $pattern) {
+            if (is_string($pattern) && $pattern !== '' && array_filter($names, fn (string $name) => Str::is($pattern, $name)) !== []) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /** @return array<string, mixed> */
@@ -252,9 +291,14 @@ final class Snapshot
     /** @return array<string, mixed> */
     protected static function job(array $job): array
     {
-        // Where it is dispatched from, by name: the file a dispatch sits in
-        // is an absolute path, and its line moves with every edit above it.
-        $dispatchedBy = array_values(array_unique(array_map(fn (array $site) => (string) ($site['label'] ?? '?'), $job['dispatched_by'] ?? [])));
+        // Where it is dispatched from, by name, never by line: a line moves
+        // with every edit above it. A controller site is its action. One in
+        // route-file code is labelled `api.php:25`, and is kept as the file
+        // alone: its path can be absolute, and so differ between machines.
+        $dispatchedBy = array_values(array_unique(array_map(
+            fn (array $site) => (string) preg_replace('/\.php:\d+$/', '.php', (string) ($site['label'] ?? '?')),
+            $job['dispatched_by'] ?? [],
+        )));
         sort($dispatchedBy);
 
         return self::compact([
@@ -283,12 +327,28 @@ final class Snapshot
     protected static function provider(array $provider): array
     {
         // What it binds, as "abstract -> concrete": the tree's own edges,
-        // without the node details (a node's file is an absolute path).
-        $edges = [];
+        // without the node details (a node's file is an absolute path). A
+        // contextual binding adds who it is for, so `when(ReportMailer)` and
+        // a plain bind of the same pair are two bindings, and moving the
+        // first to InvoiceMailer is a change.
+        $names = self::unresolvedNames($provider['nodes'] ?? []);
+        $name = fn (string $id) => $names[$id] ?? $id;
+        $kinds = [];
 
         foreach ($provider['edges'] ?? [] as $edge) {
-            $edges[$edge['source'].' -> '.$edge['target']] = ['kind' => $edge['kind']];
+            $key = $name((string) $edge['source']).' -> '.$name((string) $edge['target'])
+                .(isset($edge['consumer']) ? ' when '.$edge['consumer'] : '');
+            $kinds[$key][] = (string) $edge['kind'];
         }
+
+        // Two kinds of binding between one pair, for one consumer, stay
+        // one entry that says both.
+        $edges = array_map(function (array $kinds) {
+            $kinds = array_values(array_unique($kinds));
+            sort($kinds);
+
+            return ['kind' => implode(', ', $kinds)];
+        }, $kinds);
 
         return self::compact([
             'context' => $provider['context'] ?? null,
@@ -297,6 +357,33 @@ final class Snapshot
             'side_effects' => self::sorted($provider['side_effects'] ?? []),
             'edges' => self::sorted($edges),
         ]);
+    }
+
+    /**
+     * Something a provider binds that could not be named is `unresolved:0`,
+     * `unresolved:1`, … in the order it was met, so removing the first would
+     * read as the second changing. It is named by what it says instead, and
+     * counted only among those that say the same.
+     *
+     * @param  array<int, array<string, mixed>>  $nodes
+     * @return array<string, string>
+     */
+    protected static function unresolvedNames(array $nodes): array
+    {
+        $names = [];
+        $seen = [];
+
+        foreach ($nodes as $node) {
+            $id = (string) ($node['id'] ?? '');
+
+            if (str_starts_with($id, 'unresolved:')) {
+                $label = '? '.($node['label'] ?? '');
+                $seen[$label] = ($seen[$label] ?? 0) + 1;
+                $names[$id] = $seen[$label] === 1 ? $label : $label.' #'.$seen[$label];
+            }
+        }
+
+        return $names;
     }
 
     /**

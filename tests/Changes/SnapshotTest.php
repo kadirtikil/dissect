@@ -2,6 +2,7 @@
 
 namespace KdrDev\Dissect\Tests\Changes;
 
+use KdrDev\Dissect\Changes\Report;
 use KdrDev\Dissect\Changes\Snapshot;
 use KdrDev\Dissect\Tests\TestCase;
 use PHPUnit\Framework\Attributes\Test;
@@ -72,6 +73,8 @@ class SnapshotTest extends TestCase
                     'dispatched_by' => [
                         ['file' => '/home/someone/app/Http/Controllers/InvoiceController.php', 'line' => 30, 'label' => 'InvoiceController@send'],
                         ['file' => '/home/someone/app/Http/Controllers/InvoiceController.php', 'line' => 41, 'label' => 'InvoiceController@send'],
+                        // In a route-file closure, named by where it sits.
+                        ['file' => 'routes/api.php', 'line' => 25, 'label' => 'api.php:25'],
                     ],
                 ]],
             ],
@@ -110,7 +113,7 @@ class SnapshotTest extends TestCase
 
         $this->assertSame(['id', 'total'], array_keys($model['columns']));
         $this->assertSame(
-            ['type' => 'integer', 'nullable' => false, 'unique' => false, 'increments' => false, 'fillable' => true, 'hidden' => false, 'cast' => null, 'virtual' => false],
+            ['type' => 'integer', 'kind' => 'integer', 'nullable' => false, 'unique' => false, 'increments' => false, 'fillable' => true, 'hidden' => false, 'cast' => null, 'virtual' => false],
             $model['columns']['total'],
         );
         $this->assertSame(['type' => 'BelongsTo', 'target' => 'App\\Models\\Customer', 'keys' => ['source' => 'customer_id', 'target' => 'id', 'via' => null]], $model['relations']['customer']);
@@ -141,11 +144,12 @@ class SnapshotTest extends TestCase
         $this->assertStringNotContainsString('/home/someone', $json);
         $this->assertStringNotContainsString('confidence', $json);
         $this->assertSame('closure', $snapshot['routes']['GET:up']['action']);
-        $this->assertSame(['InvoiceController@send'], $snapshot['jobs']['App\\Jobs\\SendInvoice']['dispatched_by']);
+        $this->assertSame(['InvoiceController@send', 'api.php'], $snapshot['jobs']['App\\Jobs\\SendInvoice']['dispatched_by']);
 
         $payloads['schema']['generated_at'] = '2027-01-01T00:00:00+00:00';
         $payloads['routes']['routes'][1]['action']['label'] = 'web.php:40';
         $payloads['jobs']['jobs'][0]['dispatched_by'][0]['line'] = 99;
+        $payloads['jobs']['jobs'][0]['dispatched_by'][2] = ['file' => 'routes/api.php', 'line' => 31, 'label' => 'api.php:31'];
 
         $this->assertSame($json, Snapshot::encode(Snapshot::of($payloads)));
     }
@@ -182,7 +186,7 @@ class SnapshotTest extends TestCase
         $json = Snapshot::encode(Snapshot::of($this->payloads()));
 
         $this->assertStringContainsString(
-            "\n                \"total\": {\"type\": \"integer\", \"nullable\": false, \"unique\": false, \"increments\": false, \"fillable\": true, \"hidden\": false, \"cast\": null, \"virtual\": false}\n",
+            "\n                \"total\": {\"type\": \"integer\", \"kind\": \"integer\", \"nullable\": false, \"unique\": false, \"increments\": false, \"fillable\": true, \"hidden\": false, \"cast\": null, \"virtual\": false}\n",
             $json,
         );
         $this->assertStringContainsString("\n            \"middleware\": [\"api\", \"auth:sanctum\"],\n", $json);
@@ -231,5 +235,84 @@ class SnapshotTest extends TestCase
         $this->assertStringContainsString('"Workbench\\\\App\\\\Models\\\\Post": {', $first);
         $this->assertStringNotContainsString(base_path(), $first);
         $this->assertStringNotContainsString(dirname(__DIR__, 2), $first);
+    }
+
+    /** @param  array<int, string>  $unread  What each binding that could not be named says. */
+    protected function mailProvider(string $consumer, array $unread = []): array
+    {
+        $provider = 'App\\Providers\\MailServiceProvider';
+
+        return Snapshot::of(['providers' => ['providers' => [[
+            'id' => $provider,
+            'nodes' => array_map(fn (string $label, int $i) => ['id' => 'unresolved:'.$i, 'label' => $label], $unread, array_keys($unread)),
+            'edges' => [
+                ['source' => 'App\\Contracts\\Mailer', 'target' => 'App\\Mail\\SmtpMailer', 'kind' => 'bind', 'consumer' => null],
+                ['source' => 'App\\Contracts\\Mailer', 'target' => 'App\\Mail\\SmtpMailer', 'kind' => 'contextual', 'consumer' => $consumer],
+                ...array_map(fn (int $i) => ['source' => $provider, 'target' => 'unresolved:'.$i, 'kind' => 'bind', 'consumer' => null], array_keys($unread)),
+            ],
+        ]]]]);
+    }
+
+    #[Test]
+    public function a_binding_for_one_consumer_is_its_own_entry(): void
+    {
+        $edges = $this->mailProvider('App\\Mail\\ReportMailer')['providers']['App\\Providers\\MailServiceProvider']['edges'];
+
+        $this->assertSame([
+            'App\\Contracts\\Mailer -> App\\Mail\\SmtpMailer' => ['kind' => 'bind'],
+            'App\\Contracts\\Mailer -> App\\Mail\\SmtpMailer when App\\Mail\\ReportMailer' => ['kind' => 'contextual'],
+        ], $edges);
+
+        // Given to another consumer: one binding gone, one new.
+        $changes = Report::between($this->mailProvider('App\\Mail\\ReportMailer'), $this->mailProvider('App\\Mail\\InvoiceMailer'))['changes'];
+
+        $this->assertSame([
+            [['edges', 'App\\Contracts\\Mailer -> App\\Mail\\SmtpMailer when App\\Mail\\InvoiceMailer'], 'added'],
+            [['edges', 'App\\Contracts\\Mailer -> App\\Mail\\SmtpMailer when App\\Mail\\ReportMailer'], 'removed'],
+        ], array_map(fn (array $fact) => [$fact['path'], $fact['change']], $changes[0]['facts']));
+    }
+
+    #[Test]
+    public function a_binding_that_could_not_be_named_is_named_by_what_it_says(): void
+    {
+        $both = $this->mailProvider('App\\Mail\\ReportMailer', ['$this->app->make($a)', '$this->app->make($b)', '$this->app->make($b)']);
+        $edges = array_keys($both['providers']['App\\Providers\\MailServiceProvider']['edges']);
+
+        $this->assertContains('App\\Providers\\MailServiceProvider -> ? $this->app->make($a)', $edges);
+        $this->assertContains('App\\Providers\\MailServiceProvider -> ? $this->app->make($b) #2', $edges);
+
+        // Taking the first one out is that one gone, not the others renamed.
+        $later = $this->mailProvider('App\\Mail\\ReportMailer', ['$this->app->make($b)', '$this->app->make($b)']);
+        $facts = Report::between($both, $later)['changes'][0]['facts'];
+
+        $this->assertCount(1, $facts);
+        $this->assertSame(['edges', 'App\\Providers\\MailServiceProvider -> ? $this->app->make($a)'], $facts[0]['path']);
+        $this->assertSame('removed', $facts[0]['change']);
+    }
+
+    #[Test]
+    public function routes_only_some_machines_register_are_left_out(): void
+    {
+        $route = fn (string $id, ?string $class, ?string $name = null) => [
+            'id' => $id, 'uri' => substr($id, strpos($id, ':') + 1), 'name' => $name,
+            'action' => ['type' => $class === null ? 'closure' : 'controller', 'class' => $class, 'method' => 'index', 'label' => 'x'],
+        ];
+
+        $routes = Snapshot::of(['routes' => ['routes' => [
+            $route('GET:telescope/{view?}', 'Laravel\\Telescope\\Http\\Controllers\\HomeController', 'telescope'),
+            $route('GET:_debugbar/open', 'Barryvdh\\Debugbar\\Controllers\\OpenHandlerController', 'debugbar.openhandler'),
+            $route('GET:admin/tools/phpinfo', null),
+            $route('GET:tools.cache', null, 'tools.cache'),
+            $route('GET:v1/posts', 'LaravelJsonApi\\Laravel\\Http\\Controllers\\JsonApiController'),
+        ]]], [...config('dissect.snapshot_ignore_routes'), 'admin/tools/*', 'tools.*'])['routes'];
+
+        // A package's controller alone is no reason: these are the app's API.
+        $this->assertSame(['GET:v1/posts'], array_keys($routes));
+    }
+
+    #[Test]
+    public function the_workbench_snapshot_keeps_its_json_api_routes(): void
+    {
+        $this->assertContains('GET:v1/posts', array_keys($this->app->make(Snapshot::class)->take()['routes']));
     }
 }

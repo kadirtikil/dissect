@@ -3,6 +3,7 @@
 namespace KdrDev\Dissect\Architecture;
 
 use KdrDev\Dissect\Routes\RouteFingerprint;
+use KdrDev\Dissect\Support\Path;
 use Symfony\Component\Finder\Finder;
 use Symfony\Component\Finder\SplFileInfo;
 
@@ -83,7 +84,7 @@ final class SourceFiles
         $directories = [];
 
         foreach ($this->paths as $path) {
-            $directories[] = str_starts_with($path, DIRECTORY_SEPARATOR)
+            $directories[] = Path::isAbsolute($path)
                 ? $path
                 : rtrim($this->resolver->root(), DIRECTORY_SEPARATOR).DIRECTORY_SEPARATOR.$path;
         }

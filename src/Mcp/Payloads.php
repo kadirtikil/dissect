@@ -29,17 +29,27 @@ final class Payloads
         protected ?Surfaces $surfaces,
         protected string $cwd,
         protected float $timeout,
+        protected array $env = [],
     ) {}
 
-    /** @param  array<int, string>  $artisan */
-    public static function fresh(array $artisan, string $cwd, float $timeout = 120): self
+    /**
+     * @param  array<int, string>  $artisan
+     * @param  array<string, string|false>  $env  Over the inherited environment; false leaves one out. See LoadedEnvironment.
+     */
+    public static function fresh(array $artisan, string $cwd, float $timeout = 120, array $env = []): self
     {
-        return new self($artisan, null, $cwd, $timeout);
+        return new self($artisan, null, $cwd, $timeout, $env);
     }
 
     public static function inProcess(Surfaces $surfaces): self
     {
         return new self(null, $surfaces, '', 0);
+    }
+
+    /** @param  array<int, string>  $arguments */
+    protected function process(array $arguments): Process
+    {
+        return new Process([...(array) $this->artisan, ...$arguments, '--no-ansi', '--no-interaction'], $this->cwd, $this->env, timeout: $this->timeout);
     }
 
     /** @return array<string, mixed> */
@@ -80,27 +90,30 @@ final class Payloads
         $options = array_map(fn (string $file) => '--files='.$file, $files);
 
         if ($this->surfaces !== null) {
-            Artisan::call('dissect:check', ['--format' => 'json', '--files' => $files]);
-
-            return $this->decode(Artisan::output(), 'dissect:check');
+            $code = Artisan::call('dissect:check', ['--format' => 'json', '--files' => $files]);
+            $output = Artisan::output();
+            $errors = '';
+        } else {
+            $process = $this->process(['dissect:check', '--format=json', ...$options]);
+            $process->run();
+            $code = (int) $process->getExitCode();
+            $output = $process->getOutput();
+            $errors = $process->getErrorOutput();
         }
 
-        $process = new Process(
-            [...(array) $this->artisan, 'dissect:check', '--format=json', ...$options, '--no-ansi', '--no-interaction'],
-            $this->cwd,
-            timeout: $this->timeout,
-        );
+        // 1 is a verdict when it comes with one: something broke a rule. It
+        // is also what the command exits with when it could not check at
+        // all, and then what it said is the answer, not a guess at why there
+        // is no JSON.
+        $verdict = $code === 1 ? json_decode($output, true) : null;
 
-        $process->run();
-
-        // 1 is a verdict, not a failure: something broke a rule.
-        if (! in_array($process->getExitCode(), [0, 1], true)) {
-            $said = trim($process->getOutput()."\n".$process->getErrorOutput());
+        if ($code !== 0 && ! is_array($verdict)) {
+            $said = trim(preg_replace('/^\s*ERROR\s+/m', '', $output."\n".$errors) ?? '');
 
             throw new RuntimeException('dissect:check failed'.($said === '' ? '.' : ': '.$said));
         }
 
-        return $this->decode($process->getOutput(), 'dissect:check');
+        return $this->decode($output, 'dissect:check');
     }
 
     /**
@@ -115,11 +128,7 @@ final class Payloads
             $code = Artisan::call('dissect:diff', ['--format' => 'json', '--against' => $against]);
             $output = Artisan::output();
         } else {
-            $process = new Process(
-                [...(array) $this->artisan, 'dissect:diff', '--format=json', '--against='.$against, '--no-ansi', '--no-interaction'],
-                $this->cwd,
-                timeout: $this->timeout,
-            );
+            $process = $this->process(['dissect:diff', '--format=json', '--against='.$against]);
 
             $process->run();
             $code = $process->getExitCode();
@@ -148,11 +157,7 @@ final class Payloads
 
     protected function run(string $surface): array
     {
-        $process = new Process(
-            [...(array) $this->artisan, 'dissect:export', $surface, '--no-ansi', '--no-interaction'],
-            $this->cwd,
-            timeout: $this->timeout,
-        );
+        $process = $this->process(['dissect:export', $surface]);
 
         $process->run();
 

@@ -103,4 +103,14 @@ class DomainToolsTest extends TestCase
             ->assertSee('dissect: no boundary rule is broken.')
             ->assertDontSee('Customer.php');
     }
+
+    #[Test]
+    public function a_check_that_could_not_run_says_why(): void
+    {
+        $this->app->bind(\KdrDev\Dissect\Architecture\Boundaries::class, fn () => throw new \RuntimeException('the database is down'));
+
+        DissectServer::tool(Check::class)
+            ->assertHasErrors(['dissect:check failed: Could not check the boundaries: the database is down'])
+            ->assertDontSee('writing to the console');
+    }
 }
