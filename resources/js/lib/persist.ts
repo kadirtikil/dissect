@@ -31,6 +31,15 @@ export function revisionOf(payload: unknown): Revision {
  * message is what gets thrown: "409 Conflict" would leave somebody guessing.
  */
 export async function persist(url: string, payload: object, revision: Revision): Promise<Revision> {
+  return (await persistAnswering(url, payload, revision)).revision
+}
+
+/** As persist(), with the rest of what the host answered. */
+export async function persistAnswering(
+  url: string,
+  payload: object,
+  revision: Revision,
+): Promise<{ revision: Revision; answer: unknown }> {
   const { csrfToken } = bootstrap()
 
   const res = await fetch(url, {
@@ -50,5 +59,5 @@ export async function persist(url: string, payload: object, revision: Revision):
     throw new Error(typeof message === 'string' ? message : `${res.status} ${res.statusText}`)
   }
 
-  return revisionOf(answer)
+  return { revision: revisionOf(answer), answer }
 }

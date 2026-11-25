@@ -286,6 +286,9 @@ function onNodeDragStop(event: NodeDragEvent) {
 
     <GraphLegend v-if="status === 'ready'" />
 
+    <!-- nodes-focusable off: each card is its own button, and the wrapper
+         Vue Flow puts around it would be a second tab stop per model. Arrow
+         keys still move a selected card, from the card. -->
     <VueFlow
       :nodes="visibleNodes"
       :edges="visibleEdges"
@@ -294,6 +297,7 @@ function onNodeDragStop(event: NodeDragEvent) {
       :default-edge-options="{ type: 'default' }"
       elevate-edges-on-select
       fit-view-on-init
+      :nodes-focusable="false"
       @node-drag-start="onNodeDragStart"
       @node-drag-stop="onNodeDragStop"
     >

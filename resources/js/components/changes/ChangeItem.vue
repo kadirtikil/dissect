@@ -2,7 +2,7 @@
 import { computed } from 'vue'
 import { ArrowUpRight } from '@lucide/vue'
 import type { Change } from '@/types/changes'
-import { canOpen, severityColor, splitMark } from '@/lib/changes'
+import { canOpen, factKey, severityColor, splitMark } from '@/lib/changes'
 
 const props = defineProps<{ change: Change }>()
 
@@ -47,7 +47,7 @@ const facts = computed(() =>
     <ul v-if="facts.length" class="mt-1 space-y-0.5 pl-18">
       <li
         v-for="fact in facts"
-        :key="fact.path.join('.')"
+        :key="factKey(fact)"
         class="flex items-baseline gap-2 font-mono text-[11px]"
       >
         <span

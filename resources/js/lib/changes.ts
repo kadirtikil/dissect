@@ -1,5 +1,12 @@
 import type { PageId } from '@/pages/registry'
-import type { BaselineName, Change, ChangesFile, Part, Severity } from '@/types/changes'
+import type {
+  BaselineName,
+  Change,
+  ChangedFact,
+  ChangesFile,
+  Part,
+  Severity,
+} from '@/types/changes'
 
 /**
  * How the Changes page groups, colours and words a report.
@@ -77,6 +84,13 @@ export function since(name: BaselineName | null): string {
  * anybody needs to look.
  */
 export function headline(file: ChangesFile): string {
+  // No changes here means nothing was compared, not that nothing changed.
+  if (file.problem) {
+    return file.against === 'watch'
+      ? 'Could not read where watching started'
+      : 'Could not read the snapshot'
+  }
+
   if (!file.against) return 'What changed'
 
   const count = file.changes.length
@@ -86,6 +100,16 @@ export function headline(file: ChangesFile): string {
   const line = `${count} ${count === 1 ? 'change' : 'changes'} ${since(file.against)}`
 
   return worst ? `${line} · ${file.summary[worst]} ${worst}` : line
+}
+
+/**
+ * A key for one fact of an item. The path alone is not one: two values
+ * added to one list (`middleware`, + `auth`, + `throttle`) share it. With
+ * what changed and the values, it is, since a diff never says the same thing
+ * twice.
+ */
+export function factKey(fact: ChangedFact): string {
+  return JSON.stringify([fact.path, fact.change, fact.before, fact.after])
 }
 
 /**

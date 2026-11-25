@@ -75,35 +75,52 @@ export const useChangesStore = defineStore('changes', () => {
     }
   }
 
+  /**
+   * Which request may write its answer: the last one started. A poll that
+   * set out before somebody started watching can answer after the request
+   * that followed it, and would put back the comparison from before, with
+   * nothing to correct it until the next change.
+   */
+  let latest = 0
+
   /** Fetches once; later calls are a no-op. */
   async function load(): Promise<void> {
     if (status.value === 'loading' || status.value === 'ready') return
 
     status.value = 'loading'
     error.value = null
+    const ticket = ++latest
 
     try {
       const next = await fetchFile()
+      if (ticket !== latest) return
       file.value = next.file
       fingerprint.value = next.fingerprint
       status.value = 'ready'
     } catch (e) {
+      if (ticket !== latest) return
       error.value = e instanceof Error ? e.message : String(e)
       status.value = 'error'
     }
   }
 
-  /** Pulls a fresh answer, keeping the current one if it cannot. */
+  /**
+   * Pulls a fresh answer, keeping the current one if it cannot. One overtaken
+   * by a later request is dropped, and counts as done: the later one answers.
+   */
   async function refresh(): Promise<boolean> {
+    const ticket = ++latest
+
     try {
       const next = await fetchFile()
+      if (ticket !== latest) return true
       file.value = next.file
       fingerprint.value = next.fingerprint ?? fingerprint.value
       status.value = 'ready'
 
       return true
     } catch {
-      return false
+      return ticket !== latest
     }
   }
 

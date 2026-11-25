@@ -75,6 +75,31 @@ test('expands a card to its full attribute list, and collapses again', async ({ 
   await expect(card).toHaveAttribute('aria-expanded', 'false')
 })
 
+test('a card works from the keyboard', async ({ page }) => {
+  await openGraph(page)
+  await expect(page.locator('.vue-flow__node')).toHaveCount(22)
+
+  const card = page.locator('.model-node', { hasText: 'documents' }).first()
+  const wrapper = page.locator('.vue-flow__node', { has: card })
+
+  // One tab stop per model: the card, not Vue Flow's wrapper around it too.
+  await expect(wrapper).not.toHaveAttribute('tabindex')
+
+  await card.focus()
+  await page.keyboard.press('Enter')
+  await expect(card).toHaveAttribute('aria-expanded', 'true')
+  // Opening it is not selecting it.
+  await expect(wrapper).not.toHaveClass(/selected/)
+
+  // Enter on the link inside follows the link, and leaves the card open.
+  await card.getByRole('button', { name: /Show jobs carrying Document/ }).focus()
+  await page.keyboard.press('Enter')
+  await expect(page.getByRole('button', { name: 'Jobs', exact: true })).toHaveAttribute(
+    'aria-current',
+    'page',
+  )
+})
+
 test('saves a selection as a view, switches to it and deletes it', async ({ page }) => {
   await page.setViewportSize({ width: 1400, height: 900 })
   await openGraph(page)

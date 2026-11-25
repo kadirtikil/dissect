@@ -16,7 +16,7 @@ const routes = useRoutesStore()
 const jobs = useJobsStore()
 const nav = useNavigationStore()
 
-const { status, stats, generatedAt } = storeToRefs(schema)
+const { status, error, stats, generatedAt } = storeToRefs(schema)
 const { positions } = storeToRefs(layout)
 const { views: savedViews } = storeToRefs(views)
 // Only ever read, never awaited: see the cards below.
@@ -66,8 +66,19 @@ const generated = computed(() => {
       </p>
 
       <!-- The graph loads on its own schedule whichever page is open, so this
-           reads as pending rather than empty until it lands. -->
-      <p v-if="status !== 'ready'" class="mt-8 font-mono text-xs text-muted-foreground">
+           reads as pending rather than empty until it lands, and says so if
+           it never will: this is the page that opens first. -->
+      <div
+        v-if="status === 'error'"
+        class="mt-8 rounded-md border border-destructive/40 bg-card px-4 py-3"
+        role="alert"
+        data-testid="overview-schema-error"
+      >
+        <p class="font-mono text-xs font-semibold text-destructive">Could not load schema.json</p>
+        <p class="mt-1 font-mono text-[11px] break-words text-muted-foreground">{{ error }}</p>
+      </div>
+
+      <p v-else-if="status !== 'ready'" class="mt-8 font-mono text-xs text-muted-foreground">
         Reading schema…
       </p>
 

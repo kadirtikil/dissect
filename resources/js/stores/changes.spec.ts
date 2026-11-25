@@ -96,6 +96,27 @@ describe('changes store', () => {
     expect(changes.status).toBe('ready')
   })
 
+  it('does not let a slow poll put back the answer from before', async () => {
+    const changes = useChangesStore()
+    await changes.load()
+
+    // The poller asks, and the server is slow to say "since the snapshot".
+    let answerPoll: (r: Response) => void = () => {}
+    fetch.mockImplementationOnce(() => new Promise<Response>((resolve) => (answerPoll = resolve)))
+    const poll = changes.refresh()
+
+    // Meanwhile somebody starts watching, and that answer lands first.
+    fetch.mockImplementationOnce(() => json({ ok: true }))
+    fetch.mockImplementationOnce(() => json(answer({ against: 'watch', changes: [] })))
+    await changes.startWatching()
+
+    answerPoll(new Response(JSON.stringify(answer()), { status: 200 }))
+    expect(await poll).toBe(true)
+
+    expect(changes.file.against).toBe('watch')
+    expect(changes.file.changes).toHaveLength(0)
+  })
+
   it('asks for the baseline somebody picked', async () => {
     const changes = useChangesStore()
     await changes.load()
