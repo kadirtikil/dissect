@@ -114,10 +114,29 @@ class ViewerTest extends TestCase
     }
 
     #[Test]
+    public function it_serves_every_font_the_stylesheet_loads_and_fetches_none(): void
+    {
+        $css = (string) file_get_contents(dirname(__DIR__, 2).'/dist/dissect.css');
+
+        // Bundled with the package: no request to anybody else's server.
+        $this->assertStringNotContainsString('fonts.googleapis.com', $css);
+
+        preg_match_all('/url\(\.\/(dissect-[A-Za-z0-9_-]+\.woff2)\)/', $css, $fonts);
+        $this->assertNotEmpty($fonts[1]);
+
+        foreach (array_unique($fonts[1]) as $font) {
+            $response = $this->get('/dissect/assets/'.$font)->assertOk();
+            $this->assertSame('font/woff2', $response->headers->get('Content-Type'));
+        }
+    }
+
+    #[Test]
     public function it_serves_no_asset_outside_the_allow_list(): void
     {
         $this->get('/dissect/assets/index.html')->assertNotFound();
         $this->get('/dissect/assets/dissect-Missing.js')->assertNotFound();
+        $this->get('/dissect/assets/dissect-Missing.woff2')->assertNotFound();
+        $this->get('/dissect/assets/dissect-font.ttf')->assertNotFound();
     }
 
     #[Test]

@@ -1,15 +1,11 @@
-import process from 'node:process'
 import { readFileSync } from 'node:fs'
 import { test, expect } from '@playwright/test'
 
 /**
- * The dev server's write endpoints, called directly.
- *
- * They exist only under `vite dev` (`apply: 'serve'`), so there is nothing to
- * test against the preview build CI uses.
+ * The dev server's write endpoints, called directly. They exist only under
+ * `vite dev` (`apply: 'serve'`), which is what the suite runs against, in CI
+ * too.
  */
-// eslint-disable-next-line playwright/no-skipped-test -- conditional: dev-server only
-test.skip(!!process.env.CI, 'the persistence endpoints exist only on the dev server')
 
 const LAYOUT = 'public/layout.json'
 

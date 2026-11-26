@@ -428,10 +428,13 @@ class DissectController
         // chunk after its contents, and an icon called `arrow-up-right` gets a
         // chunk to match. A pattern narrower than what the build actually emits
         // is a 404 on a page that only loads once somebody visits it.
-        $type = $allowed[$file]
-            ?? (preg_match('/^dissect-[A-Za-z0-9_-]+\.js$/', $file) === 1
-                ? 'application/javascript'
-                : null);
+        //
+        // The fonts the stylesheet loads are named the same way, by the build.
+        $type = $allowed[$file] ?? match (true) {
+            preg_match('/^dissect-[A-Za-z0-9_-]+\.js$/', $file) === 1 => 'application/javascript',
+            preg_match('/^dissect-[A-Za-z0-9_-]+\.woff2$/', $file) === 1 => 'font/woff2',
+            default => null,
+        };
 
         abort_unless($type !== null, 404);
 
